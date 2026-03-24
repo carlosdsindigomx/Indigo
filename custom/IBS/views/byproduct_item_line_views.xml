@@ -1,0 +1,46 @@
+<odoo>
+    <data>
+        <record id='view_byproduct_item_line_list' model='ir.ui.view'>
+            <field name='name'>ibs.byproduct_item_line.list</field>
+            <field name='model'>ibs.byproduct_item_line</field>
+            <field name='arch' type='xml'>
+                <list>
+                    <field name='product_id'/>
+                    <field name='item_byproduct'/>
+                    <field name='item_type_id'/>
+                    <field name='cost_type'/>
+                    <field name="modify_quote"/>
+                    <field name="cost_frame" readonly="not modify_quote"/>
+                    <field name="price_frame" readonly="not modify_quote"/>
+                </list>
+            </field>
+        </record>
+
+        <record id='view_byproduct_item_line_form' model='ir.ui.view'>
+            <field name='name'>ibs.byproduct_item_line.form</field>
+            <field name='model'>ibs.byproduct_item_line</field>
+            <field name='arch' type='xml'>
+                <form>
+                    <sheet>
+                        <group>
+                            <field name='product_id'/>
+                            <field name='item_byproduct'/>
+                            <field name='item_type_id'/>
+                            <field name='cost_type'/>
+                            <field name="modify_quote"/>
+                            <field name="cost_frame" readonly="not modify_quote"/>
+                            <field name="price_frame" readonly="not modify_quote"/>
+                        </group>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <record id='action_byproduct_item_line' model='ir.actions.act_window'>
+            <field name='name'>Linea de item de subproducto</field>
+            <field name='res_model'>ibs.byproduct_item_line</field>
+            <field name='view_mode'>list,form</field>
+        </record>
+    </data>
+</odoo>

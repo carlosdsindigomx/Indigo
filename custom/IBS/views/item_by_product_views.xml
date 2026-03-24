@@ -1,0 +1,62 @@
+<odoo>
+    <data>
+        <record id='view_item_by_product_list' model='ir.ui.view'>
+            <field name='name'>ibs.item_by_product.list</field>
+            <field name='model'>ibs.item_by_product</field>
+            <field name='arch' type='xml'>
+                <list>
+                    <field name='name'/>
+                    <field name='item_id' />
+                    <field name='product_id'/>
+                    <field name='product_id'/>
+                    <!-- <field name='piece_per_frame'/> -->
+                    <field name='unit_cost_base'/>
+                    <!-- <field name='cost_per_piece'/> -->
+                    <!-- <field name='profit_per_frame'/> -->
+                    <!-- <field name='profit_per_piece'/> -->
+                    <field name='unit_price_base'/>
+                    <!-- <field name='price_per_piece'/> -->
+                </list>
+            </field>
+        </record>
+
+        <record id='view_item_by_product_form' model='ir.ui.view'>
+            <field name='name'>ibs.item_by_product.form</field>
+            <field name='model'>ibs.item_by_product</field>
+            <field name='arch' type='xml'>
+                <form>
+                    <sheet>
+                        <div class='oe_title'>
+                            <h1>
+                                <field name='name' placeholder='Nombre'/>
+                            </h1>
+                        </div>
+                        <group>
+                            <field name='item_id' domain="[('printer', '=', product_printer_id)]"/>
+                            <field name='product_id'/>
+                            <field name='item_type_name' invisible='1'/>
+                            <field name='unit_cost_base'/>
+                            <field name='unit_price_base'/>
+                            <field name='width' invisible="item_type_name not in ('Sustrato de Impresión', 'Material de Laminación')" required="item_type_name in ('Sustrato de Impresión', 'Material de Laminación')" />
+                            <field name='length' invisible="item_type_name not in ('Sustrato de Impresión', 'Material de Laminación')" required="item_type_name in ('Sustrato de Impresión', 'Material de Laminación')"/>
+                            <field name='factor' invisible="item_type_name not in ('Sustrato de Impresión', 'Material de Laminación')" required="item_type_name in ('Sustrato de Impresión', 'Material de Laminación')"/>
+                            <field name='waste' invisible="item_type_name not in ('Sustrato de Impresión', 'Material de Laminación')" required="item_type_name in ('Sustrato de Impresión', 'Material de Laminación')"/>
+                            <field name='frames' invisible="item_type_name not in ('Sustrato de Impresión', 'Material de Laminación')" required="item_type_name in ('Sustrato de Impresión', 'Material de Laminación')"/>
+                            <field name='kg' invisible="item_type_name not in ('Sustrato de Impresión', 'Material de Laminación')" required="item_type_name in ('Sustrato de Impresión', 'Material de Laminación')"/>
+                            <field name="total_line_cost"/>
+                            <field name="total_line_price"/>    
+                        </group>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+
+        </record>
+
+        <record id='action_item_by_product' model='ir.actions.act_window'>
+            <field name='name'>Ítems por Producto</field>
+            <field name='res_model'>ibs.item_by_product</field>
+            <field name='view_mode'>list,form</field>
+        </record>
+    </data>
+</odoo>

@@ -1,0 +1,45 @@
+<odoo>
+    <data>
+        <record id="view_printer_list" model="ir.ui.view">
+            <field name="name">printer.list</field>
+            <field name="model">ibs.printer</field>
+            <field name="arch" type="xml">
+                <list string="Impresoras">
+                    <field name="name"/>
+                    <field name='site_id'/>
+                    <field name="height"/>
+                    <field name="width"/>
+                </list>
+            </field>
+        </record>
+        <record id="view_printer_form" model="ir.ui.view">
+            <field name="name">printer.form</field>
+            <field name="model">ibs.printer</field>
+            <field name="arch" type="xml">
+                <form string="Impresora">
+                    <sheet>
+                        <div class="oe_title">
+                            <h1>
+                                <field name="name" placeholder="Nombre"/>
+                            </h1>
+                        </div>
+                        <group>
+                            <field name='site_id'/>
+                            <field name="height"/>
+                            <field name="width"/>
+                        </group>
+                        <group string="Se imprimen productos" class="text-primary">
+                            <field name="product_type_ids" widget="many2many_checkboxes" nolabel="1"/>
+                        </group>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+        <record id="action_printers" model="ir.actions.act_window">
+            <field name="name">Impresoras</field>
+            <field name="res_model">ibs.printer</field>
+            <field name="view_mode">list,form</field>
+        </record>
+    </data>
+</odoo>

@@ -1,0 +1,41 @@
+<odoo>
+    <data>
+        <record id='view_second_lamination_list' model='ir.ui.view'>
+            <field name='name'>ibs.second_lamination.list</field>
+            <field name='model'>ibs.second_lamination</field>
+            <field name='arch' type='xml'>
+                <list>
+                    <field name='name'/>
+                    <field name='cost_frame'/>
+                </list>
+            </field>
+        </record>
+
+        <record id='view_second_lamination_form' model='ir.ui.view'>
+            <field name='name'>ibs.second_lamination.form</field>
+            <field name='model'>ibs.second_lamination</field>
+            <field name='arch' type='xml'>
+                <form>
+                    <sheet>
+                        <div class='oe_title'>
+                            <h1>
+                                <field name='name' placeholder='Segunda Laminación'/>
+                            </h1>
+                        </div>
+                        <group>
+                            <field name='cost_frame'/>
+                        </group>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <record id='action_second_lamination' model='ir.actions.act_window'>
+            <field name='name'>Segunda Laminación</field>
+            <field name='res_model'>ibs.second_lamination</field>
+            <field name='view_mode'>list,form</field>
+        </record>
+
+    </data>
+</odoo>

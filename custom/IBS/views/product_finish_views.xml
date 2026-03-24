@@ -1,0 +1,40 @@
+<odoo>
+    <data>
+        <record id='view_product_finish_list' model='ir.ui.view'>
+            <field name='name'>ibs.product.finish.list</field>
+            <field name='model'>ibs.product_finish</field>
+            <field name='arch' type='xml'>
+                <list>
+                    <field name='name'/>
+                    <!-- <field name='cost_frame'/> -->
+                </list>
+            </field>
+        </record>
+
+        <record id='view_product_finish_form' model='ir.ui.view'>
+            <field name='name'>ibs.product.finish.form</field>
+            <field name='model'>ibs.product_finish</field>
+            <field name='arch' type='xml'>
+                <form>
+                    <sheet>
+                        <div class='oe_title'>
+                            <h1>
+                                <field name='name' placeholder='Nombre'/>
+                            </h1>
+                        </div>
+                         <group>
+                            <!-- <field name='cost_frame'/> -->
+                        </group>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_product_finish" model="ir.actions.act_window">
+            <field name="name">Acabado de Producto</field>
+            <field name="res_model">ibs.product_finish</field>
+            <field name="view_mode">list,form</field>
+        </record>
+    </data>
+</odoo>

@@ -1,0 +1,41 @@
+<odoo>
+    <data>
+
+        <record id="substrate_printing_list_view" model="ir.ui.view">
+            <field name="name">substrate.printing.list.view</field>
+            <field name="model">ibs.substrate_printing</field>
+            <field name="arch" type="xml">
+                <list>
+                    <field name="name"/>
+                    <field name='cost_frame'/>
+                </list>
+            </field>
+        </record>
+
+        <record id="substrate_printing_form_view" model="ir.ui.view">
+            <field name="name">substrate.printing.form.view</field>
+            <field name="model">ibs.substrate_printing</field>
+            <field name="arch" type="xml">
+                <form string="Sustrato de impresión">
+                    <sheet>
+                        <div class='oe_title'>
+                            <h1>
+                                <field name='name' placeholder='Sustrato'/>
+                            </h1>
+                        </div>
+                         <group>
+                            <field name='cost_frame'/>
+                        </group>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_substrate_printing" model="ir.actions.act_window">
+            <field name="name">Sustrato de impresión</field>
+            <field name="res_model">ibs.substrate_printing</field>
+            <field name="view_mode">list,form</field>
+        </record>
+    </data>
+</odoo>

@@ -1,0 +1,61 @@
+<odoo>
+    <data>
+        <record id='view_product_design_list' model='ir.ui.view'>
+            <field name='name'>ibs.product_design.list</field>
+            <field name='model'>ibs.product_design</field>
+            <field name='arch' type='xml'>
+                <list decoration-info="stage_id">
+                    <field name='design_number' readonly="1"/>
+                    <field name='name'/>
+                    <field name="product_id" readonly="1"/>
+                    <field name="quantity"/>
+                    <field name="produce"/>
+                    <field name="stage_id" widget="badge"/>
+                </list>
+            </field>
+        </record>
+
+        <record id='view_product_design_form' model='ir.ui.view'>
+            <field name='name'>ibs.product_design.form</field>
+            <field name='model'>ibs.product_design</field>
+            <field name='arch' type='xml'>
+                <form>
+                    <header>
+                        <field name="stage_id" widget="statusbar" options="{'clickable': '1'}"/>
+                    </header>
+                    <sheet>
+                        <div class='oe_title'>
+                            <h1>
+                                <field name='name'/>
+                            </h1>
+                        </div>
+                        <group>
+                            <group>
+                                <field name='design_number' readonly="1"/>
+                                <field name="product_id" readonly="1"/>
+                                <field name="quantity"/>
+                                <field name="produce"/>
+                            </group>
+                            <group>
+                                <field name="odoo_variant_id" readonly="1"/>
+                                <field name="description"/>
+                            </group>
+                        </group>
+                        <notebook>
+                            <page string="Imagen">
+                                <field name="image" widget="image"/>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <record id='action_product_design' model='ir.actions.act_window'>
+            <field name='name'>Diseño producto</field>
+            <field name='res_model'>ibs.product_design</field>
+            <field name='view_mode'>list,form</field>
+        </record>
+    </data>
+</odoo>

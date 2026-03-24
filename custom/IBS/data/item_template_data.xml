@@ -1,0 +1,296 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <record id="item_template_cmykw" model="ibs.item_template">
+            <field name="name">CMYK+W</field>
+            <field name="item_id" ref="item_ibs_cmyk_w"/>
+            <field name="printer" ref="printer_flexo_banda_ancha"/>
+            <field name="cost_frame_final">12.754</field>
+            <field name="price_per_frame">16.58</field>
+            <field name="factor">0.0</field>
+            <field name="waste">1</field>
+        </record>
+
+        <record id="item_template_cmyw" model="ibs.item_template">
+            <field name="name">CMY+W</field>
+            <field name="item_id" ref="item_ibs_cmy_w"/>
+            <field name="printer" ref="printer_flexo_banda_ancha"/>
+            <field name="cost_frame_final">10.869</field>
+            <field name="price_per_frame">14.13</field>
+            <field name="factor">0.0</field>
+            <field name="waste">1</field>
+        </record>
+
+        <record id="item_template_cmy" model="ibs.item_template">
+            <field name="name">CMY</field>
+            <field name="item_id" ref="item_ibs_cmy"/>
+            <field name="printer" ref="printer_flexo_banda_ancha"/>
+            <field name="cost_frame_final">6.208</field>
+            <field name="price_per_frame">8.07</field>
+            <field name="factor">0.0</field>
+            <field name="waste">1</field>
+        </record>
+
+        <record id="item_template_cmyk" model="ibs.item_template">
+            <field name="name">CMYK</field>
+            <field name="item_id" ref="item_ibs_cmyk"/>
+            <field name="printer" ref="printer_flexo_banda_ancha"/>
+            <field name="cost_frame_final">8.115</field>
+            <field name="price_per_frame">10.55</field>
+            <field name="factor">0.0</field>
+            <field name="waste">1</field>
+        </record>
+
+        <record id="item_template_1_tinta" model="ibs.item_template">
+            <field name="name">1 Tinta</field>
+            <field name="item_id" ref="item_ibs_1_tinta"/>
+            <field name="printer" ref="printer_flexo_banda_ancha"/>
+            <field name="cost_frame_final">4.236</field>
+            <field name="price_per_frame">5.507</field>
+            <field name="factor">0.0</field>
+            <field name="waste">1</field>
+        </record>
+
+        <record id="item_template_pet_nat_20_mic" model="ibs.item_template">
+            <field name="name">Pet Nat 20 mic</field>
+            <field name="item_id" ref="item_ibs_pet_nat_20mic"/>
+            <field name="printer" ref="printer_flexo_banda_ancha"/>
+            <field name="cost_frame_final">2.392</field>
+            <field name="price_per_frame">3.11</field>
+            <field name="factor">0.0028</field>
+            <field name="waste">1</field>
+        </record>
+
+        <record id="item_template_bopp_mate_20mic" model="ibs.item_template">
+            <field name="name">BOPP Mate 20mic</field>
+            <field name="item_id" ref="item_ibs_bopp_mate_20mic"/>
+            <field name="printer" ref="printer_flexo_banda_ancha"/>
+            <field name="cost_frame_final">1.562</field>
+            <field name="price_per_frame">2.03</field>
+            <field name="factor">0.00181</field>
+            <field name="waste">1</field>
+        </record>
+
+        <record id="item_template_bopp_nat_20mic" model="ibs.item_template">
+            <field name="name">BOPP Nat 20mic</field>
+            <field name="item_id" ref="item_ibs_bopp_nat_20mic"/>
+            <field name="printer" ref="printer_flexo_banda_ancha"/>
+            <field name="cost_frame_final">1.562</field>
+            <field name="price_per_frame">2.03</field>
+            <field name="factor">0.0019</field>
+            <field name="waste">1</field>
+        </record>
+
+        <record id="item_template_bopp_nat_25mic" model="ibs.item_template">
+            <field name="name">BOPP Nat 25mic</field>
+            <field name="item_id" ref="item_ibs_bopp_nat_25mic"/>
+            <field name="printer" ref="printer_flexo_banda_ancha"/>
+            <field name="cost_frame_final">1.962</field>
+            <field name="price_per_frame">2.55</field>
+            <field name="factor">0.0019</field>
+            <field name="waste">1</field>
+        </record>
+
+        <record id="item_template_bopp_nat_30mic" model="ibs.item_template">
+            <field name="name">BOPP Nat 30mic</field>
+            <field name="item_id" ref="item_ibs_bopp_nat_30mic"/>
+            <field name="printer" ref="printer_flexo_banda_ancha"/>
+            <field name="cost_frame_final">2.346</field>
+            <field name="price_per_frame">3.05</field>
+            <field name="factor">0.0019</field>
+            <field name="waste">1</field>
+        </record>
+
+        <record id="item_template_bopp_nat_35mic" model="ibs.item_template">
+            <field name="name">BOPP Nat 35mic</field>
+            <field name="item_id" ref="item_ibs_bopp_nat_35mic"/>
+            <field name="printer" ref="printer_flexo_banda_ancha"/>
+            <field name="cost_frame_final">2.738</field>
+            <field name="price_per_frame">3.56</field>
+            <field name="factor">0.0019</field>
+            <field name="waste">1</field>
+        </record>
+
+        <record id="item_template_pet_nat_12mic" model="ibs.item_template">
+            <field name="name">Pet Nat 12mic</field>
+            <field name="item_id" ref="item_ibs_pet_nat_12mic"/>
+            <field name="printer" ref="printer_flexo_banda_ancha"/>
+            <field name="cost_frame_final">1.438</field>
+            <field name="price_per_frame">1.87</field>
+            <field name="factor">0.00168</field>
+            <field name="waste">1</field>
+        </record>
+
+        <record id="item_template_pet_nat_20mic" model="ibs.item_template">
+            <field name="name">Pet Nat 20mic</field>
+            <field name="item_id" ref="item_ibs_pet_nat_20mic"/>
+            <field name="printer" ref="printer_flexo_banda_ancha"/>
+            <field name="cost_frame_final">2.392</field>
+            <field name="price_per_frame">3.11</field>
+            <field name="factor">0.0028</field>
+            <field name="waste">1</field>
+        </record>
+
+        <record id="item_template_pet_met_12mic" model="ibs.item_template">
+            <field name="name">Pet Met 12mic</field>
+            <field name="item_id" ref="item_ibs_pet_met_12mic"/>
+            <field name="printer" ref="printer_flexo_banda_ancha"/>
+            <field name="cost_frame_final">1.8</field>
+            <field name="price_per_frame">2.34</field>
+            <field name="factor">0.00168</field>
+            <field name="waste">1</field>
+        </record>
+
+        <record id="item_template_pet_met_20mic" model="ibs.item_template">
+            <field name="name">Pet Met 20mic</field>
+            <field name="item_id" ref="item_ibs_pet_met_20mic"/>
+            <field name="printer" ref="printer_flexo_banda_ancha"/>
+            <field name="cost_frame_final">3.008</field>
+            <field name="price_per_frame">3.91</field>
+            <field name="factor">0.0028</field>
+            <field name="waste">1</field>
+        </record>
+
+        <record id="item_template_pet_mate_12mic" model="ibs.item_template">
+            <field name="name">Pet Mate 12mic</field>
+            <field name="item_id" ref="item_ibs_pet_mate_12mic"/>
+            <field name="printer" ref="printer_flexo_banda_ancha"/>
+            <field name="cost_frame_final">1.438</field>
+            <field name="price_per_frame">1.87</field>
+            <field name="factor">0.00168</field>
+            <field name="waste">1</field>
+        </record>
+
+        <record id="item_template_pe_nat_100_gauges_254mic" model="ibs.item_template">
+            <field name="name">PE Nat 100 gauges = 25.4mic</field>
+            <field name="item_id" ref="item_ibs_pe_nat_100"/>
+            <field name="printer" ref="printer_flexo_banda_ancha"/>
+            <field name="cost_frame_final">1.954</field>
+            <field name="price_per_frame">2.54</field>
+            <field name="factor">0.00236</field>
+            <field name="waste">1</field>
+        </record>
+
+        <record id="item_template_pe_nat_150_gauges_381mic" model="ibs.item_template">
+            <field name="name">PE Nat 150 gauges = 38.1mic</field>
+            <field name="item_id" ref="item_ibs_pe_nat_150"/>
+            <field name="printer" ref="printer_flexo_banda_ancha"/>
+            <field name="cost_frame_final">2.923</field>
+            <field name="price_per_frame">3.8</field>
+            <field name="factor">0.005</field>
+            <field name="waste">1</field>
+        </record>
+
+        <record id="item_template_pe_nat_350_gauges_889mic" model="ibs.item_template">
+            <field name="name">PE Nat 350 gauges = 88.9mic</field>
+            <field name="item_id" ref="item_ibs_pe_nat_350_gauges_889mic"/>
+            <field name="printer" ref="printer_flexo_banda_ancha"/>
+            <field name="cost_frame_final">6.815</field>
+            <field name="price_per_frame">8.86</field>
+            <field name="factor">0.00827</field>
+            <field name="waste">1</field>
+        </record>
+
+        <record id="item_template_pe_nat_20078_gauges_51mic" model="ibs.item_template">
+            <field name="name">PE Nat 200.78 gauges = 51mic</field>
+            <field name="item_id" ref="item_ibs_pe_nat_200_78"/>
+            <field name="printer" ref="printer_flexo_banda_ancha"/>
+            <field name="cost_frame_final">3.9</field>
+            <field name="price_per_frame">5.07</field>
+            <field name="factor">0.005</field>
+            <field name="waste">1</field>
+        </record>
+
+        <record id="item_template_pe_nat_250_gauges_635mic" model="ibs.item_template">
+            <field name="name">PE Nat 250 gauges = 63.5mic</field>
+            <field name="item_id" ref="item_ibs_pe_nat_250_gauges_635mic"/>
+            <field name="printer" ref="printer_flexo_banda_ancha"/>
+            <field name="cost_frame_final">4.869</field>
+            <field name="price_per_frame">6.33</field>
+            <field name="factor">0.00591</field>
+            <field name="waste">1</field>
+        </record>
+
+        <record id="item_template_pe_bco_250_gauges_635mic" model="ibs.item_template">
+            <field name="name">PE Bco 250 gauges = 63.5mic</field>
+            <field name="item_id" ref="item_ibs_pe_bco_250_gauges_635mic"/>
+            <field name="printer" ref="printer_flexo_banda_ancha"/>
+            <field name="cost_frame_final">5.031</field>
+            <field name="price_per_frame">6.54</field>
+            <field name="factor">0.00591</field>
+            <field name="waste">1</field>
+        </record>
+
+        <record id="item_template_hora_de_diseno" model="ibs.item_template">
+            <field name="name">Hora de Diseño</field>
+            <field name="item_id" ref="item_ibs_diseno"/>
+            <field name="printer" ref="printer_flexo_banda_ancha"/>
+            <field name="cost_frame_final">278.123</field>
+            <field name="price_per_frame">361.56</field>
+            <field name="factor">0.0</field>
+            <field name="waste">1</field>
+        </record>
+
+        <record id="item_template_envio" model="ibs.item_template">
+            <field name="name">Envío</field>
+            <field name="item_id" ref="item_ibs_envio"/>
+            <field name="printer" ref="printer_flexo_banda_ancha"/>
+            <field name="cost_frame_final">132.692</field>
+            <field name="price_per_frame">172.5</field>
+            <field name="factor">0.0</field>
+            <field name="waste">1</field>
+        </record>
+
+        <record id="item_template_lam_com" model="ibs.item_template">
+            <field name="name">Lam-com</field>
+            <field name="item_id" ref="item_ibs_lam_com"/>
+            <field name="printer" ref="printer_flexo_banda_ancha"/>
+            <field name="cost_frame_final">0.492</field>
+            <field name="price_per_frame">0.64</field>
+            <field name="factor">0.0</field>
+            <field name="waste">1</field>
+        </record>
+
+        <record id="item_template_arm_bol_sin_zip_com" model="ibs.item_template">
+            <field name="name">Arm-Bol-sin Zip-Com</field>
+            <field name="item_id" ref="item_ibs_proceso_pouch_item"/>
+            <field name="printer" ref="printer_flexo_banda_ancha"/>
+            <field name="cost_frame_final">1.023</field>
+            <field name="price_per_frame">1.33</field>
+            <field name="factor">0.0</field>
+            <field name="waste">1</field>
+        </record>
+
+        <record id="item_template_arm_bol_con_zip_com" model="ibs.item_template">
+            <field name="name">Arm-Bol-con Zip-Com</field>
+            <field name="item_id" ref="item_ibs_proceso_pouch_item"/>
+            <field name="printer" ref="printer_flexo_banda_ancha"/>
+            <field name="cost_frame_final">3.031</field>
+            <field name="price_per_frame">3.94</field>
+            <field name="factor">0.0</field>
+            <field name="waste">1</field>
+        </record>
+
+        <record id="item_template_empaque" model="ibs.item_template">
+            <field name="name">Empaque</field>
+            <field name="item_id" ref="item_ibs_empaque_item"/>
+            <field name="printer" ref="printer_flexo_banda_ancha"/>
+            <field name="cost_frame_final">0.377</field>
+            <field name="price_per_frame">0.49</field>
+            <field name="factor">0.0</field>
+            <field name="waste">1</field>
+        </record>
+
+         <record id="item_template_corte" model="ibs.item_template">
+            <field name="name">Corte</field>
+            <field name="item_id" ref="item_ibs_corte_item"/>
+            <field name="printer" ref="printer_flexo_banda_ancha"/>
+            <field name="cost_frame_final">0.023</field>
+            <field name="price_per_frame">0.030</field>
+            <field name="factor">0.0</field>
+            <field name="waste">1</field>
+        </record>
+
+    </data>
+</odoo>

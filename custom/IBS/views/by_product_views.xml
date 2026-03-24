@@ -1,0 +1,141 @@
+<odoo>
+    <data>
+        <record id='view_by_product_list' model='ir.ui.view'>
+            <field name='name'>ibs.by_product.list</field>
+            <field name='model'>ibs.by_product</field>
+            <field name='arch' type='xml'>
+                <list>
+                    <field name='name'/>
+                    <field name='type_product_id'/>
+                    <field name='gusset'/>
+                    <field name='side_gusset'/>
+                    <field name='fin'/>
+                    <field name='fondo'/>
+                    <field name='perimeter_gap'/>
+                </list>
+            </field>
+        </record>
+
+        <record id='view_by_product_form' model='ir.ui.view'>
+            <field name='name'>ibs.by_product.form</field>
+            <field name='model'>ibs.by_product</field>
+            <field name='arch' type='xml'>
+                <form>
+                    <sheet>
+                        <field name="image_1920" widget="image" class="oe_avatar" options="{'preview_image': 'image_1920'}"/>
+                        <div class='oe_title'>
+                            <h1>
+                                <field name='name' placeholder='Subproducto'/>
+                            </h1>
+                        </div>
+                        <group>
+                            <field name='type_product_id'/>
+                            <field name='category_id'/>
+                        </group>
+
+                        <notebook>
+                            <page string='Medidas'>
+                                <group>
+                                    <group>
+                                        <field name='gusset'/>
+                                        <field name='side_gusset'/>
+                                        <field name='fin'/>
+                                        <field name='fondo'/>
+                                        <field name='perimeter_gap'/>
+                                    </group>
+                                    <group>
+                                        <separator string="Configuración de desarrollo"/>
+                                        <field name="geometry_axis"/>
+
+                                        <separator string="Número de veces que aparece en el desarrollo"/>
+                                        <field name="height_multiplier" string="Alto"/>
+                                        <field name="width_multiplier" string="Ancho"/>
+                                        <field name="gusset_multiplier" string="Fuelle" invisible="not gusset"/>
+                                        <field name="side_gusset_multiplier" string="Fuelle lateral" invisible="not side_gusset"/>
+                                        <field name="fin_multiplier" string="Aleta" invisible="not fin"/>
+                                        <field name="fondo_multiplier" string="Fondo" invisible="not fondo"/>
+
+                                        <separator string="Margen"/>
+                                        <field name="apply_dynamic_margin"/>
+                                        <field name="margin_factor" invisible="not apply_dynamic_margin"/>
+                                    </group>
+                                </group>
+                            </page>
+
+                            <page string='Estructura y materiales'>
+                                <separator string="Materiales"/>
+                                <group>
+                                    <group colspan="2">
+                                        <group>
+                                            <field name='printing_type'/>
+                                            <field name='printing_ink'/>
+                                            <field name='printing_substrate'/>
+                                        </group>
+                                        <group>
+                                            <field name='first_lamination'/>
+                                            <field name='second_lamination'/>
+                                        </group>
+                                    </group>
+                                    <separator string="Items por defecto"/>
+                                    <div colspan="2" string="Procesos Configurables">
+                                        <field name="default_items_ids" options="{'no_create': True}" placeholder="Selecciona los items..."/>
+                                    </div>
+                                </group>
+                            </page>
+
+                            <page string='Acabados'>
+                                <group>
+                                    <field name='items_byproduct_ids' widget='many2many_checkboxes'/>
+                                </group>
+                            </page>
+
+                            <page string='Ruta de procesos'>
+                                <field name="process_line_ids">
+                                    <list editable="bottom">
+                                        <field name="sequence" widget="handle"/>
+                                        <field name="process_id"/>
+                                    </list>
+                                </field>
+                            </page>
+
+                            <page string='Operaciones'>
+                                <field name="lines_operations_ids">
+                                    <list editable="bottom">
+                                        <field name="sequence" widget="handle"/>
+                                        <field name="name"/>
+                                        <field name="work_center_id"/>
+                                        <field name="bom"/>
+                                        <field name="frames"/>
+                                        <field name="minutes"/>
+                                    </list>
+                                </field>
+                            </page>
+
+                            <page string='Cálculo de merma'>
+                                <group>
+                                    <field name="frames_of_setting"/>
+                                </group>
+                                <field name="decrease_range_ids">
+                                    <list editable="bottom">
+                                        <field name='range_name'/>
+                                        <field name="minimum"/>
+                                        <field name="maximum"/>
+                                        <field name="percentage"/>
+                                    </list>
+                                </field>
+                            </page>
+
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <record id='action_by_product' model='ir.actions.act_window'>
+            <field name='name'>Subproducto</field>
+            <field name='res_model'>ibs.by_product</field>
+            <field name='view_mode'>list,form</field>
+        </record>
+    </data>
+</odoo>

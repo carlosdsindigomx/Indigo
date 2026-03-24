@@ -1,0 +1,75 @@
+<odoo>
+    <data>
+        <record id='view_item_template_list' model='ir.ui.view'>
+            <field name='name'>ibs.item_template.list</field>
+            <field name='model'>ibs.item_template</field>
+            <field name='arch' type='xml'>
+                <list>
+                    <field name='name'/>
+                    <field name='item_id'/>
+                    <field name='item_type_id'/>
+                    <field name='item_type_name' invisible="1"/>
+                    <field name='printer'/>
+                    <field name='cost_type'/>
+                    <field name='cost_frame_final'/>
+                    <field name='price_per_frame' />
+                    <field name='factor' invisible="item_type_name not in ('Sustrato de Impresión', 'Material de Laminación')" required="item_type_name in ('Sustrato de Impresión', 'Material de Laminación')"/>
+                    <field name='waste' invisible="item_type_name not in ('Sustrato de Impresión', 'Material de Laminación')" required="item_type_name in ('Sustrato de Impresión', 'Material de Laminación')"/>
+                </list>
+            </field>
+        </record>
+
+        <record id='view_item_template_form' model='ir.ui.view'>
+            <field name='name'>ibs.item_template.form</field>
+            <field name='model'>ibs.item_template</field>
+            <field name='arch' type='xml'>
+                <form>
+                    <sheet>
+                        <div class='oe_title'>
+                            <h1>
+                                <field name='name' placeholder='Ítem'/>
+                            </h1>
+                        </div>
+                        <group>
+                            <group>
+                                <field name='item_id'/>
+                                <field name='printer'/>
+                                <field name="required_finish_id"/>
+                                <field name='item_type_id' />
+                                <field name='cost_type'/>
+                                <field name='item_type_name' invisible="1"/>
+                            </group>
+                            <group>
+                                <field name='cost_frame_final'/>
+                                <field name='price_per_frame' />
+                                <field name='factor' invisible="item_type_name not in ('Sustrato de Impresión', 'Material de Laminación')" required="item_type_name in ('Sustrato de Impresión', 'Material de Laminación')"/>
+                                <field name='waste' invisible="item_type_name not in ('Sustrato de Impresión', 'Material de Laminación')" required="item_type_name in ('Sustrato de Impresión', 'Material de Laminación')"/>
+                            </group>
+                        </group>
+                        <notebook>
+                            <page string="Materiales">
+                                <field name="list_of_materials_ids">
+                                    <list editable="bottom">
+                                        <field name="product_id"/>
+                                        <field name="bom"/>
+                                        <field name="quantity_frame"/>
+                                        <field name="full"/>
+                                        <field name="less_than_one"/>
+                                    </list>
+                                </field>
+                            </page>
+
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <record id='action_item_template' model='ir.actions.act_window'>
+            <field name='name'>Plantilla Item</field>
+            <field name='res_model'>ibs.item_template</field>
+            <field name='view_mode'>list,form</field>
+        </record>
+    </data>
+</odoo>

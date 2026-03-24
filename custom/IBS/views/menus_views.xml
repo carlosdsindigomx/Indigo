@@ -1,0 +1,51 @@
+<odoo>
+    <data>
+        <menuitem id="menu_ibs_root" name="IBS" web_icon="IBS,static/description/icon.png" />
+
+        <menuitem id="menu_product" name="Productos" parent="menu_ibs_root" action="action_product" sequence="10"/>
+        <menuitem id="menu_client" name="Clientes" parent="menu_ibs_root" action="action_client" sequence="20"/>
+        <menuitem id="menu_assistant" name="Auxiliares" parent="menu_ibs_root" sequence="40"/>
+        <menuitem id="menu_dummies" name="Dummies" parent="menu_ibs_root" action="action_dummies" sequence="30"/>
+        <menuitem id="menu_configuration_root" name="Configuración" parent="menu_ibs_root" sequence="50"/>
+
+
+        <menuitem id="menu_group_product" name="Producto" parent="menu_configuration_root" sequence="10"/>
+        <menuitem id="menu_group_subproduct" name="Subproducto" parent="menu_configuration_root" sequence="20"/>
+        <menuitem id="menu_group_others" name="Otros" parent="menu_configuration_root" sequence="30"/>
+
+
+        <menuitem id="menu_item_ibs" name="Item" parent="menu_group_product" action="action_item_ibs" sequence="10"/>
+        <menuitem id="menu_item_type" name="Tipos de ítem" parent="menu_group_product" action="action_item_type" sequence="20"/>
+        <menuitem id="menu_item_template" name="Plantilla de ítems" parent="menu_group_product" action="action_item_template" sequence="30"/>
+        <menuitem id="menu_ibs_range_template" name="Plantilla de rangos" parent="menu_group_product" action="action_range_template" sequence="40"/>
+        <menuitem id="menu_type_product" name="Tipos de producto" parent="menu_group_product" action="action_type_product" sequence="50"/>
+        <menuitem id="menu_types_of_printing" name="Tipos de impresión" parent="menu_group_product" action="action_types_of_printing" sequence="60"/>
+
+
+        <menuitem id="menu_by_product" name="Subproducto" parent="menu_group_subproduct" action="action_by_product" sequence="10"/>
+        <!-- <menuitem id="menu_byproduct_item_type" name="Tipo item Subproducto" parent="menu_group_subproduct" action="action_type_byproduct_item" sequence="20" /> -->
+        <menuitem id="menu_byproduct_item" name="Acabados" parent="menu_group_subproduct" action="action_byproduct_item" sequence="30" />
+        
+
+
+        <menuitem id="menu_site" name="Sites" parent="menu_group_others" action="action_site" sequence="10"/>
+        <menuitem id="menu_printers" name="Impresoras" parent="menu_group_others" action="action_printers" sequence="20"/>
+        <menuitem id="menu_cost_type" name="Tipos de costo" parent="menu_group_others" action="action_cost_type" sequence="30" />
+        <menuitem id="menu_unit_of_measure" name="Unidades de medida" parent="menu_group_others" action="action_unit_of_measure" sequence="40"/>
+
+        <menuitem id="menu_product_design_stages" name="Etapas de diseño" parent="menu_group_others" action="action_product_design_stage" sequence="60"/>
+        <menuitem id="menu_processes" name="Procesos" parent="menu_group_others" action="action_processes" sequence="70"/>
+
+
+        <menuitem id="menu_product_design" name="Diseño por producto" parent="menu_assistant" action="action_product_design" sequence="10"/>
+        <menuitem id="menu_item_by_product" name="Ítems por producto" parent="menu_assistant" action="action_item_by_product" sequence="20"/>
+        <menuitem id="menu_material_by_product" name="Materiales por producto" parent="menu_assistant" action="action_material_by_product" sequence="30"/>
+        <menuitem id="menu_byproduct_material" name="Materiales por acabados" parent="menu_assistant" action="action_byproduct_material" sequence="40"/>
+        <menuitem id="menu_byproduct_item_line" name="Ítems de acabados" parent="menu_assistant" action="action_byproduct_item_line" sequence="50"/>
+        <menuitem id="menu_list_of_materials" name="Lista de materiales" parent="menu_assistant" action="action_list_of_materials" sequence="60"/>
+        <menuitem id="menu_costs" name="Rango de costos" parent="menu_assistant" action="action_costs" sequence="70"/>
+
+
+
+    </data>
+</odoo>

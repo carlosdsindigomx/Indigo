@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <record id="item_ibs_cmy" model="ibs.item_ibs">
+            <field name="name">CMY</field>
+            <field name="item_type_id" ref="item_type_tinta_impresion"/>
+        </record>
+
+        <record id="item_ibs_cmy_w" model="ibs.item_ibs">
+            <field name="name">CMY+W</field>
+            <field name="item_type_id" ref="item_type_tinta_impresion"/>
+        </record>
+
+        <record id="item_ibs_cmyk" model="ibs.item_ibs">
+            <field name="name">CMYK</field>
+            <field name="item_type_id" ref="item_type_tinta_impresion"/>
+        </record>
+
+        <record id="item_ibs_cmyk_w" model="ibs.item_ibs">
+            <field name="name">CMYK+W</field>
+            <field name="item_type_id" ref="item_type_tinta_impresion"/>
+        </record>
+
+        <record id="item_ibs_1_tinta" model="ibs.item_ibs">
+            <field name="name">1 Tinta</field>
+            <field name="item_type_id" ref="item_type_tinta_impresion"/>
+        </record>
+
+        <record id="item_ibs_bopp_mate_20mic" model="ibs.item_ibs">
+            <field name="name">BOPP Mate 20mic</field>
+            <field name="item_type_id" ref="item_type_sustrato_impresion"/>
+        </record>
+
+        <record id="item_ibs_pet_nat_12mic" model="ibs.item_ibs">
+            <field name="name">Pet Nat 12mic</field>
+            <field name="item_type_id" ref="item_type_material_laminacion"/>
+        </record>
+
+        <record id="item_ibs_bopp_nat_20mic" model="ibs.item_ibs">
+            <field name="name">BOPP Nat 20mic</field>
+            <field name="item_type_id" ref="item_type_sustrato_impresion"/>
+        </record>
+
+        <record id="item_ibs_bopp_nat_25mic" model="ibs.item_ibs">
+            <field name="name">BOPP Nat 25mic</field>
+            <field name="item_type_id" ref="item_type_sustrato_impresion"/>
+        </record>
+
+        <record id="item_ibs_bopp_nat_30mic" model="ibs.item_ibs">
+            <field name="name">BOPP Nat 30mic</field>
+            <field name="item_type_id" ref="item_type_sustrato_impresion"/>
+        </record>
+
+        <record id="item_ibs_bopp_nat_35mic" model="ibs.item_ibs">
+            <field name="name">BOPP Nat 35mic</field>
+            <field name="item_type_id" ref="item_type_sustrato_impresion"/>
+        </record>
+
+        <record id="item_ibs_pe_nat_200_78" model="ibs.item_ibs">
+            <field name="name">PE Nat 200.78 gauges = 51mic</field>
+            <field name="item_type_id" ref="item_type_material_laminacion"/>
+        </record>
+
+        <record id="item_ibs_pet_nat_20mic" model="ibs.item_ibs">
+            <field name="name">Pet Nat 20mic</field>
+            <field name="item_type_id" ref="item_type_material_laminacion"/>
+        </record>
+
+        <record id="item_ibs_pet_met_12mic" model="ibs.item_ibs">
+            <field name="name">Pet Met 12mic</field>
+            <field name="item_type_id" ref="item_type_material_laminacion"/>
+        </record>
+
+        <record id="item_ibs_pet_met_20mic" model="ibs.item_ibs">
+            <field name="name">Pet Met 20mic</field>
+            <field name="item_type_id" ref="item_type_material_laminacion"/>
+        </record>
+
+        <record id="item_ibs_pet_mate_12mic" model="ibs.item_ibs">
+            <field name="name">Pet Mate 12mic</field>
+            <field name="item_type_id" ref="item_type_material_laminacion"/>
+        </record>
+
+        <record id="item_ibs_pe_nat_100" model="ibs.item_ibs">
+            <field name="name">PE Nat 100 gauges = 25.4mic</field>
+            <field name="item_type_id" ref="item_type_material_laminacion"/>
+        </record>
+
+        <record id="item_ibs_pe_nat_150" model="ibs.item_ibs">
+            <field name="name">PE Nat 150 gauges = 38.1mic</field>
+            <field name="item_type_id" ref="item_type_material_laminacion"/>
+        </record>
+
+        <record id="item_ibs_pe_nat_200" model="ibs.item_ibs">
+            <field name="name">PE Nat 200 gauges = 50.8mic</field>
+            <field name="item_type_id" ref="item_type_material_laminacion"/>
+        </record>
+
+        <record id="item_ibs_envio" model="ibs.item_ibs">
+            <field name="name">Envío</field>
+            <field name="item_type_id" ref="item_type_envio"/>
+        </record>
+
+        <record id="item_ibs_diseno" model="ibs.item_ibs">
+            <field name="name">Diseño</field>
+            <field name="item_type_id" ref="item_type_diseno"/>
+        </record>
+
+        <record id="item_ibs_lam_com" model="ibs.item_ibs">
+            <field name="name">Lam-Com</field>
+            <field name="item_type_id" ref="item_type_proceso_laminacion"/>
+        </record>
+
+        <record id="item_ibs_empaque_item" model="ibs.item_ibs">
+            <field name="name">Empaque</field>
+            <field name="item_type_id" ref="item_type_empaque"/>
+        </record>
+
+        <record id="item_ibs_corte_item" model="ibs.item_ibs">
+            <field name="name">Corte</field>
+            <field name="item_type_id" ref="item_type_proceso_corte"/>
+        </record>
+
+        <record id="item_ibs_proceso_pouch_item" model="ibs.item_ibs">
+            <field name="name">Proceso Pouch</field>
+            <field name="item_type_id" ref="item_type_proceso_pouch"/>
+        </record>
+
+        <record id="item_ibs_pe_nat_350_gauges_889mic" model="ibs.item_ibs">
+            <field name="name">PE Nat 350 gauges = 88.9mic</field>
+            <field name="item_type_id" ref="item_type_material_laminacion"/>
+        </record>
+
+        <record id="item_ibs_pe_nat_250_gauges_635mic" model="ibs.item_ibs">
+            <field name="name">PE Nat 250 gauges = 63.5mic</field>
+            <field name="item_type_id" ref="item_type_material_laminacion"/>
+        </record>
+
+        <record id="item_ibs_pe_bco_250_gauges_635mic" model="ibs.item_ibs">
+            <field name="name">PE Bco 250 gauges = 63.5mic</field>
+            <field name="item_type_id" ref="item_type_material_laminacion"/>
+        </record>
+
+    </data>
+</odoo>

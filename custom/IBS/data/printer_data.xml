@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        
+        <record id="printer_flexo_banda_ancha" model="ibs.printer">
+            <field name="name">Flexo banda ancha</field>
+            <field name="site_id" ref="site_4"/>
+            <field name="height">112.00</field>
+            <field name="width">74.00</field>
+        </record>
+
+        <record id="printer_digital_banda_media" model="ibs.printer">
+            <field name="name">Digital banda media</field>
+            <field name="site_id" ref="site_1"/>
+            <field name="height">112.00</field>
+            <field name="width">74.00</field>
+        </record>
+
+        <record id="printer_digital_banda_angosta" model="ibs.printer">
+            <field name="name">Digital banda angosta</field>
+            <field name="site_id" ref="site_2"/>
+            <field name="height">98.00</field>
+            <field name="width">31.80</field>
+        </record>
+
+        <record id="printer_inkjet_5000" model="ibs.printer">
+            <field name="name">Inkjet 5000</field>
+            <field name="site_id" ref="site_7"/>
+            <field name="height">84.00</field>
+            <field name="width">48.00</field>
+        </record>
+
+    </data>
+</odoo>

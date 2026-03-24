@@ -1,0 +1,14 @@
+<odoo>
+    <record id="view_category_form_inherit_unspsc" model="ir.ui.view">
+        <field name="name">product.category.form.inherit.unspsc</field>
+        <field name="model">product.category</field>
+        <field name="inherit_id" ref="product.product_category_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//group[@name='first']" position="after">
+                <group string="Clasificación">
+                    <field name="unspsc_category_id"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+</odoo>

@@ -1,0 +1,62 @@
+<odoo>
+    <data>
+        <record id='view_costs_list' model='ir.ui.view'>
+            <field name='name'>ibs.costs.list</field>
+            <field name='model'>ibs.costs</field>
+            <field name='arch' type='xml'>
+                <list>
+                    <field name='name'/>
+                    <field name='percentage'/>
+                    <field name='minimum_range'/>
+                    <field name='maximum_range'/>
+                    <field name='range_pieces' />
+                    <field name='quantity_per_piece'/>
+                    <field name='price_per_piece'/>
+                    <field name="price_per_piece_discount"/>
+                    <field name='total_sale'/>
+                    <field name='total_sale_discount'/>
+                </list>
+            </field>
+
+        </record>
+
+
+        <record id='view_costs_form' model='ir.ui.view'>
+            <field name='name'>ibs.costs.form</field>
+            <field name='model'>ibs.costs</field>
+            <field name='arch' type='xml'>
+                <form>
+                    <sheet>
+                        <div class='oe_title'>
+                            <h1>
+                                <field name='name' placeholder='Nombre'/>
+                            </h1>
+                        </div>
+                        <group>
+                            <field name='product_id'/>
+                            <field name='percentage'/>
+                            <field name='minimum_range'/>
+                            <field name='maximum_range'/>
+                            <field name='range_pieces' />
+                            <field name='quantity_per_piece'/>
+                            <field name='aux_price_per_piece' readonly="1"/>
+                            <field name='price_per_piece'/>
+                            <field name="price_per_piece_discount"/>
+                            <field name='total_sale'/>
+                            <field name='total_sale_discount'/>
+                        </group>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+
+        </record>
+
+        <record id='action_costs' model='ir.actions.act_window'>
+            <field name='name'>Costos</field>
+            <field name='res_model'>ibs.costs</field>
+            <field name='view_mode'>list,form</field>
+        </record>
+
+    </data>
+</odoo>

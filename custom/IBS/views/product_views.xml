@@ -1,0 +1,437 @@
+<odoo>
+    <data>
+        <record id='view_product_list' model='ir.ui.view'>
+            <field name='name'>ibs.product.list</field>
+            <field name='model'>ibs.product</field>
+            <field name='arch' type='xml'>
+                <list>
+                    <field name='name'/>
+                    <field name='state'/>
+                    <field name='product_type'/>
+                    <field name='by_product'/>
+                    <field name='number_of_changes'/>
+                    <field name='number_of_pieces'/>
+                    <field name='types_of_printing'/>
+                </list>
+            </field>
+        </record>
+
+        <record id='view_product_form' model='ir.ui.view'>
+            <field name='name'>ibs.product.form</field>
+            <field name='model'>ibs.product</field>
+            <field name='arch' type='xml'>
+                <form>
+                    <header>
+                        <button name="action_update_all_calculations" string="Calcular" type="object" class="oe_highlight" invisible="odoo_product"/>
+                        <button name="action_create_product" string="Crear Producto" type="object" class="btn-secondary" invisible="odoo_product or state != 'authorized_sac'"/>
+                        <button name="action_create_sales_order" string="Orden de venta" type="object" class="oe_highlight" invisible="not odoo_product or state != 'authorized_sac'"/>
+                        <button name="action_authorize_sac" string="Revisado SAC" type="object" class="oe_highlight" invisible="state != 'revision'"/>
+                        <field name="state" widget="statusbar" options="{'clickable': '1'}" statusbar_visible="quote,quote_approval,negotiation,revision,authorized_sac,enter_op,finalized"/>
+                    </header>
+                    <sheet>
+                        <div class="oe_button_box" name="button_box">
+                            <button name="action_view_sales_order" type="object" class="oe_stat_button" icon="fa-usd" invisible="not sale_order_id">
+                                <div class="o_stat_info">
+                                    <span class="o_stat_text">Orden Venta</span>
+                                </div>
+                            </button>
+                        </div>
+                        <div class="oe_avatar float-end d-flex flex-column align-items-center">
+                            <field name="by_product_image" widget="image" style="width: 90px; height: 90px; margin-bottom: 5px;"/>
+                            <field name="kanban_state" widget="state_selection" class="me-2"/>
+                        </div>
+                        <div class='oe_title'>
+                            <h1>
+                                <field name='name' placeholder='Nombre del Producto'/>
+                            </h1>
+                        </div>
+                        <group>
+                            <group>
+                                <field name='client_id' readonly="odoo_product"/>
+                                <field name='cliente_discount' readonly="odoo_product"/>
+                                <field name='product_type' readonly="odoo_product"/>
+                                <field name='by_product' domain="[('type_product_id', '=', product_type)]" readonly="odoo_product"/>
+                                <field name="printer_id" domain="[('product_type_ids', 'in', product_type)]" readonly="odoo_product"/>
+                                <field name="site_id"/>
+                                <field name='number_of_changes' readonly="odoo_product"/>
+
+                                <label for="number_of_pieces" string="Cantidad de"/>
+                                <div class="o_row">
+                                    <field name="number_of_pieces" nolabel="1" class="oe_inline" readonly="odoo_product"/>
+                                    <field name="measure" nolabel="1" class="oe_inline" readonly="odoo_product" options="{'no_open': True, 'no_create': True}" domain="[('product_type_ids', 'in', product_type)]" placeholder="Medida"/>
+                                </div>
+
+                                <field name="extended_measure"/>
+                                <field name="final_measure"/>
+                            </group>
+                            <group>
+                                <field name='types_of_printing' invisible='not has_printing_type' required='has_printing_type' readonly="odoo_product"/>
+                                <field name='printing_inks' invisible='not has_printing_ink' required='has_printing_ink' domain="[('item_type_id', '=', 'Tinta Impresión'), ('printer', '=', printer_id)]" readonly="odoo_product"/>
+                                <field name='printing_summary'/>
+                                <field name='finishing_summary'/>
+                                <field name='technica_data'/>
+                                <field name='customer_response'/>
+                                <field name='odoo_product'/>
+                                <field name='lead_id' invisible="1"/>
+                            </group>
+                            <group string="Seguimiento">
+                                <field name="general_task_id" invisible="1"/>
+                                <field name="active_task_id" invisible="1"/>
+                                <field name="current_process_name"/>
+                                <field name="current_stage_name"/>
+                            </group>
+                        </group>
+
+                        <notebook>
+                            <page string="Medidas de Pieza" groups="IBS.group_cotizar_producto">
+                                <group>
+                                    <group>
+                                        <field name="height" readonly="odoo_product"/>
+                                        <field name="width" readonly="odoo_product"/>
+                                        <field name="gusset" invisible="not has_gusset" readonly="odoo_product"/>
+                                        <field name="side_gusset" invisible="not has_side_gusset" readonly="odoo_product"/>
+                                        <field name="fin_seal" invisible="not has_fin" readonly="odoo_product"/>
+                                        <field name="perimeter_gap" invisible='not has_gap' readonly="odoo_product"/>
+                                        <field name="fondo" invisible='not has_fondo' readonly="odoo_product"/>
+                                        <div colspan="2" style="max-width: 350px; margin-top: 10px;">
+                                            <table class="table table-bordered table-sm" style="font-size: 0.85rem; margin-bottom: 0;">
+                                                <thead class="bg-light">
+                                                    <tr>
+                                                        <th style="width: 20%; padding: 4px;"></th>
+                                                        <th style="width: 40%; text-align: center; padding: 4px;">Ancho</th>
+                                                        <th style="width: 40%; text-align: center; padding: 4px;">Alto</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody style="text-align: center;">
+                                                    <tr style="height: 30px;">
+                                                        <td style="text-align: left; padding: 4px;">
+                                                            <strong>Extendido</strong>
+                                                        </td>
+                                                        <td style="padding: 4px;">
+                                                            <field name='width_ext_val' nolabel="1" decoration-danger="width_ext_val &gt; bobbin_width"/>
+                                                        </td>
+                                                        <td style="padding: 4px;">
+                                                            <field name='height_ext_val' nolabel="1" decoration-danger="height_ext_val &gt; bobbin_height"/>
+                                                        </td>
+                                                    </tr>
+                                                    <tr style="height: 30px;">
+                                                        <td style="text-align: left; padding: 4px;">
+                                                            <strong>Repeticiones</strong>
+                                                        </td>
+
+                                                        <td style="padding: 4px;">
+                                                            <field name='fits_width' nolabel="1"/>
+                                                        </td>
+                                                        <td style="padding: 4px;">
+                                                            <field name='fits_height' nolabel="1"/>
+                                                        </td>
+                                                    </tr>
+                                                    <tr style="height: 30px;">
+                                                        <td style="text-align: left; padding: 4px;">
+                                                            <strong>Cálculos</strong>
+                                                        </td>
+                                                        <td style="padding: 4px;">
+                                                            <field name='total_ext_width' nolabel="1"/>
+                                                        </td>
+                                                        <td style="padding: 4px;">
+                                                            <field name='total_ext_height' nolabel="1"/>
+                                                        </td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </group>
+                                    <group>
+                                        <field name='bobbin_width'/>
+                                        <field name='bobbin_height'/>
+
+                                        <label for="piece_by_frame" class="text-primary fw-bold"/>
+                                        <div class="o_row">
+                                            <field name="piece_by_frame" nolabel="1"/>
+                                        </div>
+                                        <label for="total_amount" class="text-primary fw-bold"/>
+                                        <div class="o_row">
+                                            <field name="total_amount" nolabel="1"/>
+                                        </div>
+                                        <!-- <field name="total_project_meters" readonly="1"/> -->
+                                        <field name="is_print_area_exceeded" invisible="1"/>
+
+                                        <div class="alert alert-danger text-center mb-3" role="alert" invisible="not is_print_area_exceeded" colspan="2">
+                                            <i class="fa fa-exclamation-triangle me-2"/>
+                                            El tamaño del diseño extendido sobrepasa el área de impresión.
+                                        </div>
+                                    </group>
+                                </group>
+                            </page>
+                            <page string='Estructura' groups="IBS.group_cotizar_producto">
+                                <group>
+                                    <field name='substrate_printing' readonly="odoo_product" invisible='not has_printing_substrate' required='has_printing_substrate' domain="[('item_type_id', '=', 'Sustrato de Impresión'), ('printer', '=', printer_id)]"/>
+                                    <field name="first_lamination" readonly="odoo_product" invisible='not has_first_lamination' required='has_first_lamination' domain="[('item_type_id', '=', 'Material de Laminación'), ('printer', '=', printer_id)]"/>
+                                    <field name="second_lamination" readonly="odoo_product" invisible='not has_second_lamination' domain="[('item_type_id', '=', 'Material de Laminación'), ('printer', '=', printer_id)]"/>
+                                </group>
+                            </page>
+                            <page string="Acabados" groups="IBS.group_cotizar_producto">
+                                <field name="items_acabados_ids" readonly="odoo_product">
+                                    <list editable="bottom">
+                                        <field name="available_item_ids" column_invisible="1"/>
+                                        <field name="item_type_id" column_invisible="1" force_save="1"/>
+                                        <field name="item_byproduct" domain="[('id', 'in', available_item_ids), ('type_by_product_item.name', '=', 'Acabados')]"/>
+                                        <field name="cost_type"/>
+                                        <!-- <field name="modify_quote"/> -->
+                                        <field name="cost_frame" readonly="not modify_quote" force_save="1"/>
+                                        <field name="price_frame" readonly="not modify_quote" force_save="1"/>
+                                    </list>
+                                </field>
+                                <group>
+                                    <field name="finishing_cost_table" widget="html" nolabel="1"/>
+                                </group>
+                            </page>
+                            <page string="Envío" groups="IBS.group_cotizar_producto">
+                                <field name='logistics_item_ids' readonly="odoo_product">
+                                    <list>
+                                        <field name="product_printer_id" column_invisible="1"/>
+                                        <field name="item_type_id"/>
+                                        <field name="item_id" />
+                                        <field name="cost_type"/>
+                                        <field name="unit_cost_base"/>
+                                        <field name="unit_price_base"/>
+                                    </list>
+                                </field>
+
+                                <group >
+                                    <group string="Logística y Paquete">
+                                        <field name="shipping_zone"/>
+                                        <field name="is_palletized"/>
+                                        <separator string="Dimensiones y Peso"/>
+                                        <field name="box_quantity"/>
+                                        <field name="weight_kg"/>
+
+                                        <label for="box_width" string="Medidas Caja"/>
+                                        <div class="o_row">
+                                            <field name="box_width" placeholder="Ancho"/>
+                                            <span>cm x </span>
+                                            <field name="box_length" placeholder="Largo"/>
+                                            <span>cm x </span>
+                                            <field name="box_height" placeholder="Alto"/>
+                                            <span>cm</span>
+                                        </div>
+                                    </group>
+
+                                    <group string="Dirección de Destino">
+                                        <field name="dest_name"/>
+                                        <label for="dest_street" string="Dirección"/>
+                                        <div class="o_address_format">
+                                            <field name="dest_street" placeholder="Calle y número..."/>
+                                            <field name="dest_colonia" placeholder="Colonia..."/>
+                                            <div class="o_row">
+                                                <field name="dest_city" placeholder="Municipio"/>
+                                                <field name="dest_state" placeholder="Estado"/>
+                                            </div>
+                                            <div class="o_row">
+                                                <field name="dest_zip" placeholder="C.P."/>
+                                                <field name="dest_country" placeholder="País"/>
+                                            </div>
+                                        </div>
+                                    </group>
+                                </group>
+                            </page>
+
+                            <page string='Rangos de Venta' groups="IBS.group_cotizar_producto">
+                                <group>
+                                    <group>
+                                        <field name='original_quantity' readonly="1"/>
+                                        <field name='minimum_quantity' readonly="1"/>
+                                        <field name='unit_price' readonly="1"/>
+                                        <field name='unit_price_discount' readonly="1"/>
+                                    </group>
+                                    <group>
+                                        <field name='total' readonly="1"/>
+                                        <field name='total_discount' readonly="1"/>
+                                        <field name='applied_range_discount'/>
+                                    </group>
+                                </group>
+
+                                <field name="costs_ids">
+                                    <list editable="bottom">
+                                        <field name="is_kilo_mode" column_invisible="1"/>
+                                        <field name="is_meter_mode" column_invisible="1"/>
+
+                                        <field name="range_pieces" string="Rango Metros" column_invisible="not parent.is_meter_mode"/>
+                                        <field name="range_pieces" string="Rango Kilos" column_invisible="not parent.is_kilo_mode"/>
+                                        <field name="range_pieces" string="Rango Piezas" column_invisible="parent.is_kilo_mode or parent.is_meter_mode"/>
+
+                                        <field name='percentage' string="%" />
+
+                                        <field name="quantity_per_piece" string="Cantidad minima" column_invisible="not parent.is_meter_mode"/>
+                                        <field name="quantity_per_piece" string="Cantidad minima" column_invisible="not parent.is_kilo_mode"/>
+                                        <field name="quantity_per_piece" string="Cantidad minima" column_invisible="parent.is_kilo_mode or parent.is_meter_mode"/>
+
+                                        <field name='price_per_piece' string="Precio x Metro" column_invisible="not parent.is_meter_mode"/>
+                                        <field name='price_per_piece' string="Precio x Kilo" column_invisible="not parent.is_kilo_mode"/>
+                                        <field name='price_per_piece' string="Precio x Pieza" column_invisible="parent.is_kilo_mode or parent.is_meter_mode"/>
+
+                                        <field name="discount_points" string="Puntos desc."/>
+                                        <field name="total_discount_percentage" string="% Total" readonly="1" force_save="1"/>
+
+                                        <field name="price_per_piece_discount" string="P.Desc x Metro" column_invisible="not parent.is_meter_mode"/>
+                                        <field name="price_per_piece_discount" string="P.Desc x Kilo" column_invisible="not parent.is_kilo_mode"/>
+                                        <field name="price_per_piece_discount" string="P.Desc x Pieza" column_invisible="parent.is_kilo_mode or parent.is_meter_mode"/>
+
+                                        <field name='total_sale' readonly="1"/>
+                                        <field name='total_sale_discount' readonly="1" force_save="1"/>
+                                    </list>
+                                </field>
+                            </page>
+
+                            <page string='Items' groups="IBS.group_costos">
+                                <field name="item_by_product_ids" force_save="1">
+                                    <list>
+                                        <field name="sequence" widget="handle"/>
+                                        <field name="product_printer_id" column_invisible="1"/>
+                                        <field name="item_type_id"/>
+                                        <field name="item_id" />
+                                        <field name="cost_type"/>
+                                        <field name="unit_cost_base"/>
+                                        <field name="unit_price_base"/>
+                                    </list>
+                                </field>
+                                <group>
+                                    <group string="Costos variables" class="text-primary">
+                                        <field name="total_cost_per_frame" readonly="1"/>
+                                        <field name="total_cost_per_piece" readonly="1"/>
+                                        <field name="total_profit_per_frame" readonly="1"/>
+                                        <field name="total_profit_per_piece" readonly="1"/>
+                                        <field name="total_price_per_frame" readonly="1"/>
+                                        <field name="total_price_per_piece" readonly="1"/>
+                                        <field name='profit_margin' readonly="1"/>
+                                    </group>
+
+                                    <group string="Costos fijos" class="text-primary">
+                                        <field name="total_cost_per_frame_fixed" readonly="1"/>
+                                        <field name="total_cost_per_piece_fixed" readonly="1"/>
+                                        <field name="total_profit_per_frame_fixed" readonly="1"/>
+                                        <field name="total_profit_per_piece_fixed" readonly="1"/>
+                                        <field name="total_price_per_frame_fixed" readonly="1"/>
+                                        <field name="total_price_per_piece_fixed" readonly="1"/>
+                                    </group>
+                                </group>
+                            </page>
+
+                            <page string="Diseños" groups="IBS.group_diseno">
+                                <group>
+                                    <field name="design_ids" force_save="1" nolabel="1" colspan="2">
+                                        <list create="0" delete="0" editable="bottom">
+                                            <field name='design_number' readonly="1"/>
+                                            <field name="image" widget="image" options="{'size': [40, 40], 'zoom': true}"/>
+                                            <field name='name'/>
+                                            <field name="description"/>
+                                            <field name="quantity"/>
+                                            <field name="produce"/>
+                                            <field name='stage_id'/>
+                                        </list>
+                                    </field>
+                                </group>
+                            </page>
+
+                            <page string='Materiales y Operaciones' groups="IBS.group_materiales">
+                                <separator string="Lista de Materiales"/>
+                                <field name="material_by_product_ids">
+                                    <list editable="bottom">
+                                        <field name="sequence" widget="handle"/>
+                                        <field name="raw_material_id"/>
+                                        <field name="component_name"/>
+                                        <field name="bom"/>
+                                        <field name="quantity_frame"/>
+                                        <field name="quantity_waste"/>
+                                        <field name="quantity_total"/>
+                                        <field name="is_auto" column_invisible="True"/>
+                                    </list>
+                                </field>
+
+                                <separator string="Operaciones"/>
+                                <field name="operation_by_product_ids">
+                                    <list editable="bottom">
+                                        <field name="sequence" widget="handle"/>
+                                        <field name="name"/>
+                                        <field name="work_center_id"/>
+                                        <field name="bom"/>
+                                        <field name="frames"/>
+                                        <field name="minutes"/>
+                                    </list>
+                                </field>
+                            </page>
+
+                            <page string="Otros" groups="IBS.group_cotizar_producto">
+                                <group>
+                                    <group>
+                                        <field name="accepted_joints"/>
+                                        <field name="customer_process"/>
+                                        <field name="core_measurement"/>
+                                    </group>
+                                    <group>
+                                        <field name="output_type"/>
+                                        <field name="aplicacion"/>
+                                        <field name="exposure_type"/>
+                                    </group>
+                                </group>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <record id="view_product_kanban" model="ir.ui.view">
+            <field name="name">ibs.product.kanban</field>
+            <field name="model">ibs.product</field>
+            <field name="arch" type="xml">
+                <kanban default_group_by="state" class="o_kanban_small_column" sample="1">
+                    <field name="id"/>
+                    <field name="name"/>
+                    <field name="client_id"/>
+                    <field name="product_type"/>
+                    <field name="by_product_image"/>
+                    <field name="state"/>
+                    <field name="number_of_pieces"/>
+                    <field name="kanban_state"/>
+
+                    <templates>
+                        <t t-name="card">
+                            <div class="d-flex">
+                                <div class="oe_kanban_details d-flex flex-column justify-content-between flex-grow-1">
+                                    <div>
+                                        <strong class="o_kanban_record_title">
+                                            <field name="name"/>
+                                        </strong>
+                                        <div class="text-muted small">
+                                            <i class="fa fa-user me-1"/>
+                                            <field name="client_id"/>
+                                        </div>
+                                    </div>
+
+                                    <div class="d-flex justify-content-between align-items-end mt-2">
+                                        <span class="badge rounded-pill text-bg-info">
+                                            <field name="product_type"/>
+                                        </span>
+                                        <span class="fw-bold">
+                                            <field name="number_of_pieces" class="me-1"/>
+                                            <field name="measure" options="{'no_open': True, 'no_create': True}" domain="[('product_type_ids', 'in', product_type)]"/>
+                                        </span>
+                                        <field name="kanban_state" widget="state_selection"/>
+                                    </div>
+                                </div>
+                            </div>
+                        </t>
+                    </templates>
+                </kanban>
+            </field>
+        </record>
+
+        <record id='action_product' model='ir.actions.act_window'>
+            <field name='name'>Producto</field>
+            <field name='res_model'>ibs.product</field>
+            <field name='view_mode'>kanban,list,form</field>
+        </record>
+    </data>
+</odoo>

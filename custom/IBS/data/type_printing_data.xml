@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="type_front" model="ibs.types_of_printing">
+            <field name="name">Frente</field>
+        </record>
+        <record id="type_mirror" model="ibs.types_of_printing">
+            <field name="name">Espejo</field>
+        </record>
+    </data>
+</odoo>

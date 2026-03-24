@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        
+        <record id="range_template_500_1000" model="ibs.range_template">
+            <field name="name">500 - 1,000</field>
+            <field name="minimum_range">500</field>
+            <field name="maximum_range">1000</field>
+            <field name="quantity">500</field>
+            <field name="percentage">30.00</field>
+            <field name="discount_points">1.00</field>
+        </record>
+
+        <record id="range_template_1001_3000" model="ibs.range_template">
+            <field name="name">1,001 - 3,000</field>
+            <field name="minimum_range">1001</field>
+            <field name="maximum_range">3000</field>
+            <field name="quantity">1001</field>
+            <field name="percentage">28.00</field>
+            <field name="discount_points">2.00</field>
+        </record>
+
+        <record id="range_template_3001_5000" model="ibs.range_template">
+            <field name="name">3,001 - 5,000</field>
+            <field name="minimum_range">3001</field>
+            <field name="maximum_range">5000</field>
+            <field name="quantity">3001</field>
+            <field name="percentage">26.00</field>
+            <field name="discount_points">3.00</field>
+        </record>
+
+        <record id="range_template_5001_7000" model="ibs.range_template">
+            <field name="name">5,000 - 7,001</field>
+            <field name="minimum_range">5001</field>
+            <field name="maximum_range">7000</field>
+            <field name="quantity">5001</field>
+            <field name="percentage">24.00</field>
+            <field name="discount_points">4.00</field>
+        </record>
+
+        <record id="range_template_7001_10000" model="ibs.range_template">
+            <field name="name">7,001 - 10,000</field>
+            <field name="minimum_range">7001</field>
+            <field name="maximum_range">10000</field>
+            <field name="quantity">7001</field>
+            <field name="percentage">20.00</field>
+            <field name="discount_points">5.00</field>
+        </record>
+
+        <record id="range_template_10001_30000" model="ibs.range_template">
+            <field name="name">10,001 - 30,000</field>
+            <field name="minimum_range">10001</field>
+            <field name="maximum_range">30000</field>
+            <field name="quantity">10001</field>
+            <field name="percentage">19.00</field>
+            <field name="discount_points">6.00</field>
+        </record>
+
+        <record id="range_template_30001_50000" model="ibs.range_template">
+            <field name="name">30,001 - 50,000</field>
+            <field name="minimum_range">30001</field>
+            <field name="maximum_range">50000</field>
+            <field name="quantity">30001</field>
+            <field name="percentage">18.00</field>
+            <field name="discount_points">7.00</field>
+        </record>
+
+    </data>
+</odoo>

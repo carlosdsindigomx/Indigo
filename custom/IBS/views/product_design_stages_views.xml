@@ -1,0 +1,21 @@
+<odoo>
+    <data>
+        <record id="view_product_design_stage_list" model="ir.ui.view">
+            <field name="name">ibs.product_design_stage.list</field>
+            <field name="model">ibs.product_design_stage</field>
+            <field name="arch" type="xml">
+                <list editable="bottom">
+                    <field name="sequence" widget="handle"/>
+                    <field name="name"/>
+                    <field name="fold"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="action_product_design_stage" model="ir.actions.act_window">
+            <field name="name">Etapas de Diseño</field>
+            <field name="res_model">ibs.product_design_stage</field>
+            <field name="view_mode">list,form</field>
+        </record>
+    </data>
+</odoo>

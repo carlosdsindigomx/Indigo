@@ -1,0 +1,55 @@
+<odoo>
+    <data>
+        <record id='view_list_of_materials_list' model='ir.ui.view'>
+            <field name='name'>ibs.list_of_materials.list</field>
+            <field name='model'>ibs.list_of_materials</field>
+            <field name='arch' type='xml'>
+                <list>
+                    <field name='name'/>
+                    <field name="product_id" />
+                    <field name='item_id'/>
+                    <field name='item_type_id'/>
+                    <field name="bom"/>
+                    <field name='quantity_frame'/>
+                    <field name="full"/>
+                    <field name="less_than_one"/>
+                </list>
+            </field>
+        </record>
+
+        <record id='view_list_of_materials_form' model='ir.ui.view'>
+            <field name='name'>ibs.list_of_materials.form</field>
+            <field name='model'>ibs.list_of_materials</field>
+            <field name='arch' type='xml'>
+                <form>
+                    <sheet>
+                        <div>
+                            <div class='oe_title'>
+                                <h1>
+                                    <field name='name' placeholder='Materia'/>
+                                </h1>
+                            </div>
+                        </div>
+                        <group>
+                            <group>
+                                <field name="product_id" />
+                                <field name="item_id"/>
+                                <field name='item_type_id'/>
+                                <field name="bom"/>
+                                <field name="quantity_frame"/>
+                                <field name="full"/>
+                                <field name="less_than_one"/>
+                            </group>
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+        <record id='action_list_of_materials' model='ir.actions.act_window'>
+            <field name='name'>Lista de Materiales</field>
+            <field name='res_model'>ibs.list_of_materials</field>
+            <field name='view_mode'>list,form</field>
+        </record>
+
+    </data>
+</odoo>
