@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ════════════════════════════════════════════════════════════
+         MRP PRODUCTION — Extend Form View
+         Adds: checkbox, shift declarations stat button,
+               and notebook page with shift history
+         ════════════════════════════════════════════════════════════ -->
+    <record id="mrp_production_form_view_inherit" model="ir.ui.view">
+        <field name="name">mrp.production.form.manufacturing_control</field>
+        <field name="model">mrp.production</field>
+        <field name="inherit_id" ref="mrp.mrp_production_form_view" />
+        <field name="arch" type="xml">
+
+            <!-- Stat button: Declaraciones de Turno -->
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="action_view_shift_declarations"
+                    type="object"
+                    class="oe_stat_button"
+                    icon="fa-clipboard"
+                    invisible="shift_total_declared == 0">
+                    <field name="shift_total_declared" string="Declarado" widget="statinfo" />
+                </button>
+            </xpath>
+
+            <!-- Notebook page: Shift Declarations History -->
+            <xpath expr="//page[@name='miscellaneous']" position="after">
+                <page string="Turnos" name="shift_declarations">
+                    <field name="shift_declaration_ids" readonly="1">
+                        <list decoration-success="state=='done'"
+                            decoration-danger="state=='error'">
+                            <field name="date_declared" />
+                            <field name="employee_id" />
+                            <field name="operation_id" />
+                            <field name="qty_declared" sum="Total" />
+                            <field name="state" widget="badge"
+                                decoration-success="state == 'done'"
+                                decoration-danger="state == 'error'"
+                                decoration-info="state == 'draft'" />
+                            <field name="backorder_created_id" />
+                        </list>
+                    </field>
+                </page>
+            </xpath>
+
+        </field>
+    </record>
+
+</odoo>

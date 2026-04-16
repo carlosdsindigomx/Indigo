@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_mrp_shift_declaration_user,mrp.shift.declaration.user,model_mrp_shift_declaration,mrp.group_mrp_user,1,1,1,0
+access_mrp_shift_declaration_manager,mrp.shift.declaration.manager,model_mrp_shift_declaration,mrp.group_mrp_manager,1,1,1,1

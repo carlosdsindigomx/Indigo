@@ -1,0 +1,9 @@
+.env
+.vscode
+.venv
+.vscode/*
+__pycache__
+__pycache__/*
+.DS_Store
+models/__pycache__/*
+models/__pycache__

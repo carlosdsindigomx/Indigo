@@ -1,0 +1,248 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="manufacturing_control.KioskAction">
+        <div class="mc_kiosk">
+
+            <!-- Header -->
+            <div class="mc_kiosk_header">
+                <div class="mc_kiosk_title">
+                    <i class="fa fa-industry me-2"/>Kiosco de Producción
+                </div>
+                <button class="btn btn-outline-light btn-sm" t-on-click="resetKiosk">
+                    <i class="fa fa-refresh me-1"/>Reiniciar
+                </button>
+            </div>
+
+            <!-- Success Banner -->
+            <div t-if="state.successMessage" class="mc_kiosk_success">
+                <i class="fa fa-check-circle fa-2x me-3"/>
+                <span t-esc="state.successMessage"/>
+            </div>
+
+            <div class="mc_kiosk_body">
+
+                <!-- ═══ STEP 1: Scan MO ═══ -->
+                <div class="mc_kiosk_card">
+                    <div class="mc_kiosk_card_header">
+                        <span class="mc_kiosk_step_num">1</span>
+                        <span>Orden de Producción</span>
+                        <i t-if="state.parentData" class="fa fa-check-circle text-success ms-auto fa-lg"/>
+                    </div>
+
+                    <div t-if="!state.parentData" class="mc_kiosk_card_body">
+                        <div class="mc_kiosk_input_group">
+                            <i class="fa fa-barcode mc_kiosk_input_icon"/>
+                            <input type="text"
+                                t-ref="moInput"
+                                class="mc_kiosk_input"
+                                placeholder="Escanear código de barras de la OP..."
+                                t-att-value="state.moBarcode"
+                                t-on-input="onMoBarcodeInput"
+                                t-on-keydown="onMoBarcodeKeydown"
+                                t-att-disabled="state.isProcessing"/>
+                        </div>
+                        <div t-if="state.moError" class="mc_kiosk_error">
+                            <i class="fa fa-exclamation-triangle me-1"/>
+                            <t t-esc="state.moError"/>
+                        </div>
+                    </div>
+
+                    <!-- Parent MO found — show info -->
+                    <div t-if="state.parentData" class="mc_kiosk_card_body">
+                        <div class="mc_kiosk_mo_info">
+                            <div class="mc_kiosk_mo_product">
+                                <i class="fa fa-cube me-2"/>
+                                <strong t-esc="state.parentData.parent_mo_name"/>
+                                <span class="ms-2 text-muted" t-esc="state.parentData.parent_product_name"/>
+                            </div>
+                        </div>
+                        <button class="btn btn-sm btn-outline-secondary mt-2" t-on-click="clearMo">
+                            <i class="fa fa-times me-1"/>Cambiar OP
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ═══ STEP 2: Select Child MO ═══ -->
+                <div t-if="state.parentData"
+                     class="mc_kiosk_card"
+                     t-att-class="{ 'mc_kiosk_card_disabled': !state.parentData }">
+                    <div class="mc_kiosk_card_header">
+                        <span class="mc_kiosk_step_num">2</span>
+                        <span t-if="state.parentData.has_children">Seleccionar Sub-Orden</span>
+                        <span t-else="">Orden a Reportar</span>
+                        <i t-if="state.selectedChild" class="fa fa-check-circle text-success ms-auto fa-lg"/>
+                    </div>
+
+                    <div class="mc_kiosk_card_body">
+                        <!-- List of child MOs -->
+                        <div class="mc_kiosk_child_orders">
+                            <t t-foreach="state.parentData.child_orders" t-as="child" t-key="child_index">
+                                <div class="mc_kiosk_child_row"
+                                     t-att-class="{
+                                         'mc_kiosk_child_active': child.is_active,
+                                         'mc_kiosk_child_done': child.state === 'done',
+                                         'mc_kiosk_child_selected': state.selectedChild and state.selectedChild.id === child.id
+                                     }"
+                                     t-on-click="() => this.selectChild(child)">
+                                    <div class="mc_kiosk_child_main">
+                                        <div class="mc_kiosk_child_name" t-esc="child.product_name"/>
+                                        <div class="mc_kiosk_child_mo_name" t-esc="child.name"/>
+                                    </div>
+                                    <span class="mc_kiosk_child_qty">
+                                        <t t-esc="child.done_qty"/>/<t t-esc="child.total_qty"/> pzas
+                                    </span>
+                                    <span class="mc_kiosk_child_state">
+                                        <t t-if="child.state === 'done'">
+                                            <i class="fa fa-check-circle text-success"/>
+                                        </t>
+                                        <t t-elif="child.is_active">
+                                            <i class="fa fa-arrow-right text-warning"/>
+                                        </t>
+                                        <t t-elif="child.blocked_reason">
+                                            <i class="fa fa-lock text-muted"/>
+                                            <small class="text-muted ms-1" t-esc="child.blocked_reason"/>
+                                        </t>
+                                    </span>
+                                </div>
+                            </t>
+                        </div>
+
+                        <!-- Selected child info -->
+                        <t t-if="state.selectedChild">
+                            <div class="mc_kiosk_mo_qty mt-3">
+                                <i class="fa fa-arrow-circle-right me-2 text-info"/>
+                                Reportando en: <strong t-esc="state.selectedChild.name"/>
+                                — <t t-esc="state.selectedChild.product_qty"/> pzas pendientes
+                            </div>
+                            <div class="mc_kiosk_progress mt-2">
+                                <div class="mc_kiosk_progress_bar"
+                                     t-attf-style="width: {{ progressPct }}%">
+                                    <t t-esc="progressPct"/>%
+                                </div>
+                            </div>
+                            <button class="btn btn-sm btn-outline-secondary mt-2" t-on-click="clearChild">
+                                <i class="fa fa-times me-1"/>Cambiar Sub-Orden
+                            </button>
+                        </t>
+                    </div>
+                </div>
+
+                <!-- ═══ STEP 3: Scan Employee ═══ -->
+                <div class="mc_kiosk_card" t-att-class="{ 'mc_kiosk_card_disabled': !state.selectedChild }">
+                    <div class="mc_kiosk_card_header">
+                        <span class="mc_kiosk_step_num">3</span>
+                        <span>Operario</span>
+                        <i t-if="state.empData" class="fa fa-check-circle text-success ms-auto fa-lg"/>
+                    </div>
+
+                    <div t-if="state.selectedChild and !state.empData" class="mc_kiosk_card_body">
+                        <div class="mc_kiosk_input_group">
+                            <i class="fa fa-id-badge mc_kiosk_input_icon"/>
+                            <input type="text"
+                                t-ref="empInput"
+                                class="mc_kiosk_input"
+                                placeholder="Escanear gafete del operario..."
+                                t-att-value="state.empBarcode"
+                                t-on-input="onEmpBarcodeInput"
+                                t-on-keydown="onEmpBarcodeKeydown"
+                                t-att-disabled="state.isProcessing"/>
+                        </div>
+                        <div t-if="state.empError" class="mc_kiosk_error">
+                            <i class="fa fa-exclamation-triangle me-1"/>
+                            <t t-esc="state.empError"/>
+                        </div>
+                    </div>
+
+                    <div t-if="state.empData" class="mc_kiosk_card_body">
+                        <div class="mc_kiosk_emp_info">
+                            <i class="fa fa-user-circle fa-2x me-3"/>
+                            <strong t-esc="state.empData.employee_name"/>
+                        </div>
+                        <button class="btn btn-sm btn-outline-secondary mt-2" t-on-click="clearEmp">
+                            <i class="fa fa-times me-1"/>Cambiar Operario
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ═══ STEP 4: Select Operation (if any) ═══ -->
+                <div t-if="hasOperations"
+                     class="mc_kiosk_card"
+                     t-att-class="{ 'mc_kiosk_card_disabled': !state.empData }">
+                    <div class="mc_kiosk_card_header">
+                        <span class="mc_kiosk_step_num">4</span>
+                        <span>Operación</span>
+                        <i t-if="state.selectedOperationId" class="fa fa-check-circle text-success ms-auto fa-lg"/>
+                    </div>
+
+                    <div t-if="state.empData" class="mc_kiosk_card_body">
+                        <select class="mc_kiosk_select"
+                                t-on-change="onOperationChange"
+                                t-att-disabled="state.isProcessing">
+                            <option value="">— Seleccionar operación —</option>
+                            <t t-foreach="state.selectedChild.operations" t-as="op" t-key="op.id">
+                                <option t-att-value="op.id"
+                                        t-att-selected="state.selectedOperationId === op.id">
+                                    <t t-esc="op.name"/> (<t t-esc="op.workcenter"/>)
+                                </option>
+                            </t>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- ═══ STEP 5: Enter Quantity ═══ -->
+                <div class="mc_kiosk_card"
+                     t-att-class="{ 'mc_kiosk_card_disabled': !state.selectedChild or !state.empData }">
+                    <div class="mc_kiosk_card_header">
+                        <span class="mc_kiosk_step_num"
+                            t-esc="hasOperations ? '5' : '4'"/>
+                        <span>Piezas Producidas</span>
+                    </div>
+
+                    <div t-if="state.selectedChild and state.empData" class="mc_kiosk_card_body">
+                        <div class="mc_kiosk_input_group">
+                            <i class="fa fa-hashtag mc_kiosk_input_icon"/>
+                            <input type="number"
+                                t-ref="qtyInput"
+                                class="mc_kiosk_input mc_kiosk_input_qty"
+                                placeholder="0"
+                                min="1"
+                                step="1"
+                                t-att-value="state.qtyDeclared"
+                                t-on-input="onQtyInput"
+                                t-on-blur="onQtyBlur"
+                                t-att-disabled="state.isProcessing"/>
+                        </div>
+
+                        <!-- Overproduction Warning -->
+                        <div t-if="state.overproductionWarning" class="mc_kiosk_warning">
+                            <i class="fa fa-exclamation-triangle me-2"/>
+                            <t t-esc="state.overproductionWarning"/>
+                        </div>
+
+                        <!-- Overproduction Block -->
+                        <div t-if="state.overproductionBlock" class="mc_kiosk_block">
+                            <i class="fa fa-ban me-2"/>
+                            <t t-esc="state.overproductionBlock"/>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ═══ SUBMIT BUTTON ═══ -->
+                <button class="mc_kiosk_submit"
+                    t-att-class="{ 'mc_kiosk_submit_disabled': !canSubmit }"
+                    t-att-disabled="!canSubmit"
+                    t-on-click="submitDeclaration">
+                    <t t-if="state.isProcessing">
+                        <i class="fa fa-spinner fa-spin me-2"/>Procesando...
+                    </t>
+                    <t t-else="">
+                        <i class="fa fa-check-circle me-2"/>REGISTRAR PRODUCCIÓN
+                    </t>
+                </button>
+
+            </div>
+        </div>
+    </t>
+
+</templates>

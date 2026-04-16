@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ════════════════════════════════════════════════════════════
+         ROOT MENU — Manufacturing Control as standalone app
+         ════════════════════════════════════════════════════════════ -->
+    <menuitem id="menu_manufacturing_control_root"
+        name="Control de Producción"
+        web_icon="manufacturing_control,static/description/icon.png"
+        sequence="55"/>
+
+    <!-- ════════════════════════════════════════════════════════════
+         KIOSK — Client Action (Fullscreen)
+         ════════════════════════════════════════════════════════════ -->
+    <record id="action_manufacturing_kiosk" model="ir.actions.client">
+        <field name="name">Kiosco de Producción</field>
+        <field name="tag">manufacturing_control.kiosk_action</field>
+        <field name="target">fullscreen</field>
+    </record>
+
+    <menuitem id="menu_manufacturing_kiosk"
+        name="Kiosco"
+        parent="menu_manufacturing_control_root"
+        action="action_manufacturing_kiosk"
+        sequence="5"/>
+
+</odoo>

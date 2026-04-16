@@ -6,12 +6,17 @@
     'description': """ """,
     'author': 'Obi',
     'website': 'https://www.obi-mx.com/',
-    'depends': ['base','mrp', 'stock'],
+    'depends': ['base', 'mrp', 'stock', 'hr'],
     'data': [
-        'security/ir.model.access.csv',    
+        'security/ir.model.access.csv',
+        'views/kiosk_action.xml',
+        'views/mrp_shift_declaration_views.xml',
+        'views/mrp_production_views.xml',
+        'views/res_config_settings_views.xml',
     ],
     'assets': {
         'web.assets_backend': [
+            'manufacturing_control/static/src/kiosk/**/*',
         ],
     },
     'installable': True,
