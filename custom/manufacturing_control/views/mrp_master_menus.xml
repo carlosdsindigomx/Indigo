@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_mrp_master_order" model="ir.actions.act_window">
+        <field name="name">Consola Maestra de Producción</field>
+        <field name="res_model">mrp.master.order</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No hay órdenes maestras activas.
+            </p>
+        </field>
+    </record>
+
+    <menuitem id="menu_mrp_master_root" 
+              name="Consola Maestra" 
+              sequence="10"/>
+
+    <menuitem id="menu_mrp_master_dashboard" 
+              name="Tablero Maestro" 
+              parent="menu_mrp_master_root" 
+              action="action_mrp_master_order" 
+              sequence="10"/>
+</odoo>

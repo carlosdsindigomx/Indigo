@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_mrp_master_order_kanban" model="ir.ui.view">
+        <field name="name">mrp.master.order.kanban</field>
+        <field name="model">mrp.master.order</field>
+        <field name="arch" type="xml">
+            <kanban class="o_kanban_mobile" sample="1" create="0">
+                <field name="name"/>
+                <field name="product_id"/>
+                <field name="uom_id"/> <field name="global_demand"/>
+                <field name="total_produced"/>
+                <field name="progress_percentage"/>
+                <field name="state"/>
+                <field name="kanban_indicators_html"/>
+                <templates>
+                    <t t-name="card">
+                        <div class="oe_kanban_global_click p-0 d-flex flex-column h-100">
+                            
+                            <div t-attf-class="text-center py-2 text-white fw-bold 
+                                {{ record.state.raw_value == 'done' ? 'bg-success' : 
+                                record.state.raw_value == 'cancel' ? 'bg-danger' : 
+                                record.state.raw_value == 'to_close' ? 'bg-warning' : 
+                                record.state.raw_value == 'progress' ? 'bg-info' : 
+                                record.state.raw_value == 'confirmed' ? 'bg-primary' : 'bg-secondary' }}" 
+                                style="font-size: 1.1em;">
+                                <field name="state"/>
+                            </div>
+
+                            <div class="p-3 d-flex flex-column flex-grow-1">
+                                <strong class="d-block mb-1 fs-5">
+                                    <field name="name"/>
+                                </strong>
+                                <div class="text-muted mb-3">
+                                    <field name="product_id"/>
+                                </div>
+
+                                <div class="row text-center mb-3 border rounded p-1 mx-0 align-items-center" style="background-color: rgba(255,255,255,0.05);">
+                                    <div class="col-4 border-end border-secondary px-0">
+                                        <div class="fw-bold fs-5" style="color: #875A7B;">
+                                            <field name="global_demand"/>
+                                        </div>
+                                        <small class="text-muted"><field name="uom_id"/></small>
+                                    </div>
+                                    <div class="col-4 border-end border-secondary px-0">
+                                        <div class="text-success fw-bold fs-5">
+                                            <field name="total_produced"/>
+                                        </div>
+                                        <small class="text-muted">Producido</small>
+                                    </div>
+                                    <div class="col-4 px-0">
+                                        <div t-attf-class="fw-bold fs-5 {{ record.progress_percentage.raw_value == 100 ? 'text-success' : 'text-danger' }}">
+                                            <field name="progress_percentage" widget="float" digits="[16,1]"/>%
+                                        </div>
+                                        <small class="text-muted">Avance</small>
+                                    </div>
+                                </div>
+
+                                <div class="p-2 rounded flex-grow-1 border border-secondary" style="background-color: rgba(255,255,255,0.05);">
+                                    <small class="text-muted d-block mb-2 fw-bold border-bottom border-secondary pb-1">Componentes</small>
+                                    <field name="kanban_indicators_html" widget="html" options="{'sanitize': False}"/>
+                                </div>
+
+                               <div class="mt-3 text-end" t-if="record.state.raw_value != 'done' and record.state.raw_value != 'cancel'">
+                                    <button name="action_close_definitive" type="object" class="btn btn-sm btn-outline-danger" confirm="¿Seguro que desea cerrar definitivamente este proyecto y cancelar las órdenes pendientes?">
+                                        <i class="fa fa-lock me-1"/> Cerrar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="view_mrp_master_order_form" model="ir.ui.view">
+        <field name="name">mrp.master.order.form</field>
+        <field name="model">mrp.master.order</field>
+        <field name="arch" type="xml">
+            <form string="Consola Maestra">
+                <header>
+                    <button name="action_close_definitive" string="Cerrar orden" type="object" class="oe_highlight" invisible="state == 'done'" confirm="¿Seguro que desea cerrar definitivamente esta orden y cancelar los remanentes?"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" readonly="1"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="product_id" readonly="1"/>
+                            <field name="global_demand" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="total_produced" readonly="1"/>
+                            <field name="missing_quantity" readonly="1"/>
+                        </group>
+                    </group>
+
+                    <notebook>
+                        <page string="Componentes" name="components_progress">
+                            <field name="subproduct_ids" readonly="1">
+                                <list decoration-success="progress_percentage == 100">
+                                    <field name="product_id"/>
+                                    <field name="demand_qty" string="Meta Total"/> <field name="produced_qty" string="Terminado"/>
+                                    <field name="progress_percentage" widget="progressbar" string="% Avance"/>
+                                </list>
+                            </field>
+                        </page>
+
+                        <page string="Órdenes" name="productions">
+                            <field name="production_ids" readonly="1">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="product_id" string="Componente"/>
+                                    <field name="date_start" string="Fecha"/>
+                                    <field name="qty_produced" string="Cantidad terminada"/>
+                                    <field name="state" widget="badge" decoration-success="state == 'done'" decoration-info="state not in ('done', 'cancel')"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+</odoo>

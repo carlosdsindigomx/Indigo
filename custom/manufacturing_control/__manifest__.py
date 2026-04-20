@@ -6,9 +6,11 @@
     'description': """ """,
     'author': 'Obi',
     'website': 'https://www.obi-mx.com/',
-    'depends': ['base','mrp', 'stock'],
+    'depends': ['base','mrp'],
     'data': [
-        'security/ir.model.access.csv',    
+        'security/ir.model.access.csv',
+        'views/mrp_master_order_views.xml',
+        'views/mrp_master_menus.xml',
     ],
     'assets': {
         'web.assets_backend': [
