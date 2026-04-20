@@ -9,7 +9,7 @@ Long description of module's purpose
     'website': "https://www.obi-mx.com/es_MX",
     'category': 'Uncategorized',
     'version': '1.0',
-    'depends': ['base', 'mail','product','mrp','project', 'product_unspsc', 'sale'],
+    'depends': ['base', 'mail','product','mrp','project', 'product_unspsc', 'sale', 'crm'],
     'data': [
         'security/security.xml',
         'security/ir.model.access.csv',
