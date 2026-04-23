@@ -1,0 +1,293 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="manufacturing_control.KioskAction">
+        <div class="mc_kiosk">
+
+            <!-- ═══ HEADER ═══ -->
+            <div class="mc_kiosk_header">
+                <div class="mc_kiosk_title">
+                    <i class="fa fa-industry me-2"/>Kiosco de Producción
+                </div>
+                <div class="mc_kiosk_header_actions">
+                    <!-- Show employee name when logged in -->
+                    <t t-if="state.empData">
+                        <span class="mc_kiosk_header_emp">
+                            <i class="fa fa-user-circle me-1"/>
+                            <t t-esc="state.empData.employee_name"/>
+                        </span>
+                        <button class="btn btn-outline-light btn-sm me-2"
+                                t-on-click="showReconfigure"
+                                t-if="state.screen === 'production'">
+                            <i class="fa fa-cog me-1"/>Centros
+                        </button>
+                        <button class="btn btn-outline-light btn-sm"
+                                t-on-click="logoutEmployee">
+                            <i class="fa fa-sign-out me-1"/>Salir
+                        </button>
+                    </t>
+                    <t t-else="">
+                        <button class="btn btn-outline-light btn-sm" t-on-click="resetKiosk">
+                            <i class="fa fa-refresh me-1"/>Reiniciar
+                        </button>
+                    </t>
+                </div>
+            </div>
+
+            <!-- ═══ SUCCESS BANNER ═══ -->
+            <t t-if="state.screen === 'success'">
+                <div class="mc_kiosk_success_screen">
+                    <div class="mc_kiosk_success_icon">
+                        <i class="fa fa-check-circle"/>
+                    </div>
+                    <div class="mc_kiosk_success_text">
+                        <t t-esc="state.successMessage"/>
+                    </div>
+                    <div class="mc_kiosk_success_sub">
+                        Regresando al escáner en unos segundos...
+                    </div>
+                </div>
+            </t>
+
+            <!-- ═══ MAIN BODY ═══ -->
+            <div class="mc_kiosk_body" t-if="state.screen !== 'success'">
+
+                <!-- ═══════════════════════════════════════════════
+                     SCREEN: Employee Login
+                     ═══════════════════════════════════════════════ -->
+                <t t-if="state.screen === 'employee'">
+                    <div class="mc_kiosk_center_card">
+                        <div class="mc_kiosk_center_icon">
+                            <i class="fa fa-id-badge"/>
+                        </div>
+                        <h2 class="mc_kiosk_center_title">Identificación del Operario</h2>
+                        <p class="mc_kiosk_center_subtitle">
+                            Digite su número de gafete y presione Enter
+                        </p>
+                        <div class="mc_kiosk_input_group mc_kiosk_input_lg">
+                            <i class="fa fa-id-badge mc_kiosk_input_icon"/>
+                            <input type="text"
+                                t-ref="empInput"
+                                class="mc_kiosk_input"
+                                placeholder="Número de gafete..."
+                                t-att-value="state.empBarcode"
+                                t-on-input="onEmpBarcodeInput"
+                                t-on-keydown="onEmpBarcodeKeydown"
+                                t-att-disabled="state.isProcessing"/>
+                        </div>
+                        <div t-if="state.empError" class="mc_kiosk_error mt-3">
+                            <i class="fa fa-exclamation-triangle me-1"/>
+                            <t t-esc="state.empError"/>
+                        </div>
+                        <div t-if="state.isProcessing" class="mc_kiosk_loading mt-3">
+                            <i class="fa fa-spinner fa-spin me-2"/>Validando...
+                        </div>
+                    </div>
+                </t>
+
+                <!-- ═══════════════════════════════════════════════
+                     SCREEN: Kiosk Configuration
+                     ═══════════════════════════════════════════════ -->
+                <t t-if="state.screen === 'config'">
+                    <div class="mc_kiosk_config_card">
+                        <div class="mc_kiosk_config_header">
+                            <i class="fa fa-cogs me-2"/>
+                            <span>Configuración de Centros de Trabajo</span>
+                        </div>
+                        <p class="mc_kiosk_config_subtitle">
+                            <i class="fa fa-user-circle me-1"/>
+                            <strong t-esc="state.empData.employee_name"/>
+                            — Seleccione los centros de trabajo donde va a operar:
+                        </p>
+                        <div class="mc_kiosk_wc_grid">
+                            <t t-foreach="state.availableWorkcenters" t-as="wc" t-key="wc.id">
+                                <div class="mc_kiosk_wc_item"
+                                     t-att-class="{ 'mc_kiosk_wc_selected': isWcSelected(wc.id) }"
+                                     t-on-click="() => this.toggleWorkcenter(wc.id)">
+                                    <div class="mc_kiosk_wc_check">
+                                        <i t-if="isWcSelected(wc.id)" class="fa fa-check-square"/>
+                                        <i t-else="" class="fa fa-square-o"/>
+                                    </div>
+                                    <div class="mc_kiosk_wc_name" t-esc="wc.name"/>
+                                </div>
+                            </t>
+                        </div>
+                        <div t-if="state.availableWorkcenters.length === 0" class="mc_kiosk_empty">
+                            <i class="fa fa-exclamation-circle me-2"/>
+                            No hay centros de trabajo registrados en el sistema.
+                        </div>
+                        <button class="mc_kiosk_submit mt-3"
+                                t-att-class="{ 'mc_kiosk_submit_disabled': !canSaveConfig }"
+                                t-att-disabled="!canSaveConfig"
+                                t-on-click="saveConfig">
+                            <t t-if="state.isProcessing">
+                                <i class="fa fa-spinner fa-spin me-2"/>Guardando...
+                            </t>
+                            <t t-else="">
+                                <i class="fa fa-save me-2"/>GUARDAR Y CONTINUAR
+                            </t>
+                        </button>
+                    </div>
+                </t>
+
+                <!-- ═══════════════════════════════════════════════
+                     SCREEN: Production Order + Work Orders (FOCUS MODE)
+                     ═══════════════════════════════════════════════ -->
+                <t t-if="state.screen === 'production'">
+
+                    <!-- FOCUS 1: Scan Production Order -->
+                    <t t-if="!state.moData">
+                        <div class="mc_kiosk_center_card">
+                            <div class="mc_kiosk_center_icon" style="font-size: 60px; margin-bottom: 24px;">
+                                <i class="fa fa-barcode"/>
+                            </div>
+                            <h2 class="mc_kiosk_center_title">Escanear Orden</h2>
+                            <p class="mc_kiosk_center_subtitle">
+                                Escanee el código de barras de la OP
+                            </p>
+                            <div class="mc_kiosk_input_group mc_kiosk_input_lg">
+                                <i class="fa fa-search mc_kiosk_input_icon"/>
+                                <input type="text"
+                                    t-ref="moInput"
+                                    class="mc_kiosk_input"
+                                    placeholder="Código de barras..."
+                                    t-att-value="state.moBarcode"
+                                    t-on-input="onMoBarcodeInput"
+                                    t-on-keydown="onMoBarcodeKeydown"
+                                    t-att-disabled="state.isProcessing"/>
+                            </div>
+                            <div t-if="state.moError" class="mc_kiosk_error mt-3">
+                                <i class="fa fa-exclamation-triangle me-1"/>
+                                <t t-esc="state.moError"/>
+                            </div>
+                            <div t-if="state.isProcessing" class="mc_kiosk_loading mt-3">
+                                <i class="fa fa-spinner fa-spin me-2"/>Buscando...
+                            </div>
+                        </div>
+                    </t>
+
+                    <!-- FOCUS 2: Select Work Order -->
+                    <t t-if="state.moData and !state.selectedWO">
+                        <div class="mc_kiosk_card">
+                            <div class="mc_kiosk_card_header d-flex justify-content-between">
+                                <div class="d-flex align-items-center">
+                                    <button class="btn btn-outline-light me-3 border-0" t-on-click="clearMo" style="background: rgba(255,255,255,0.1);">
+                                        <i class="fa fa-arrow-left"/>
+                                    </button>
+                                    <div>
+                                        <div style="font-size: 20px;"><t t-esc="state.moData.mo_name"/></div>
+                                        <div style="font-size: 14px; color: var(--mc-text-muted); font-weight: normal;"><t t-esc="state.moData.mo_product_name"/></div>
+                                    </div>
+                                </div>
+                                <div class="text-end" style="font-size: 14px; color: var(--mc-text-muted); font-weight: normal;">
+                                    Meta: <strong style="color: #ffffff;"><t t-esc="state.moData.mo_qty"/></strong> pzas
+                                </div>
+                            </div>
+                            
+                            <div class="mc_kiosk_card_body p-0">
+                                <!-- Family Orders grouped list -->
+                                <t t-foreach="state.familyOrders" t-as="familyOrder" t-key="familyOrder.mo_id">
+                                    <div class="mc_kiosk_family_header" t-if="state.familyOrders.length > 1">
+                                        <span class="ms-2 text-muted"><t t-esc="familyOrder.product_name"/></span>
+                                    </div>
+                                    <div class="mc_kiosk_wo_list" style="border: none; border-radius: 0;">
+                                        <t t-foreach="familyOrder.workorders" t-as="wo" t-key="wo.id">
+                                            <div class="mc_kiosk_wo_row"
+                                                 t-on-click="() => this.selectWorkOrder(wo)">
+                                                <div class="mc_kiosk_wo_main">
+                                                    <div class="mc_kiosk_wo_name" style="font-size: 22px;"><t t-esc="wo.name"/></div>
+                                                    <div class="mc_kiosk_wo_wc" style="font-size: 16px;">
+                                                        <i class="fa fa-wrench me-1"/>
+                                                        <t t-esc="wo.workcenter_name"/>
+                                                    </div>
+                                                </div>
+                                                <div class="mc_kiosk_wo_progress_info me-3">
+                                                    <div class="mc_kiosk_wo_declared" style="font-size: 20px;">
+                                                        <t t-esc="wo.total_declared"/> / <t t-esc="wo.product_qty"/>
+                                                    </div>
+                                                </div>
+                                                <div class="mc_kiosk_wo_arrow" style="font-size: 24px;">
+                                                    <i class="fa fa-chevron-right"/>
+                                                </div>
+                                            </div>
+                                        </t>
+                                    </div>
+                                </t>
+                            </div>
+                        </div>
+                    </t>
+
+                    <!-- FOCUS 3: Enter Quantity & Submit -->
+                    <t t-if="state.selectedWO">
+                        <div class="mc_kiosk_center_card" style="padding-top: 20px;">
+                            <button class="btn btn-outline-light mb-4 border-0" t-on-click="clearWorkOrder" style="align-self: flex-start; background: rgba(255,255,255,0.1);">
+                                <i class="fa fa-arrow-left me-2"/>Cambiar Operación
+                            </button>
+                            
+                            <h2 class="mc_kiosk_center_title" style="font-size: 40px; margin-bottom: 8px;">
+                                <t t-esc="state.selectedWO.name"/>
+                            </h2>
+                            <p class="mc_kiosk_center_subtitle" style="font-size: 22px; color: var(--mc-primary);">
+                                <i class="fa fa-wrench me-2"/>
+                                <t t-esc="state.selectedWO.workcenter_name"/>
+                            </p>
+                            
+                            <div class="mc_kiosk_input_group mc_kiosk_input_lg mt-2" style="max-width: 400px;">
+                                <i class="fa fa-hashtag mc_kiosk_input_icon" style="font-size: 30px;"/>
+                                <input type="number"
+                                    t-ref="qtyInput"
+                                    class="mc_kiosk_input mc_kiosk_input_qty"
+                                    style="font-size: 60px; padding: 20px 0; height: 120px;"
+                                    placeholder="0"
+                                    min="1"
+                                    step="1"
+                                    t-att-value="state.qtyDeclared"
+                                    t-on-input="onQtyInput"
+                                    t-on-blur="onQtyBlur"
+                                    t-att-disabled="state.isProcessing"/>
+                            </div>
+
+                            <!-- Progress info context -->
+                            <div class="mt-4" style="font-size: 18px; color: var(--mc-text-muted);">
+                                Llevas <strong style="color: #ffffff;"><t t-esc="state.selectedWO.total_declared"/></strong> de <strong style="color: #ffffff;"><t t-esc="state.selectedWO.product_qty"/></strong>
+                            </div>
+                            <div class="mc_kiosk_progress mt-2" style="max-width: 400px; width: 100%;">
+                                <div class="mc_kiosk_progress_bar"
+                                     t-attf-style="width: {{ woProgressPct }}%">
+                                    <t t-esc="woProgressPct"/>%
+                                </div>
+                            </div>
+
+                            <!-- Alerts -->
+                            <div t-if="state.overproductionWarning" class="mc_kiosk_warning mt-4 w-100" style="max-width: 500px;">
+                                <i class="fa fa-exclamation-triangle me-2"/>
+                                <t t-esc="state.overproductionWarning"/>
+                            </div>
+                            <div t-if="state.overproductionBlock" class="mc_kiosk_block mt-4 w-100" style="max-width: 500px;">
+                                <i class="fa fa-ban me-2"/>
+                                <t t-esc="state.overproductionBlock"/>
+                            </div>
+
+                            <button class="mc_kiosk_submit mt-5 mc_kiosk_input_lg"
+                                style="max-width: 400px; font-size: 30px; padding: 24px;"
+                                t-att-class="{ 'mc_kiosk_submit_disabled': !canSubmit }"
+                                t-att-disabled="!canSubmit"
+                                t-on-click="submitDeclaration">
+                                <t t-if="state.isProcessing">
+                                    <i class="fa fa-spinner fa-spin me-2"/>...
+                                </t>
+                                <t t-else="">
+                                    REGISTRAR
+                                </t>
+                            </button>
+                        </div>
+                    </t>
+
+
+                </t>
+
+            </div>
+        </div>
+    </t>
+
+</templates>
