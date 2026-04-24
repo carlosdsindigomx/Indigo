@@ -1,10 +1,6 @@
 from odoo import api, fields, models, _
 
-"""
-Hay que hacer que la declaracion de los turnos se ponga en el princial de cada producto, esto ayudara a dar mas visibilidad
-En el principal las cantidad que se declaren por el turno, en los subproductos igual sus respectivos declaraciones.
 
-"""
 class MrpProduction(models.Model):
     _inherit = 'mrp.production'
 
@@ -28,6 +24,34 @@ class MrpProduction(models.Model):
                 for declaration in production.shift_declaration_ids
                 if declaration.state == 'done'
             )
+
+    def _get_family_orders(self):
+        """Return this MO plus all related MOs in the family."""
+        self.ensure_one()
+        
+        domain = [('id', '!=', self.id)]
+        or_conditions = []
+        
+        # 1. Child MOs that explicitly reference this MO's name
+        or_conditions.append(('origin', 'ilike', self.name))
+        
+        # 2. MOs that share the exact same origin (e.g. the same Sales Order)
+        if self.origin:
+            or_conditions.append(('origin', '=', self.origin))
+            
+        # 3. MOs in the same procurement group (standard Odoo MTO behavior)
+        if hasattr(self, 'procurement_group_id') and self.procurement_group_id:
+            or_conditions.append(('procurement_group_id', '=', self.procurement_group_id.id))
+            
+        if len(or_conditions) == 1:
+            domain.append(or_conditions[0])
+        elif len(or_conditions) > 1:
+            # Prefix with '|' for OR operations in Odoo domains
+            combined_or = ['|'] * (len(or_conditions) - 1) + or_conditions
+            domain = combined_or + domain
+            
+        related_mos = self.env['mrp.production'].search(domain)
+        return self | related_mos
 
     def action_view_shift_declarations(self):
         """Open the shift declarations linked to this production order."""

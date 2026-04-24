@@ -14,14 +14,14 @@
                 <field name="date_declared"/>
                 <field name="production_name"/>
                 <field name="product_id"/>
+                <field name="workorder_name" string="Operación"/>
+                <field name="workcenter_name" string="Centro de Trabajo"/>
                 <field name="employee_id"/>
-                <field name="operation_id" optional="show"/>
                 <field name="qty_declared" sum="Total Declarado"/>
                 <field name="state" widget="badge"
                     decoration-success="state == 'done'"
                     decoration-danger="state == 'error'"
                     decoration-info="state == 'draft'"/>
-                <field name="backorder_created_id" optional="hide"/>
             </list>
         </field>
     </record>
@@ -45,23 +45,22 @@
                 </header>
                 <sheet>
                     <group>
-                        <group string="Orden de Producción">
+                        <group string="Orden de Trabajo">
+                            <field name="workorder_id"/>
                             <field name="production_id"/>
                             <field name="production_name"/>
                             <field name="product_id"/>
+                            <field name="workcenter_id"/>
                             <field name="production_qty"/>
                             <field name="production_state"/>
                         </group>
                         <group string="Declaración del Turno">
                             <field name="employee_id"/>
-                            <field name="operation_id"/>
                             <field name="qty_declared"/>
                             <field name="date_declared"/>
                         </group>
                     </group>
                     <group string="Trazabilidad" invisible="state == 'draft'">
-                        <field name="backorder_created_id"
-                            invisible="state != 'done'"/>
                         <field name="error_message"
                             invisible="state != 'error'"/>
                     </group>

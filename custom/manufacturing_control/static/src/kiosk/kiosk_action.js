@@ -10,127 +10,59 @@ class KioskAction extends Component {
 
     setup() {
         this.orm = useService("orm");
-        this.moInputRef = useRef("moInput");
         this.empInputRef = useRef("empInput");
+        this.moInputRef = useRef("moInput");
         this.qtyInputRef = useRef("qtyInput");
 
         this.state = useState({
-            // Step 1: MO scan
-            moBarcode: "",
-            moError: "",
-            parentData: null,       // { parent_mo_name, parent_product_name, has_children, child_orders }
+            // ─── Screen control ───────────────────────────────
+            // "employee" | "config" | "production" | "success"
+            screen: "employee",
 
-            // Step 2: Select child MO
-            selectedChild: null,    // the selected child order object
-
-            // Step 3: Employee
+            // ─── Employee session ─────────────────────────────
             empBarcode: "",
             empError: "",
-            empData: null,
+            empData: null,          // { employee_id, employee_name, has_config, workcenter_ids }
 
-            // Step 4: Operation
-            selectedOperationId: false,
+            // ─── Kiosk configuration ──────────────────────────
+            availableWorkcenters: [],   // [{ id, name }]
+            selectedWcIds: new Set(),   // IDs selected in config
 
-            // Step 5: Quantity
+            // ─── Production order ─────────────────────────────
+            moBarcode: "",
+            moError: "",
+            moData: null,           // { mo_name, mo_product_name, mo_qty }
+
+            // ─── Work orders (grouped by MO family) ─────────
+            familyOrders: [],       // [{ mo_id, mo_name, product_name, is_parent, workorders: [...] }]
+            selectedWO: null,       // selected work order object
+
+            // ─── Quantity ─────────────────────────────────────
             qtyDeclared: "",
             overproductionWarning: "",
             overproductionBlock: "",
 
-            // General
+            // ─── General ──────────────────────────────────────
             isProcessing: false,
             successMessage: "",
         });
 
-        onMounted(() => this.focusNext());
+        onMounted(() => this._focusCurrent());
     }
 
-    focusNext() {
-        if (!this.state.parentData) {
-            this.moInputRef.el?.focus();
-        } else if (!this.state.empData) {
-            this.empInputRef.el?.focus();
-        } else {
-            this.qtyInputRef.el?.focus();
-        }
-    }
-
-    // ─── MO Scan ──────────────────────────────────────────────────
-
-    onMoBarcodeInput(ev) {
-        this.state.moBarcode = ev.target.value;
-        this.state.moError = "";
-    }
-
-    async onMoBarcodeKeydown(ev) {
-        if (ev.key !== "Enter") return;
-        if (!this.state.moBarcode.trim()) return;
-
-        this.state.isProcessing = true;
-        this.state.moError = "";
-
-        try {
-            const result = await this.orm.call(
-                "mrp.shift.declaration",
-                "kiosk_validate_production",
-                [this.state.moBarcode.trim()]
-            );
-
-            if (result.error) {
-                this.state.moError = result.error;
-            } else {
-                this.state.parentData = result;
-                this.state.selectedChild = null;
-                this.state.selectedOperationId = false;
-
-                // Auto-select if only one child order
-                if (result.child_orders && result.child_orders.length === 1) {
-                    this.selectChild(result.child_orders[0]);
-                }
-
-                setTimeout(() => this.focusNext(), 50);
+    _focusCurrent() {
+        setTimeout(() => {
+            if (this.state.screen === "employee") {
+                this.empInputRef.el?.focus();
+            } else if (this.state.screen === "production") {
+                this.moInputRef.el?.focus();
             }
-        } catch (e) {
-            this.state.moError = "Error de conexión. Intente de nuevo.";
-        } finally {
-            this.state.isProcessing = false;
-        }
+        }, 80);
     }
 
-    clearMo() {
-        this.state.parentData = null;
-        this.state.selectedChild = null;
-        this.state.moBarcode = "";
-        this.state.selectedOperationId = false;
-        this.state.empData = null;
-        this.state.empBarcode = "";
-        this.state.qtyDeclared = "";
-        this.state.overproductionWarning = "";
-        this.state.overproductionBlock = "";
-        this.state.successMessage = "";
-        setTimeout(() => this.focusNext(), 50);
-    }
-
-    // ─── Child MO Selection ───────────────────────────────────────
-
-    selectChild(child) {
-        if (!child.is_active) return;
-        this.state.selectedChild = child;
-        this.state.selectedOperationId = false;
-        // Auto-select operation if only one
-        if (child.operations && child.operations.length === 1) {
-            this.state.selectedOperationId = child.operations[0].id;
-        }
-    }
-
-    clearChild() {
-        this.state.selectedChild = null;
-        this.state.selectedOperationId = false;
-        this.state.qtyDeclared = "";
-        this.state.overproductionWarning = "";
-        this.state.overproductionBlock = "";
-    }
-
-    // ─── Employee Handling ─────────────────────────────────────────
+    // ═══════════════════════════════════════════════════════════════
+    //  SCREEN: Employee Login
+    // ═══════════════════════════════════════════════════════════════
 
     onEmpBarcodeInput(ev) {
         this.state.empBarcode = ev.target.value;
@@ -155,7 +87,16 @@ class KioskAction extends Component {
                 this.state.empError = result.error;
             } else {
                 this.state.empData = result;
-                setTimeout(() => this.focusNext(), 50);
+
+                if (result.has_config) {
+                    // Employee already configured → go to production screen
+                    this.state.screen = "production";
+                    this._focusCurrent();
+                } else {
+                    // No config → show configuration screen
+                    await this._loadWorkcenters();
+                    this.state.screen = "config";
+                }
             }
         } catch (e) {
             this.state.empError = "Error de conexión. Intente de nuevo.";
@@ -164,19 +105,156 @@ class KioskAction extends Component {
         }
     }
 
-    clearEmp() {
-        this.state.empData = null;
-        this.state.empBarcode = "";
-        setTimeout(() => this.focusNext(), 50);
+    // ═══════════════════════════════════════════════════════════════
+    //  SCREEN: Kiosk Configuration
+    // ═══════════════════════════════════════════════════════════════
+
+    async _loadWorkcenters() {
+        try {
+            const wcs = await this.orm.call(
+                "mrp.shift.declaration",
+                "kiosk_get_available_workcenters",
+                []
+            );
+            this.state.availableWorkcenters = wcs;
+            // Pre-select already configured ones
+            this.state.selectedWcIds = new Set(
+                (this.state.empData?.workcenter_ids || []).map(wc => wc.id)
+            );
+        } catch (e) {
+            this.state.empError = "Error cargando centros de trabajo.";
+        }
     }
 
-    // ─── Operation Handling ────────────────────────────────────────
-
-    onOperationChange(ev) {
-        this.state.selectedOperationId = parseInt(ev.target.value) || false;
+    toggleWorkcenter(wcId) {
+        const s = new Set(this.state.selectedWcIds);
+        if (s.has(wcId)) {
+            s.delete(wcId);
+        } else {
+            s.add(wcId);
+        }
+        this.state.selectedWcIds = s;
     }
 
-    // ─── Quantity Handling ─────────────────────────────────────────
+    isWcSelected(wcId) {
+        return this.state.selectedWcIds.has(wcId);
+    }
+
+    get canSaveConfig() {
+        return this.state.selectedWcIds.size > 0 && !this.state.isProcessing;
+    }
+
+    async saveConfig() {
+        if (!this.canSaveConfig) return;
+
+        this.state.isProcessing = true;
+        try {
+            await this.orm.call(
+                "mrp.shift.declaration",
+                "kiosk_save_employee_config",
+                [this.state.empData.employee_id, [...this.state.selectedWcIds]]
+            );
+
+            // Update local data
+            this.state.empData.has_config = true;
+            this.state.empData.workcenter_ids = this.state.availableWorkcenters.filter(
+                wc => this.state.selectedWcIds.has(wc.id)
+            );
+
+            this.state.screen = "production";
+            this._focusCurrent();
+        } catch (e) {
+            this.state.empError = "Error guardando configuración.";
+        } finally {
+            this.state.isProcessing = false;
+        }
+    }
+
+    async showReconfigure() {
+        await this._loadWorkcenters();
+        this.state.screen = "config";
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  SCREEN: Production Order + Work Orders
+    // ═══════════════════════════════════════════════════════════════
+
+    onMoBarcodeInput(ev) {
+        this.state.moBarcode = ev.target.value;
+        this.state.moError = "";
+    }
+
+    async onMoBarcodeKeydown(ev) {
+        if (ev.key !== "Enter") return;
+        if (!this.state.moBarcode.trim()) return;
+
+        this.state.isProcessing = true;
+        this.state.moError = "";
+
+        try {
+            const result = await this.orm.call(
+                "mrp.shift.declaration",
+                "kiosk_get_workorders",
+                [this.state.moBarcode.trim(), this.state.empData.employee_id]
+            );
+
+            if (result.error) {
+                this.state.moError = result.error;
+            } else {
+                this.state.moData = {
+                    mo_name: result.mo_name,
+                    mo_product_name: result.mo_product_name,
+                    mo_qty: result.mo_qty,
+                };
+                this.state.familyOrders = result.family_orders || [];
+                this.state.selectedWO = null;
+                this.state.qtyDeclared = "";
+                this.state.overproductionWarning = "";
+                this.state.overproductionBlock = "";
+
+                // Auto-select if only one work order across entire family
+                const allWos = this.state.familyOrders.flatMap(fo => fo.workorders);
+                if (allWos.length === 1) {
+                    this.selectWorkOrder(allWos[0]);
+                }
+            }
+        } catch (e) {
+            this.state.moError = "Error de conexión. Intente de nuevo.";
+        } finally {
+            this.state.isProcessing = false;
+        }
+    }
+
+    clearMo() {
+        this.state.moData = null;
+        this.state.moBarcode = "";
+        this.state.familyOrders = [];
+        this.state.selectedWO = null;
+        this.state.qtyDeclared = "";
+        this.state.overproductionWarning = "";
+        this.state.overproductionBlock = "";
+        this.state.successMessage = "";
+        this._focusCurrent();
+    }
+
+    // ─── Work Order Selection ─────────────────────────────────────
+
+    selectWorkOrder(wo) {
+        this.state.selectedWO = wo;
+        this.state.qtyDeclared = "";
+        this.state.overproductionWarning = "";
+        this.state.overproductionBlock = "";
+        setTimeout(() => this.qtyInputRef.el?.focus(), 80);
+    }
+
+    clearWorkOrder() {
+        this.state.selectedWO = null;
+        this.state.qtyDeclared = "";
+        this.state.overproductionWarning = "";
+        this.state.overproductionBlock = "";
+    }
+
+    // ─── Quantity ─────────────────────────────────────────────────
 
     onQtyInput(ev) {
         this.state.qtyDeclared = ev.target.value;
@@ -187,13 +265,13 @@ class KioskAction extends Component {
 
     async onQtyBlur() {
         if (!this.state.qtyDeclared || parseFloat(this.state.qtyDeclared) <= 0) return;
-        if (!this.state.selectedChild) return;
+        if (!this.state.selectedWO) return;
 
         try {
             const result = await this.orm.call(
                 "mrp.shift.declaration",
                 "kiosk_check_overproduction",
-                [this.state.selectedChild.id, parseFloat(this.state.qtyDeclared)]
+                [this.state.selectedWO.id, parseFloat(this.state.qtyDeclared)]
             );
 
             if (result.status === "blocked") {
@@ -210,26 +288,19 @@ class KioskAction extends Component {
 
     // ─── Computed Properties ──────────────────────────────────────
 
-    get progressPct() {
-        if (!this.state.selectedChild) return 0;
-        const total = this.state.selectedChild.total_qty;
+    get woProgressPct() {
+        if (!this.state.selectedWO) return 0;
+        const total = this.state.selectedWO.product_qty;
         if (total <= 0) return 0;
-        return Math.min(100, Math.round((this.state.selectedChild.done_qty / total) * 100));
-    }
-
-    get hasOperations() {
-        return this.state.selectedChild &&
-               this.state.selectedChild.operations &&
-               this.state.selectedChild.operations.length > 0;
+        return Math.min(100, Math.round((this.state.selectedWO.total_declared / total) * 100));
     }
 
     get canSubmit() {
         if (this.state.isProcessing) return false;
-        if (!this.state.selectedChild) return false;
+        if (!this.state.selectedWO) return false;
         if (!this.state.empData) return false;
         if (!this.state.qtyDeclared || parseFloat(this.state.qtyDeclared) <= 0) return false;
         if (this.state.overproductionBlock) return false;
-        if (this.hasOperations && !this.state.selectedOperationId) return false;
         return true;
     }
 
@@ -246,22 +317,18 @@ class KioskAction extends Component {
                 "mrp.shift.declaration",
                 "kiosk_create_and_process",
                 [
-                    this.state.selectedChild.id,
+                    this.state.selectedWO.id,
                     this.state.empData.employee_id,
-                    this.state.selectedOperationId || false,
                     parseFloat(this.state.qtyDeclared),
                 ]
             );
 
             if (result.success) {
-                let msg = result.message;
-                if (result.backorder_name) {
-                    msg += ` — Backorder: ${result.backorder_name}`;
-                }
-                this.state.successMessage = msg;
+                this.state.successMessage = result.message;
+                this.state.screen = "success";
 
-                // Auto-reset after 3 seconds
-                setTimeout(() => this.resetKiosk(), 3000);
+                // Auto-reset to production screen after 3 seconds
+                setTimeout(() => this._resetToProduction(), 3000);
             }
         } catch (e) {
             this.state.moError = e.message || "Error al registrar. Intente de nuevo.";
@@ -270,21 +337,42 @@ class KioskAction extends Component {
         }
     }
 
-    resetKiosk() {
+    _resetToProduction() {
         this.state.moBarcode = "";
         this.state.moError = "";
-        this.state.parentData = null;
-        this.state.selectedChild = null;
+        this.state.moData = null;
+        this.state.familyOrders = [];
+        this.state.selectedWO = null;
+        this.state.qtyDeclared = "";
+        this.state.overproductionWarning = "";
+        this.state.overproductionBlock = "";
+        this.state.successMessage = "";
+        this.state.screen = "production";
+        this._focusCurrent();
+    }
+
+    resetKiosk() {
         this.state.empBarcode = "";
         this.state.empError = "";
         this.state.empData = null;
-        this.state.selectedOperationId = false;
+        this.state.availableWorkcenters = [];
+        this.state.selectedWcIds = new Set();
+        this.state.moBarcode = "";
+        this.state.moError = "";
+        this.state.moData = null;
+        this.state.familyOrders = [];
+        this.state.selectedWO = null;
         this.state.qtyDeclared = "";
         this.state.overproductionWarning = "";
         this.state.overproductionBlock = "";
         this.state.isProcessing = false;
         this.state.successMessage = "";
-        setTimeout(() => this.focusNext(), 50);
+        this.state.screen = "employee";
+        this._focusCurrent();
+    }
+
+    logoutEmployee() {
+        this.resetKiosk();
     }
 }
 

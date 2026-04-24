@@ -12,23 +12,31 @@ class MrpShiftDeclaration(models.Model):
     _order = 'create_date desc'
 
     # ─── Core Fields ────────────────────────────────────────────────
-    production_id = fields.Many2one(
-        'mrp.production',
-        string="Orden de Producción",
+    workorder_id = fields.Many2one(
+        'mrp.workorder',
+        string="Orden de Trabajo",
         required=True,
         ondelete='cascade',
         index=True,
+    )
+    production_id = fields.Many2one(
+        'mrp.production',
+        string="Orden de Producción",
+        related='workorder_id.production_id',
+        store=True,
+        index=True,
+    )
+    workcenter_id = fields.Many2one(
+        'mrp.workcenter',
+        string="Centro de Trabajo",
+        related='workorder_id.workcenter_id',
+        store=True,
     )
     employee_id = fields.Many2one(
         'hr.employee',
         string="Operario",
         required=True,
         index=True,
-    )
-    operation_id = fields.Many2one(
-        'mrp.routing.workcenter',
-        string="Operación",
-        help="Operación específica reportada (ej. Extrusión, Inyección).",
     )
     qty_declared = fields.Float(
         string="Cantidad Declarada",
@@ -66,10 +74,15 @@ class MrpShiftDeclaration(models.Model):
         related='production_id.product_id',
         store=True,
     )
-    backorder_created_id = fields.Many2one(
-        'mrp.production',
-        string="Backorder Generado",
-        readonly=True,
+    workcenter_name = fields.Char(
+        string="Centro de Trabajo",
+        related='workcenter_id.name',
+        store=True,
+    )
+    workorder_name = fields.Char(
+        string="Operación",
+        related='workorder_id.name',
+        store=True,
     )
     error_message = fields.Text(
         string="Detalle de Error",
@@ -98,26 +111,20 @@ class MrpShiftDeclaration(models.Model):
     # ─── Overproduction Validation ──────────────────────────────────
 
     def _validate_overproduction(self):
-        """Check overproduction thresholds. Returns dict with status info."""
+        """Check overproduction thresholds against the work order."""
         self.ensure_one()
-        mo = self.production_id
+        wo = self.workorder_id
 
-        # Get ALL related MOs from the production group (original + backorders)
-        if mo.production_group_id:
-            group_mos = mo.production_group_id.production_ids
-        else:
-            group_mos = mo
+        if not wo:
+            return {'status': 'ok', 'pct': 0, 'message': ''}
 
-        # Original total = sum of done + active
-        total_original_qty = sum(
-            p.product_qty for p in group_mos.filtered(
-                lambda p: p.state != 'cancel'
-            )
-        )
-        # Already done via kiosk
+        # Total quantity for the WO
+        total_original_qty = getattr(wo, 'qty_production', wo.production_id.product_qty)
+
+        # Already declared via kiosk for this WO
         total_already_done = sum(
-            p.shift_total_declared for p in group_mos.filtered(
-                lambda p: p.state == 'done'
+            d.qty_declared for d in wo.shift_declaration_ids.filtered(
+                lambda d: d.state == 'done'
             )
         )
         projected_total = total_already_done + self.qty_declared
@@ -161,18 +168,15 @@ class MrpShiftDeclaration(models.Model):
     def action_process_declaration(self):
         """
         Process a shift declaration:
-        1. Validate MO state
+        1. Validate WO and MO state
         2. Validate overproduction
-        3. Set qty_producing on the MO
-        4. Auto-generate lot if product uses lot tracking
-        5. Mark raw materials as picked (proportional consumption via native unit_factor)
-        6. Execute button_mark_done with silent backorder
-        7. Record the backorder created
+        3. Record the declaration as done
         """
         self.ensure_one()
+        wo = self.workorder_id
         mo = self.production_id
 
-        # ── Step 1: Validate MO state ──────────────────────────────
+        # ── Step 1: Validate states ─────────────────────────────────
         if mo.state in ('done', 'cancel'):
             self.write({
                 'state': 'error',
@@ -182,8 +186,14 @@ class MrpShiftDeclaration(models.Model):
             })
             raise UserError(self.error_message)
 
-        if mo.state == 'draft':
-            mo.action_confirm()
+        if wo.state in ('done', 'cancel'):
+            self.write({
+                'state': 'error',
+                'error_message': _(
+                    "La orden de trabajo %s está %s. No se puede registrar."
+                ) % (wo.name, dict(wo._fields['state'].selection).get(wo.state)),
+            })
+            raise UserError(self.error_message)
 
         # ── Step 2: Validate overproduction ────────────────────────
         overproduction = self._validate_overproduction()
@@ -194,69 +204,29 @@ class MrpShiftDeclaration(models.Model):
             })
             raise UserError(self.error_message)
 
-        # ── Step 3: Set qty_producing ──────────────────────────────
-        qty_to_produce = min(self.qty_declared, mo.product_qty)
-        mo.qty_producing = qty_to_produce
-
         try:
-            # ── Step 4: Auto-generate lot if needed ────────────────
-            if mo.product_tracking in ('lot', 'serial') and not mo.lot_producing_ids:
-                mo.action_generate_serial()
-
-
-            # ── Step 6: Execute button_mark_done silently ──────────
-            # Determine if we need a backorder (partial production)
-            needs_backorder = qty_to_produce < mo.product_qty
-
-            # Context flags explanation:
-            # - skip_backorder: skips _get_quantity_produced_issues() so no wizard prompt
-            # - mo_ids_to_backorder: tells button_mark_done to call _split_productions()
-            # - skip_consumption: skips _get_consumption_issues() so no consumption wizard
-            # - skip_redirection: prevents redirecting to the backorder form view
-            # - skip_immediate: prevents immediate production wizard
-            ctx = {
-                'skip_backorder': True,
-                'skip_consumption': True,
-                'skip_redirection': True,
-                'skip_immediate': True,
-            }
-            if needs_backorder:
-                ctx['mo_ids_to_backorder'] = [mo.id]
-
-            result = mo.with_context(**ctx).button_mark_done()
+            # ── Step 3: Mark declaration as done ───────────────────
+            self.write({'state': 'done'})
+            
+            # Update the work order qty_produced
+            if hasattr(wo, 'qty_produced'):
+                wo.qty_produced += self.qty_declared
 
             _logger.info(
-                "button_mark_done result for %s: %s (MO state after: %s)",
-                mo.name, result, mo.state,
-            )
-
-            # ── Step 7: Find and record backorder ──────────────────
-            backorder = self.env['mrp.production']
-            if needs_backorder and mo.production_group_id:
-                backorder = mo.production_group_id.production_ids.filtered(
-                    lambda p: p.state not in ('done', 'cancel') and p.id != mo.id
-                )[:1]
-
-            self.write({
-                'state': 'done',
-                'backorder_created_id': backorder.id if backorder else False,
-            })
-
-            _logger.info(
-                "Shift declaration processed: MO=%s, Employee=%s, Qty=%s, Backorder=%s",
+                "Shift declaration processed: WO=%s, MO=%s, Employee=%s, Qty=%s, Workcenter=%s",
+                wo.name,
                 mo.name,
                 self.employee_id.name,
-                qty_to_produce,
-                backorder.name if backorder else 'None',
+                self.qty_declared,
+                wo.workcenter_id.name,
             )
 
             return {
                 'success': True,
-                'message': _("¡Registrado! %s unidades de %s") % (
-                    qty_to_produce,
-                    mo.product_id.display_name,
+                'message': _("¡Registrado! %s unidades en %s") % (
+                    self.qty_declared,
+                    wo.workcenter_id.name,
                 ),
-                'backorder_name': backorder.name if backorder else False,
             }
 
         except Exception as e:
@@ -265,30 +235,86 @@ class MrpShiftDeclaration(models.Model):
                 'error_message': str(e),
             })
             _logger.exception(
-                "Error processing shift declaration for MO=%s: %s",
-                mo.name, str(e),
+                "Error processing shift declaration for WO=%s: %s",
+                wo.name, str(e),
             )
             raise
 
     # ─── Kiosk API Methods ──────────────────────────────────────────
 
     @api.model
-    def kiosk_validate_production(self, production_barcode):
-        """Validate a production order barcode from the kiosk.
+    def kiosk_validate_employee(self, barcode):
+        """Validate an employee badge barcode and return their kiosk config."""
+        employee = self.env['hr.employee'].sudo().search([
+            ('barcode', '=', barcode),
+        ], limit=1)
 
-        When the operator scans the parent MO (e.g., "Tubo Completo"), the system:
-        1. Finds the parent MO
-        2. Gets ALL child MOs (sub-assemblies: Manga, Corona, Tapa)
-        3. Returns them so the operator can choose which one to report on
+        if not employee:
+            return {'error': _("No se encontró empleado con gafete: %s") % barcode}
+
+        # Look up kiosk config
+        config = self.env['kiosk.employee.config'].sudo().search([
+            ('employee_id', '=', employee.id),
+        ], limit=1)
+
+        workcenter_ids = []
+        if config:
+            workcenter_ids = [{
+                'id': wc.id,
+                'name': wc.name,
+            } for wc in config.workcenter_ids]
+
+        return {
+            'employee_id': employee.id,
+            'employee_name': employee.name,
+            'has_config': bool(config and config.workcenter_ids),
+            'workcenter_ids': workcenter_ids,
+        }
+
+    @api.model
+    def kiosk_get_available_workcenters(self):
+        """Return all available work centers for kiosk configuration."""
+        workcenters = self.env['mrp.workcenter'].sudo().search([])
+        return [{
+            'id': wc.id,
+            'name': wc.name,
+        } for wc in workcenters]
+
+    @api.model
+    def kiosk_save_employee_config(self, employee_id, workcenter_ids):
+        """Save or update the employee's kiosk work center configuration."""
+        config = self.env['kiosk.employee.config'].sudo().search([
+            ('employee_id', '=', employee_id),
+        ], limit=1)
+
+        if config:
+            config.write({'workcenter_ids': [(6, 0, workcenter_ids)]})
+        else:
+            self.env['kiosk.employee.config'].sudo().create({
+                'employee_id': employee_id,
+                'workcenter_ids': [(6, 0, workcenter_ids)],
+            })
+
+        return {'success': True}
+
+    @api.model
+    def kiosk_get_workorders(self, production_barcode, employee_id):
+        """Get work orders for a production order and its sub-orders,
+        filtered by employee's work centers.
+
+        1. Find the production order by barcode/name
+        2. Find all sub-orders that reference it in their origin field
+        3. Collect work orders from the entire family
+        4. Filter by the employee's configured work centers
+        5. Return grouped by MO
         """
-        # Search for exact match first (any state except cancel)
+        # Search for the production order
         mo = self.env['mrp.production'].search([
             ('name', '=', production_barcode),
             ('state', '!=', 'cancel'),
         ], limit=1)
 
         if not mo:
-            # Try partial match
             mo = self.env['mrp.production'].search([
                 ('name', 'ilike', production_barcode),
                 ('state', '!=', 'cancel'),
@@ -297,171 +323,123 @@ class MrpShiftDeclaration(models.Model):
         if not mo:
             return {'error': _("No se encontró una OP con código: %s") % production_barcode}
 
-        # ── Get child MOs (sub-assemblies) ──────────────────────────
-        child_mos = self.env['mrp.production']
-        try:
-            child_mos = mo._get_children()
-        except Exception:
-            pass
-
-        # Build list of child MOs for the kiosk (deduplicated by production group)
-        child_orders = []
-        seen_groups = set()
-        if child_mos:
-            for child in child_mos.filtered(lambda p: p.state != 'cancel').sorted('id'):
-                # Deduplicate: skip if we already processed this production group
-                group_key = child.production_group_id.id if child.production_group_id else child.id
-                if group_key in seen_groups:
-                    continue
-                seen_groups.add(group_key)
-                # For each child MO, also include its backorders
-                group_mos = child
-                if child.production_group_id:
-                    group_mos = child.production_group_id.production_ids.filtered(
-                        lambda p: p.state != 'cancel'
-                    )
-                # Find the active one (not done) in the backorder chain
-                active_child = group_mos.filtered(
-                    lambda p: p.state in ('confirmed', 'progress')
-                )[:1]
-                done_qty = sum(
-                    p.qty_produced for p in group_mos.filtered(
-                        lambda p: p.state == 'done'
-                    )
-                )
-                total_qty = sum(p.product_qty for p in group_mos)
-
-                # Get operations for this child
-                operations = []
-                bom = active_child.bom_id if active_child else child.bom_id
-                if bom and bom.operation_ids:
-                    for op in bom.operation_ids:
-                        operations.append({
-                            'id': op.id,
-                            'name': op.name,
-                            'workcenter': op.workcenter_id.name,
-                        })
-
-                child_orders.append({
-                    'id': active_child.id if active_child else child.id,
-                    'name': active_child.name if active_child else child.name,
-                    'product_name': child.product_id.display_name,
-                    'product_qty': active_child.product_qty if active_child else 0,
-                    'total_qty': total_qty,
-                    'done_qty': done_qty,
-                    'state': active_child.state if active_child else child.state,
-                    'is_active': bool(active_child),
-                    'operations': operations,
-                })
-
-        # Also check if the scanned MO itself can be reported on
-        # (it might be a standalone MO without children)
-        has_children = bool(child_orders)
-
-        # Always add the parent/scanned MO to the list
-        # (for standalone MOs this is the only entry;
-        #  for parent MOs with children, this is the final assembly step)
-        group_mos = mo
-        if mo.production_group_id:
-            group_mos = mo.production_group_id.production_ids.filtered(
-                lambda p: p.state != 'cancel'
-            ).sorted('id')
-
-        active_mo = group_mos.filtered(
-            lambda p: p.state in ('confirmed', 'progress')
-        )[:1]
-
-        if active_mo:
-            operations = []
-            if active_mo.bom_id and active_mo.bom_id.operation_ids:
-                for op in active_mo.bom_id.operation_ids:
-                    operations.append({
-                        'id': op.id,
-                        'name': op.name,
-                        'workcenter': op.workcenter_id.name,
-                    })
-
-            total_declared = sum(
-                p.shift_total_declared for p in group_mos.filtered(
-                    lambda x: x.state == 'done'
-                )
-            )
-
-            label = active_mo.product_id.display_name
-
-            # Check if all children are done before allowing parent production
-            parent_is_active = True
-            if has_children:
-                label = "⭐ " + label + " (Ensamble Final)"
-                # Check if ALL child MOs (across all groups) are done
-                all_children_done = all(
-                    c.get('state') == 'done' or not c.get('is_active')
-                    for c in child_orders
-                )
-                if not all_children_done:
-                    parent_is_active = False
-
-            child_orders.append({
-                'id': active_mo.id,
-                'name': active_mo.name,
-                'product_name': label,
-                'product_qty': active_mo.product_qty,
-                'total_qty': sum(p.product_qty for p in group_mos),
-                'done_qty': total_declared,
-                'state': active_mo.state,
-                'is_active': parent_is_active,
-                'blocked_reason': '' if parent_is_active else 'Componentes pendientes',
-                'operations': operations,
-            })
-        elif not has_children:
-            if group_mos.filtered(lambda p: p.state == 'draft'):
-                return {'error': _(
-                    "La orden %s está en estado Borrador. Confírmala primero en el sistema."
-                ) % production_barcode}
-
-            # No active MO and no children — everything is done
+        if mo.state in ('done', 'cancel', 'draft'):
+            state_label = dict(mo.fields_get(['state'])['state']['selection']).get(mo.state, mo.state)
             return {'error': _(
-                "Todas las órdenes de %s ya están terminadas."
-            ) % production_barcode}
+                "La orden %s está en estado %s."
+            ) % (mo.name, state_label)}
 
-        return {
-            'parent_mo_name': mo.name,
-            'parent_product_name': mo.product_id.display_name,
-            'has_children': has_children,
-            'child_orders': child_orders,
-        }
-
-    @api.model
-    def kiosk_validate_employee(self, barcode):
-        """Validate an employee badge barcode from the kiosk."""
-        employee = self.env['hr.employee'].sudo().search([
-            ('barcode', '=', barcode),
+        # Get employee's configured work centers
+        config = self.env['kiosk.employee.config'].sudo().search([
+            ('employee_id', '=', employee_id),
         ], limit=1)
 
-        if not employee:
-            return {'error': _("No se encontró empleado con gafete: %s") % barcode}
+        if not config or not config.workcenter_ids:
+            return {'error': _(
+                "No tiene centros de trabajo configurados. Reconfigure el kiosco."
+            )}
+
+        employee_wc_ids = config.workcenter_ids.ids
+
+        # ── Build family: parent MO + child MOs via native mechanism ─
+        family_mos = mo._get_family_orders().filtered(
+            lambda m: m.state not in ('done', 'cancel')
+        )
+
+        # ── Collect work orders from entire family ──────────────────
+        family_orders = []
+        has_any_wo = False
+
+        for family_mo in family_mos.sorted('id'):
+            workorders = family_mo.workorder_ids.filtered(
+                lambda wo: wo.workcenter_id.id in employee_wc_ids
+                    and wo.state not in ('done', 'cancel')
+            )
+
+            if not workorders:
+                continue
+
+            has_any_wo = True
+            wo_list = []
+            for wo in workorders.sorted('id'):
+                # Get total declared for this work order from kiosk
+                total_declared = sum(
+                    d.qty_declared for d in self.search([
+                        ('workorder_id', '=', wo.id),
+                        ('state', '=', 'done'),
+                    ])
+                )
+
+                wo_list.append({
+                    'id': wo.id,
+                    'name': wo.name,
+                    'workcenter_id': wo.workcenter_id.id,
+                    'workcenter_name': wo.workcenter_id.name,
+                    'product_name': family_mo.product_id.display_name,
+                    'product_qty': family_mo.product_qty,
+                    'qty_produced': wo.qty_produced,
+                    'total_declared': total_declared,
+                    'state': wo.state,
+                })
+
+            family_orders.append({
+                'mo_id': family_mo.id,
+                'mo_name': family_mo.name,
+                'product_name': family_mo.product_id.display_name,
+                'product_qty': family_mo.product_qty,
+                'is_parent': family_mo.id == mo.id,
+                'workorders': wo_list,
+            })
+
+        if not has_any_wo:
+            # Check if there are WOs in the family but none match
+            all_family_wos = family_mos.mapped('workorder_ids').filtered(
+                lambda wo: wo.state not in ('done', 'cancel')
+            )
+            if all_family_wos:
+                return {'error': _(
+                    "La OP %s y sus subórdenes tienen órdenes de trabajo, pero ninguna "
+                    "coincide con sus centros de trabajo configurados."
+                ) % mo.name}
+            else:
+                done_wos = family_mos.mapped('workorder_ids').filtered(
+                    lambda wo: wo.state == 'done'
+                )
+                if done_wos:
+                    return {'error': _(
+                        "Todas las órdenes de trabajo de %s y sus subórdenes ya están terminadas."
+                    ) % mo.name}
+                return {'error': _(
+                    "La OP %s no tiene órdenes de trabajo. "
+                    "Verifique que la lista de materiales tenga operaciones definidas."
+                ) % mo.name}
 
         return {
-            'employee_id': employee.id,
-            'employee_name': employee.name,
+            'mo_name': mo.name,
+            'mo_product_name': mo.product_id.display_name,
+            'mo_qty': mo.product_qty,
+            'family_orders': family_orders,
         }
 
     @api.model
-    def kiosk_check_overproduction(self, mo_id, qty):
+    def kiosk_check_overproduction(self, workorder_id, qty):
         """Check overproduction thresholds before submitting."""
+        wo = self.env['mrp.workorder'].browse(workorder_id)
+        if not wo.exists():
+            return {'status': 'error', 'message': _("Orden de trabajo no encontrada.")}
+
         declaration = self.new({
-            'production_id': mo_id,
+            'workorder_id': workorder_id,
             'qty_declared': qty,
         })
         return declaration._validate_overproduction()
 
     @api.model
-    def kiosk_create_and_process(self, mo_id, employee_id, operation_id, qty):
+    def kiosk_create_and_process(self, workorder_id, employee_id, qty):
         """Create a shift declaration and process it. Main kiosk entry point."""
         declaration = self.create({
-            'production_id': mo_id,
+            'workorder_id': workorder_id,
             'employee_id': employee_id,
-            'operation_id': operation_id or False,
             'qty_declared': qty,
         })
         return declaration.action_process_declaration()
