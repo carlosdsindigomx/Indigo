@@ -151,8 +151,8 @@ class KioskAction extends Component {
         try {
             await this.orm.call(
                 "mrp.shift.declaration",
-                "kiosk_save_employee_config",
-                [this.state.empData.employee_id, [...this.state.selectedWcIds]]
+                "kiosk_save_session_config",
+                [[...this.state.selectedWcIds]]
             );
 
             // Update local data

@@ -13,7 +13,7 @@
         'views/mrp_shift_declaration_views.xml',
         'views/mrp_production_views.xml',
         'views/mrp_workorder_views.xml',
-        'views/res_config_settings_views.xml',
+        'views/mrp_workcenter_limit_views.xml',
     ],
     'assets': {
         'web.assets_backend': [

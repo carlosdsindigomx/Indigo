@@ -188,7 +188,11 @@
                                 <!-- Family Orders grouped list -->
                                 <t t-foreach="state.familyOrders" t-as="familyOrder" t-key="familyOrder.mo_id">
                                     <div class="mc_kiosk_family_header" t-if="state.familyOrders.length > 1">
-                                        <span class="ms-2 text-muted"><t t-esc="familyOrder.product_name"/></span>
+                                        <span class="ms-2">
+                                            <strong style="color: #60a5fa;"><t t-esc="familyOrder.mo_name"/></strong>
+                                            <span class="mx-2 text-muted">-</span>
+                                            <span style="color: #f8fafc;"><t t-esc="familyOrder.product_name"/></span>
+                                        </span>
                                     </div>
                                     <div class="mc_kiosk_wo_list" style="border: none; border-radius: 0;">
                                         <t t-foreach="familyOrder.workorders" t-as="wo" t-key="wo.id">

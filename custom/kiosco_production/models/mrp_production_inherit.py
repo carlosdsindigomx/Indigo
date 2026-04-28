@@ -26,32 +26,47 @@ class MrpProduction(models.Model):
             )
 
     def _get_family_orders(self):
-        """Return this MO plus all related MOs in the family."""
+        """Return this MO plus all related MOs in the family.
+        Busca a la OP principal y a las OPs que la contengan en su origen.
+        """
         self.ensure_one()
         
-        domain = [('id', '!=', self.id)]
-        or_conditions = []
+        # 1. Identificar el nombre de la OP Principal (El Padre)
+        parent_name = self.name
         
-        # 1. Child MOs that explicitly reference this MO's name
-        or_conditions.append(('origin', 'ilike', self.name))
-        
-        # 2. MOs that share the exact same origin (e.g. the same Sales Order)
+        # Si nuestra OP tiene algo en 'origin', tratamos de encontrar al Padre.
         if self.origin:
-            or_conditions.append(('origin', '=', self.origin))
+            # Primero intentamos quitando posibles espacios en blanco
+            clean_origin = self.origin.strip()
+            parent_mo = self.env['mrp.production'].search([('name', '=', clean_origin)], limit=1)
             
-        # 3. MOs in the same procurement group (standard Odoo MTO behavior)
-        if hasattr(self, 'procurement_group_id') and self.procurement_group_id:
-            or_conditions.append(('procurement_group_id', '=', self.procurement_group_id.id))
-            
-        if len(or_conditions) == 1:
-            domain.append(or_conditions[0])
-        elif len(or_conditions) > 1:
-            # Prefix with '|' for OR operations in Odoo domains
-            combined_or = ['|'] * (len(or_conditions) - 1) + or_conditions
-            domain = combined_or + domain
-            
-        related_mos = self.env['mrp.production'].search(domain)
-        return self | related_mos
+            # Si no lo encuentra, intentamos separar por el guión
+            if not parent_mo and ' - ' in clean_origin:
+                parts = [p.strip() for p in clean_origin.split(' - ')]
+                parent_mo = self.env['mrp.production'].search([('name', 'in', parts)], limit=1)
+                
+            # Si no lo encuentra, usamos Regex genérico para secuencias de Odoo
+            if not parent_mo:
+                import re
+                # Busca letras seguidas de una o más diagonales y números al final
+                match = re.search(r'[A-Z0-9/]+/\d+', self.origin)
+                if match:
+                    parent_mo = self.env['mrp.production'].search([('name', '=', match.group(0))], limit=1)
+                    
+            if parent_mo:
+                parent_name = parent_mo.name
+                
+        # 2. Buscar a la familia: La OP Principal + Todas las hijas directas
+        # Usamos ILIKE porque Odoo claramente le está agregando caracteres invisibles o texto extra al origin
+        domain = [
+            '|', 
+            ('name', '=', parent_name), 
+            ('origin', 'ilike', parent_name)
+        ]
+        
+        family_mos = self.env['mrp.production'].search(domain)
+        
+        return self | family_mos
 
     def action_view_shift_declarations(self):
         """Open the shift declarations linked to this production order."""

@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         Workorder Form: Declaraciones Kiosco tab + Limit fields
+         ═══════════════════════════════════════════════════════════════ -->
     <record id="mrp_workorder_form_view_inherit_kiosk" model="ir.ui.view">
         <field name="name">mrp.workorder.form.kiosk</field>
         <field name="model">mrp.workorder</field>
@@ -8,6 +12,11 @@
             <!-- Notebook page: Declaraciones Kiosco -->
             <xpath expr="//notebook" position="inside">
                 <page string="Declaraciones Kiosco" name="kiosk_production">
+                    <group string="Límite de Declaración (Excepción)" col="4">
+                        <field name="limit_type" />
+                        <field name="limit_value"
+                            invisible="not limit_type" />
+                    </group>
                     <field name="shift_declaration_ids" readonly="1">
                         <list decoration-success="state=='done'" decoration-danger="state=='error'">
                             <field name="date_declared" />
@@ -22,4 +31,23 @@
             </xpath>
         </field>
     </record>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         MO Form: Add limit columns to the workorder inline list
+         ═══════════════════════════════════════════════════════════════ -->
+    <record id="mrp_production_workorder_tree_limit" model="ir.ui.view">
+        <field name="name">mrp.production.workorder.tree.limit</field>
+        <field name="model">mrp.workorder</field>
+        <field name="inherit_id" ref="mrp.mrp_production_workorder_tree_editable_view" />
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='workcenter_id']" position="after">
+                <field name="limit_type" optional="hide"
+                    string="Tipo Límite" />
+                <field name="limit_value" optional="hide"
+                    string="Valor Límite"
+                    invisible="not limit_type" />
+            </xpath>
+        </field>
+    </record>
+
 </odoo>

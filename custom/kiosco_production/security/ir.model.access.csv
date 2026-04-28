@@ -3,3 +3,5 @@ access_mrp_shift_declaration_user,mrp.shift.declaration.user,model_mrp_shift_dec
 access_mrp_shift_declaration_manager,mrp.shift.declaration.manager,model_mrp_shift_declaration,mrp.group_mrp_manager,1,1,1,1
 access_kiosk_employee_config_user,kiosk.employee.config.user,model_kiosk_employee_config,mrp.group_mrp_user,1,1,1,0
 access_kiosk_employee_config_manager,kiosk.employee.config.manager,model_kiosk_employee_config,mrp.group_mrp_manager,1,1,1,1
+access_mrp_workcenter_limit_user,mrp.workcenter.limit.user,model_mrp_workcenter_limit,mrp.group_mrp_user,1,0,0,0
+access_mrp_workcenter_limit_manager,mrp.workcenter.limit.manager,model_mrp_workcenter_limit,mrp.group_mrp_manager,1,1,1,1

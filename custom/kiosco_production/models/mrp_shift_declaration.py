@@ -2,6 +2,7 @@ import logging
 
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
+from odoo.http import request
 
 _logger = logging.getLogger(__name__)
 
@@ -108,18 +109,59 @@ class MrpShiftDeclaration(models.Model):
                     _("La cantidad declarada debe ser mayor a cero.")
                 )
 
-    # ─── Overproduction Validation ──────────────────────────────────
+    # ─── Overproduction Validation (CU-08: Cascading Rules) ────────
+
+    def _get_applicable_limit(self):
+        """Determine the applicable limit rule using the cascade:
+        1. Workorder exception (CU-03) → highest priority
+        2. Workcenter global limit (CU-02)
+        3. System fallback (ir.config_parameter) → lowest priority
+        Returns: (limit_type, limit_value) or (None, None) if no rule.
+        """
+        self.ensure_one()
+        wo = self.workorder_id
+
+        # ── Level 1: Workorder exception (CU-03) ───────────────────
+        if wo.limit_type and wo.limit_value:
+            return wo.limit_type, wo.limit_value
+
+        # ── Level 2: Workcenter global limit (CU-02) ───────────────
+        wc_limit = self.env['mrp.workcenter.limit'].sudo().search([
+            ('workcenter_id', '=', wo.workcenter_id.id),
+        ], limit=1)
+        if wc_limit:
+            return wc_limit.limit_type, wc_limit.limit_value
+
+        # No rule configured → process without limit
+        return None, None
+
+    def _calculate_max_allowed(self, limit_type, limit_value, planned_qty):
+        """Calculate the maximum allowed quantity based on limit type.
+        - percentage: planned_qty × (limit_value / 100)
+        - fixed: limit_value directly
+        """
+        if limit_type == 'percentage':
+            return planned_qty * (limit_value / 100.0)
+        elif limit_type == 'fixed':
+            return limit_value
+        return 0
 
     def _validate_overproduction(self):
-        """Check overproduction thresholds against the work order."""
+        """Check overproduction thresholds using cascading rules (CU-08).
+
+        Cascade: WO exception → CT global → system fallback → no limit.
+        """
         self.ensure_one()
         wo = self.workorder_id
 
         if not wo:
             return {'status': 'ok', 'pct': 0, 'message': ''}
 
-        # Total quantity for the WO
-        total_original_qty = getattr(wo, 'qty_production', wo.production_id.product_qty)
+        # Total planned quantity for the WO
+        planned_qty = getattr(wo, 'qty_production', wo.production_id.product_qty)
+
+        if not planned_qty:
+            return {'status': 'ok', 'pct': 0, 'message': ''}
 
         # Already declared via kiosk for this WO
         total_already_done = sum(
@@ -128,35 +170,38 @@ class MrpShiftDeclaration(models.Model):
             )
         )
         projected_total = total_already_done + self.qty_declared
-        pct = (projected_total / total_original_qty * 100) if total_original_qty else 0
+        pct = (projected_total / planned_qty * 100)
 
-        # Read thresholds from Settings (ir.config_parameter)
-        ICP = self.env['ir.config_parameter'].sudo()
-        warning_pct = float(ICP.get_param(
-            'manufacturing_control.overproduction_warning', '100.0'
-        ))
-        block_pct = float(ICP.get_param(
-            'manufacturing_control.overproduction_block', '105.0'
-        ))
+        # ── Get applicable rule ────────────────────────────────────
+        limit_type, limit_value = self._get_applicable_limit()
 
-        if pct > block_pct:
-            return {
-                'status': 'blocked',
-                'pct': pct,
-                'message': _(
-                    "BLOQUEADO: La producción total alcanzaría %.1f%%, "
-                    "superando el límite de %.1f%%."
-                ) % (pct, block_pct),
-            }
-        elif pct > warning_pct:
-            return {
-                'status': 'warning',
-                'pct': pct,
-                'message': _(
-                    "ADVERTENCIA: La producción total alcanzaría %.1f%%, "
-                    "superando la meta del %.1f%%."
-                ) % (pct, warning_pct),
-            }
+        if not limit_type:
+            # No rule configured → process without limit
+            return {'status': 'ok', 'pct': pct, 'message': ''}
+
+        # ── Calculate maximum and compare ──────────────────────────
+        max_allowed = self._calculate_max_allowed(limit_type, limit_value, planned_qty)
+
+        if projected_total > max_allowed:
+            if limit_type == 'percentage':
+                return {
+                    'status': 'blocked',
+                    'pct': pct,
+                    'message': _(
+                        "BLOQUEADO: La producción total alcanzaría %.1f unidades "
+                        "(%.1f%%), superando el límite de %.1f%% (%.1f unidades)."
+                    ) % (projected_total, pct, limit_value, max_allowed),
+                }
+            else:  # fixed
+                return {
+                    'status': 'blocked',
+                    'pct': pct,
+                    'message': _(
+                        "BLOQUEADO: La producción total alcanzaría %.1f unidades, "
+                        "superando el límite fijo de %.1f unidades."
+                    ) % (projected_total, max_allowed),
+                }
+
         return {
             'status': 'ok',
             'pct': pct,
@@ -244,7 +289,9 @@ class MrpShiftDeclaration(models.Model):
 
     @api.model
     def kiosk_validate_employee(self, barcode):
-        """Validate an employee badge barcode and return their kiosk config."""
+        """Validate an employee badge barcode and return their kiosk config.
+        Work center config is read from the Odoo session (shared across all operators).
+        """
         employee = self.env['hr.employee'].sudo().search([
             ('barcode', '=', barcode),
         ], limit=1)
@@ -252,22 +299,20 @@ class MrpShiftDeclaration(models.Model):
         if not employee:
             return {'error': _("No se encontró empleado con gafete: %s") % barcode}
 
-        # Look up kiosk config
-        config = self.env['kiosk.employee.config'].sudo().search([
-            ('employee_id', '=', employee.id),
-        ], limit=1)
-
+        # Read work center config from session (shared for this kiosk)
+        session_wc_ids = request.session.get('kiosk_workcenter_ids', [])
         workcenter_ids = []
-        if config:
+        if session_wc_ids:
+            workcenters = self.env['mrp.workcenter'].sudo().browse(session_wc_ids).exists()
             workcenter_ids = [{
                 'id': wc.id,
                 'name': wc.name,
-            } for wc in config.workcenter_ids]
+            } for wc in workcenters]
 
         return {
             'employee_id': employee.id,
             'employee_name': employee.name,
-            'has_config': bool(config and config.workcenter_ids),
+            'has_config': bool(session_wc_ids),
             'workcenter_ids': workcenter_ids,
         }
 
@@ -281,20 +326,11 @@ class MrpShiftDeclaration(models.Model):
         } for wc in workcenters]
 
     @api.model
-    def kiosk_save_employee_config(self, employee_id, workcenter_ids):
-        """Save or update the employee's kiosk work center configuration."""
-        config = self.env['kiosk.employee.config'].sudo().search([
-            ('employee_id', '=', employee_id),
-        ], limit=1)
-
-        if config:
-            config.write({'workcenter_ids': [(6, 0, workcenter_ids)]})
-        else:
-            self.env['kiosk.employee.config'].sudo().create({
-                'employee_id': employee_id,
-                'workcenter_ids': [(6, 0, workcenter_ids)],
-            })
-
+    def kiosk_save_session_config(self, workcenter_ids):
+        """Save work center configuration to the Odoo session.
+        This config is shared across all operators using this kiosk session.
+        """
+        request.session['kiosk_workcenter_ids'] = workcenter_ids
         return {'success': True}
 
     @api.model
@@ -329,17 +365,15 @@ class MrpShiftDeclaration(models.Model):
                 "La orden %s está en estado %s."
             ) % (mo.name, state_label)}
 
-        # Get employee's configured work centers
-        config = self.env['kiosk.employee.config'].sudo().search([
-            ('employee_id', '=', employee_id),
-        ], limit=1)
+        # Get work centers from session (shared for this kiosk)
+        session_wc_ids = request.session.get('kiosk_workcenter_ids', [])
 
-        if not config or not config.workcenter_ids:
+        if not session_wc_ids:
             return {'error': _(
                 "No tiene centros de trabajo configurados. Reconfigure el kiosco."
             )}
 
-        employee_wc_ids = config.workcenter_ids.ids
+        employee_wc_ids = session_wc_ids
 
         # ── Build family: parent MO + child MOs via native mechanism ─
         family_mos = mo._get_family_orders().filtered(
