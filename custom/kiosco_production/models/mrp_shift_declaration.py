@@ -112,44 +112,37 @@ class MrpShiftDeclaration(models.Model):
     # ─── Overproduction Validation (CU-08: Cascading Rules) ────────
 
     def _get_applicable_limit(self):
-        """Determine the applicable limit rule using the cascade:
-        1. Workorder exception (CU-03) → highest priority
-        2. Workcenter global limit (CU-02)
-        3. System fallback (ir.config_parameter) → lowest priority
-        Returns: (limit_type, limit_value) or (None, None) if no rule.
+        """Determine the applicable limit (max units per declaration).
+
+        Cascade:
+          1. Workorder exception (CU-03) → highest priority
+          2. Workcenter global limit (CU-02)
+        Returns: limit_value (float) or 0 if no rule.
         """
         self.ensure_one()
         wo = self.workorder_id
 
         # ── Level 1: Workorder exception (CU-03) ───────────────────
-        if wo.limit_type and wo.limit_value:
-            return wo.limit_type, wo.limit_value
+        if wo.limit_value:
+            return wo.limit_value
 
         # ── Level 2: Workcenter global limit (CU-02) ───────────────
         wc_limit = self.env['mrp.workcenter.limit'].sudo().search([
             ('workcenter_id', '=', wo.workcenter_id.id),
         ], limit=1)
         if wc_limit:
-            return wc_limit.limit_type, wc_limit.limit_value
+            return wc_limit.limit_value
 
         # No rule configured → process without limit
-        return None, None
-
-    def _calculate_max_allowed(self, limit_type, limit_value, planned_qty):
-        """Calculate the maximum allowed quantity based on limit type.
-        - percentage: planned_qty × (limit_value / 100)
-        - fixed: limit_value directly
-        """
-        if limit_type == 'percentage':
-            return planned_qty * (limit_value / 100.0)
-        elif limit_type == 'fixed':
-            return limit_value
         return 0
 
     def _validate_overproduction(self):
-        """Check overproduction thresholds using cascading rules (CU-08).
+        """Check if this single declaration exceeds the allowed limit.
 
-        Cascade: WO exception → CT global → system fallback → no limit.
+        The limit applies PER SINGLE DECLARATION (max units at once),
+        not against the accumulated total.
+
+        Cascade: WO exception → CT global → no limit.
         """
         self.ensure_one()
         wo = self.workorder_id
@@ -157,56 +150,105 @@ class MrpShiftDeclaration(models.Model):
         if not wo:
             return {'status': 'ok', 'pct': 0, 'message': ''}
 
-        # Total planned quantity for the WO
-        planned_qty = getattr(wo, 'qty_production', wo.production_id.product_qty)
+        # ── Get applicable limit (max units per declaration) ───────
+        max_allowed = self._get_applicable_limit()
 
-        if not planned_qty:
+        if not max_allowed:
+            # No rule configured → process without limit
             return {'status': 'ok', 'pct': 0, 'message': ''}
 
-        # Already declared via kiosk for this WO
-        total_already_done = sum(
-            d.qty_declared for d in wo.shift_declaration_ids.filtered(
-                lambda d: d.state == 'done'
-            )
-        )
-        projected_total = total_already_done + self.qty_declared
-        pct = (projected_total / planned_qty * 100)
-
-        # ── Get applicable rule ────────────────────────────────────
-        limit_type, limit_value = self._get_applicable_limit()
-
-        if not limit_type:
-            # No rule configured → process without limit
-            return {'status': 'ok', 'pct': pct, 'message': ''}
-
-        # ── Calculate maximum and compare ──────────────────────────
-        max_allowed = self._calculate_max_allowed(limit_type, limit_value, planned_qty)
-
-        if projected_total > max_allowed:
-            if limit_type == 'percentage':
-                return {
-                    'status': 'blocked',
-                    'pct': pct,
-                    'message': _(
-                        "BLOQUEADO: La producción total alcanzaría %.1f unidades "
-                        "(%.1f%%), superando el límite de %.1f%% (%.1f unidades)."
-                    ) % (projected_total, pct, limit_value, max_allowed),
-                }
-            else:  # fixed
-                return {
-                    'status': 'blocked',
-                    'pct': pct,
-                    'message': _(
-                        "BLOQUEADO: La producción total alcanzaría %.1f unidades, "
-                        "superando el límite fijo de %.1f unidades."
-                    ) % (projected_total, max_allowed),
-                }
+        # ── Compare single declaration vs limit ────────────────────
+        if self.qty_declared > max_allowed:
+            return {
+                'status': 'blocked',
+                'pct': 0,
+                'message': _(
+                    "BLOQUEADO: Está declarando %.1f unidades, "
+                    "el máximo permitido por declaración es %.1f unidades."
+                ) % (self.qty_declared, max_allowed),
+            }
 
         return {
             'status': 'ok',
-            'pct': pct,
+            'pct': 0,
             'message': '',
         }
+
+    # ─── Raw Material Consumption (Regla de 3) ───────────────────────
+
+    def _consume_raw_materials(self):
+        """Register proportional material consumption using the rule of three.
+
+        Only consumes components assigned to this specific workorder
+        (wo.move_raw_ids), which correspond to the work center where
+        the operator declared. These same stock.move records appear
+        in the MO's Components tab automatically.
+
+        Rule of three:
+          percentage = qty_declared / mo.product_qty
+          consumption = percentage × move.product_uom_qty (total demanded)
+        """
+        self.ensure_one()
+        wo = self.workorder_id
+        mo = self.production_id
+
+        # Planned quantity for the MO (denominator of rule of three)
+        planned_qty = mo.product_qty
+        if not planned_qty:
+            _logger.warning(
+                "MO=%s has no planned quantity, cannot calculate consumption.",
+                mo.name,
+            )
+            return
+
+        # Only components assigned to this workorder (this work center)
+        raw_moves = wo.move_raw_ids.filtered(
+            lambda m: m.state not in ('done', 'cancel')
+        )
+
+        if not raw_moves:
+            _logger.info(
+                "No raw materials assigned to WO=%s (workcenter=%s) for MO=%s",
+                wo.name, wo.workcenter_id.name, mo.name,
+            )
+            return
+
+        # Total declared via kiosk for this WO (past done + current)
+        total_kiosk_qty = sum(
+            d.qty_declared for d in wo.shift_declaration_ids.filtered(
+                lambda d: d.state == 'done' and d.id != self.id
+            )
+        ) + self.qty_declared
+
+        # Percentage of total kiosk production vs planned
+        pct_produced = total_kiosk_qty / planned_qty
+
+        consumption_details = []
+        for move in raw_moves:
+            # Rule of three: total proportional consumption
+            # consumption = (total_kiosk_qty / product_qty) × product_uom_qty
+            correct_qty = move.product_uom.round(
+                pct_produced * move.product_uom_qty
+            )
+            if correct_qty <= 0:
+                continue
+
+            # SET the quantity (not accumulate) — avoids duplication
+            # with Odoo's pre-filled values
+            move._set_quantity_done(correct_qty)
+            move.picked = True
+
+            consumption_details.append(
+                f"{move.product_id.name}: {correct_qty} {move.product_uom.name}"
+            )
+
+        _logger.info(
+            "Raw material consumption SET: MO=%s, WO=%s, "
+            "total_kiosk_qty=%s (%.1f%%), components=[%s]",
+            mo.name, wo.name, total_kiosk_qty,
+            pct_produced * 100,
+            ', '.join(consumption_details),
+        )
 
     # ─── Main Processing Logic ──────────────────────────────────────
 
@@ -256,6 +298,9 @@ class MrpShiftDeclaration(models.Model):
             # Update the work order qty_produced
             if hasattr(wo, 'qty_produced'):
                 wo.qty_produced += self.qty_declared
+
+            # ── Step 4: Register proportional material consumption ─
+            self._consume_raw_materials()
 
             _logger.info(
                 "Shift declaration processed: WO=%s, MO=%s, Employee=%s, Qty=%s, Workcenter=%s",
@@ -319,7 +364,7 @@ class MrpShiftDeclaration(models.Model):
     @api.model
     def kiosk_get_available_workcenters(self):
         """Return all available work centers for kiosk configuration."""
-        workcenters = self.env['mrp.workcenter'].sudo().search([])
+        workcenters = self.env['mrp.workcenter'].sudo().search([], order='name')
         return [{
             'id': wc.id,
             'name': wc.name,
@@ -332,6 +377,12 @@ class MrpShiftDeclaration(models.Model):
         """
         request.session['kiosk_workcenter_ids'] = workcenter_ids
         return {'success': True}
+
+    @api.model
+    def kiosk_has_session_config(self):
+        """Check if the session already has work centers configured."""
+        session_wc_ids = request.session.get('kiosk_workcenter_ids', [])
+        return {'has_config': bool(session_wc_ids)}
 
     @api.model
     def kiosk_get_workorders(self, production_barcode, employee_id):

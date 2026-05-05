@@ -17,7 +17,7 @@ class KioskAction extends Component {
         this.state = useState({
             // ─── Screen control ───────────────────────────────
             // "employee" | "config" | "production" | "success"
-            screen: "employee",
+            screen: "config",
 
             // ─── Employee session ─────────────────────────────
             empBarcode: "",
@@ -27,6 +27,7 @@ class KioskAction extends Component {
             // ─── Kiosk configuration ──────────────────────────
             availableWorkcenters: [],   // [{ id, name }]
             selectedWcIds: new Set(),   // IDs selected in config
+            wcSearch: "",               // Search filter for work centers
 
             // ─── Production order ─────────────────────────────
             moBarcode: "",
@@ -47,7 +48,23 @@ class KioskAction extends Component {
             successMessage: "",
         });
 
-        onMounted(() => this._focusCurrent());
+        onMounted(async () => {
+            // Check if session already has work centers configured
+            const sessionCheck = await this.orm.call(
+                "mrp.shift.declaration",
+                "kiosk_has_session_config",
+                []
+            );
+            if (sessionCheck.has_config) {
+                // Session already configured → go straight to employee login
+                this.state.screen = "employee";
+            } else {
+                // No config → load workcenters and show config screen
+                await this._loadWorkcenters();
+                this.state.screen = "config";
+            }
+            this._focusCurrent();
+        });
     }
 
     _focusCurrent() {
@@ -87,16 +104,9 @@ class KioskAction extends Component {
                 this.state.empError = result.error;
             } else {
                 this.state.empData = result;
-
-                if (result.has_config) {
-                    // Employee already configured → go to production screen
-                    this.state.screen = "production";
-                    this._focusCurrent();
-                } else {
-                    // No config → show configuration screen
-                    await this._loadWorkcenters();
-                    this.state.screen = "config";
-                }
+                // Config was already saved before employee login → go to production
+                this.state.screen = "production";
+                this._focusCurrent();
             }
         } catch (e) {
             this.state.empError = "Error de conexión. Intente de nuevo.";
@@ -140,6 +150,18 @@ class KioskAction extends Component {
         return this.state.selectedWcIds.has(wcId);
     }
 
+    onWcSearchInput(ev) {
+        this.state.wcSearch = ev.target.value;
+    }
+
+    get filteredWorkcenters() {
+        const q = this.state.wcSearch.trim().toLowerCase();
+        if (!q) return this.state.availableWorkcenters;
+        return this.state.availableWorkcenters.filter(
+            wc => wc.name.toLowerCase().includes(q)
+        );
+    }
+
     get canSaveConfig() {
         return this.state.selectedWcIds.size > 0 && !this.state.isProcessing;
     }
@@ -155,13 +177,18 @@ class KioskAction extends Component {
                 [[...this.state.selectedWcIds]]
             );
 
-            // Update local data
-            this.state.empData.has_config = true;
-            this.state.empData.workcenter_ids = this.state.availableWorkcenters.filter(
-                wc => this.state.selectedWcIds.has(wc.id)
-            );
+            this.state.wcSearch = "";
 
-            this.state.screen = "production";
+            // Update local data (only if employee already logged in)
+            if (this.state.empData) {
+                this.state.empData.has_config = true;
+                this.state.empData.workcenter_ids = this.state.availableWorkcenters.filter(
+                    wc => this.state.selectedWcIds.has(wc.id)
+                );
+            }
+
+            // After saving config → go to employee login
+            this.state.screen = "employee";
             this._focusCurrent();
         } catch (e) {
             this.state.empError = "Error guardando configuración.";
@@ -367,7 +394,9 @@ class KioskAction extends Component {
         this.state.overproductionBlock = "";
         this.state.isProcessing = false;
         this.state.successMessage = "";
-        this.state.screen = "employee";
+        this.state.screen = "config";
+        // Reload workcenters for a fresh config screen
+        this._loadWorkcenters();
         this._focusCurrent();
     }
 

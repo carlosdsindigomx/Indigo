@@ -14,17 +14,10 @@ class MrpWorkcenterLimit(models.Model):
         ondelete='cascade',
         index=True,
     )
-    limit_type = fields.Selection(
-        [('percentage', 'Porcentaje'), ('fixed', 'Cantidad Fija')],
-        string="Tipo de Límite",
-        required=True,
-        default='percentage',
-    )
     limit_value = fields.Float(
-        string="Valor del Límite",
+        string="Límite por Declaración",
         required=True,
-        help="Para porcentaje: ej. 110 = máximo 110%% de la meta. "
-             "Para cantidad fija: número exacto de unidades permitidas.",
+        help="Máximo de unidades que se pueden declarar en una sola vez.",
     )
 
     _sql_constraints = [
@@ -39,3 +32,4 @@ class MrpWorkcenterLimit(models.Model):
                 raise ValidationError(
                     _("El valor del límite debe ser mayor a cero.")
                 )
+

@@ -11,13 +11,10 @@ class MrpWorkorder(models.Model):
     )
 
     # ─── Declaration Limit Override (CU-03) ─────────────────────────
-    limit_type = fields.Selection(
-        [('percentage', 'Porcentaje'), ('fixed', 'Cantidad Fija')],
-        string="Tipo de Límite",
-        help="Sobrescribe la regla global del Centro de Trabajo para esta operación específica.",
-    )
     limit_value = fields.Float(
-        string="Valor del Límite",
-        help="Valor de la excepción. Porcentaje: ej. 110 = 110%% de la meta. "
-             "Cantidad Fija: unidades exactas.",
+        string="Límite por Declaración",
+        help="Máximo de unidades que se pueden declarar en una sola vez. "
+             "Sobrescribe la regla global del Centro de Trabajo. "
+             "Dejar en 0 para no aplicar excepción.",
     )
+

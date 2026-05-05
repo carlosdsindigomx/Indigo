@@ -95,12 +95,18 @@
                             <span>Configuración de Centros de Trabajo</span>
                         </div>
                         <p class="mc_kiosk_config_subtitle">
-                            <i class="fa fa-user-circle me-1"/>
-                            <strong t-esc="state.empData.employee_name"/>
-                            — Seleccione los centros de trabajo donde va a operar:
+                            Seleccione los centros de trabajo donde va a operar:
                         </p>
+                        <div class="mc_kiosk_input_group mb-3">
+                            <i class="fa fa-search mc_kiosk_input_icon"/>
+                            <input type="text"
+                                class="mc_kiosk_input"
+                                placeholder="Buscar centro de trabajo..."
+                                t-att-value="state.wcSearch"
+                                t-on-input="onWcSearchInput"/>
+                        </div>
                         <div class="mc_kiosk_wc_grid">
-                            <t t-foreach="state.availableWorkcenters" t-as="wc" t-key="wc.id">
+                            <t t-foreach="filteredWorkcenters" t-as="wc" t-key="wc.id">
                                 <div class="mc_kiosk_wc_item"
                                      t-att-class="{ 'mc_kiosk_wc_selected': isWcSelected(wc.id) }"
                                      t-on-click="() => this.toggleWorkcenter(wc.id)">
