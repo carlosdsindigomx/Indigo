@@ -19,6 +19,7 @@
                         <list decoration-success="state=='done'" decoration-danger="state=='error'">
                             <field name="date_declared" />
                             <field name="employee_id" />
+                            <field name="shift_id" />
                             <field name="qty_declared" sum="Total" />
                             <field name="state" widget="badge" decoration-success="state == 'done'"
                                 decoration-danger="state == 'error'"

@@ -5,3 +5,5 @@ access_kiosk_employee_config_user,kiosk.employee.config.user,model_kiosk_employe
 access_kiosk_employee_config_manager,kiosk.employee.config.manager,model_kiosk_employee_config,mrp.group_mrp_manager,1,1,1,1
 access_mrp_workcenter_limit_user,mrp.workcenter.limit.user,model_mrp_workcenter_limit,mrp.group_mrp_user,1,0,0,0
 access_mrp_workcenter_limit_manager,mrp.workcenter.limit.manager,model_mrp_workcenter_limit,mrp.group_mrp_manager,1,1,1,1
+access_tdmx_shift_user,tdmx.shift.user,model_tdmx_shift,mrp.group_mrp_user,1,0,0,0
+access_tdmx_shift_manager,tdmx.shift.manager,model_tdmx_shift,mrp.group_mrp_manager,1,1,1,1

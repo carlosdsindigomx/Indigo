@@ -2,26 +2,27 @@
 <odoo>
 
     <!-- ════════════════════════════════════════════════════════════
-         SHIFT DECLARATION — Tree View
+         SHIFT DECLARATION — List View
          ════════════════════════════════════════════════════════════ -->
-    <record id="mrp_shift_declaration_tree_view" model="ir.ui.view">
-        <field name="name">mrp.shift.declaration.tree</field>
+    <record id="mrp_shift_declaration_list_view" model="ir.ui.view">
+        <field name="name">mrp.shift.declaration.list</field>
         <field name="model">mrp.shift.declaration</field>
         <field name="arch" type="xml">
             <list string="Declaraciones de Turno"
-                  decoration-success="state=='done'"
-                  decoration-danger="state=='error'">
-                <field name="date_declared"/>
-                <field name="production_name"/>
-                <field name="product_id"/>
-                <field name="workorder_name" string="Operación"/>
-                <field name="workcenter_name" string="Centro de Trabajo"/>
-                <field name="employee_id"/>
-                <field name="qty_declared" sum="Total Declarado"/>
+                decoration-success="state=='done'"
+                decoration-danger="state=='error'">
+                <field name="date_declared" />
+                <field name="production_name" />
+                <field name="product_id" />
+                <field name="workorder_name" string="Operación" />
+                <field name="workcenter_name" string="Centro de Trabajo" />
+                <field name="employee_id" />
+                <field name="shift_id" />
+                <field name="qty_declared" sum="Total Declarado" />
                 <field name="state" widget="badge"
                     decoration-success="state == 'done'"
                     decoration-danger="state == 'error'"
-                    decoration-info="state == 'draft'"/>
+                    decoration-info="state == 'draft'" />
             </list>
         </field>
     </record>
@@ -39,30 +40,31 @@
                         string="Procesar"
                         type="object"
                         class="oe_highlight"
-                        invisible="state != 'draft'"/>
+                        invisible="state != 'draft'" />
                     <field name="state" widget="statusbar"
-                        statusbar_visible="draft,done"/>
+                        statusbar_visible="draft,done" />
                 </header>
                 <sheet>
                     <group>
                         <group string="Orden de Trabajo">
-                            <field name="workorder_id"/>
-                            <field name="production_id"/>
-                            <field name="production_name"/>
-                            <field name="product_id"/>
-                            <field name="workcenter_id"/>
-                            <field name="production_qty"/>
-                            <field name="production_state"/>
+                            <field name="workorder_id" />
+                            <field name="production_id" />
+                            <field name="production_name" />
+                            <field name="product_id" />
+                            <field name="workcenter_id" />
+                            <field name="production_qty" />
+                            <field name="production_state" />
                         </group>
                         <group string="Declaración del Turno">
-                            <field name="employee_id"/>
-                            <field name="qty_declared"/>
-                            <field name="date_declared"/>
+                            <field name="employee_id" />
+                            <field name="qty_declared" />
+                            <field name="date_declared" />
+                            <field name="shift_id" />
                         </group>
                     </group>
                     <group string="Trazabilidad" invisible="state == 'draft'">
                         <field name="error_message"
-                            invisible="state != 'error'"/>
+                            invisible="state != 'error'" />
                     </group>
                 </sheet>
             </form>
@@ -90,6 +92,6 @@
         name="Declaraciones de Turno"
         parent="menu_manufacturing_control_root"
         action="action_mrp_shift_declaration"
-        sequence="10"/>
+        sequence="10" />
 
 </odoo>

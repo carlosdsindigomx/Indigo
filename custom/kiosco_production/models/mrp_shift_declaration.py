@@ -49,6 +49,12 @@ class MrpShiftDeclaration(models.Model):
         default=fields.Datetime.now,
         readonly=True,
     )
+    shift_id = fields.Many2one(
+        'tdmx.shift',
+        string="Turno",
+        readonly=True,
+        index=True,
+    )
 
     # ─── State Machine ──────────────────────────────────────────────
     state = fields.Selection(
@@ -522,9 +528,34 @@ class MrpShiftDeclaration(models.Model):
     @api.model
     def kiosk_create_and_process(self, workorder_id, employee_id, qty):
         """Create a shift declaration and process it. Main kiosk entry point."""
+        
+        # ── Lógica de Asignación Automática de Turno ──
+        shift_id = False
+        now_utc = fields.Datetime.now()
+        now_local = fields.Datetime.context_timestamp(self, now_utc)
+        current_hour = now_local.hour + now_local.minute / 60.0
+
+        shifts = self.env['tdmx.shift'].sudo().search([])
+        best_shift = None
+        min_diff = float('inf')
+
+        for shift in shifts:
+            # Calcular la diferencia absoluta considerando el cruce de medianoche (24 horas)
+            diff = abs(shift.end_time - current_hour)
+            diff = min(diff, 24.0 - diff)
+            
+            # Buscar el turno cuya hora de cierre se acerque más, con margen de +/- 1 hora
+            if diff <= 1.0 and diff < min_diff:
+                min_diff = diff
+                best_shift = shift
+
+        if best_shift:
+            shift_id = best_shift.id
+
         declaration = self.create({
             'workorder_id': workorder_id,
             'employee_id': employee_id,
             'qty_declared': qty,
+            'shift_id': shift_id,
         })
         return declaration.action_process_declaration()
