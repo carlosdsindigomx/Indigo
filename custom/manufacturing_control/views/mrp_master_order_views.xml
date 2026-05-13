@@ -1,5 +1,46 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <record id="view_mrp_master_order_list" model="ir.ui.view">
+        <field name="name">mrp.master.order.list</field>
+        <field name="model">mrp.master.order</field>
+        <field name="arch" type="xml">
+            <list string="Órdenes Maestras" decoration-success="state == 'done'" decoration-info="state == 'progress'" decoration-warning="state == 'to_close'" decoration-muted="state == 'cancel'" sample="1">
+
+                <field name="name" string="Referencia" decoration-bf="1"/>
+                <field name="product_id" string='Producto'/>
+
+                <field name="global_demand" string="Meta" sum="Total Meta"/>
+
+                <field name="estimated_qty" string="Estimado" optional="hide"/>
+                <field name="estimated_progress" widget="progressbar" string="% Estimado" optional="hide"/>
+
+                <field name="total_produced" string="Producido" sum="Total Producido"/>
+                <field name="progress_percentage" widget="progressbar" string="% Producido"/>
+
+                <field name="date_deadline" optional="show" widget="remaining_days"/>
+                <field name="semaforo_label" optional="show" decoration-danger="semaforo == 'red'" decoration-warning="semaforo == 'orange'" decoration-success="semaforo == 'green'" decoration-info="semaforo == 'blue'"/>
+                <field name="deadline_delta" optional="hide"/>
+
+                <field name="state" widget="badge" decoration-success="state == 'done'" decoration-info="state in ['progress', 'confirmed']" decoration-warning="state == 'to_close'" decoration-danger="state == 'cancel'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_mrp_master_order_pivot" model="ir.ui.view">
+        <field name="name">mrp.master.order.pivot</field>
+        <field name="model">mrp.master.order</field>
+        <field name="arch" type="xml">
+            <pivot string="Resumen de Producción" sample="1">
+                <field name="product_id" type="row"/>
+
+                <field name="global_demand" type="measure" string="Meta Total"/>
+                <field name="total_produced" type="measure" string="Total Producido"/>
+
+                <field name="progress_percentage" type="measure" string="% Avance Real"/>
+            </pivot>
+        </field>
+    </record>
+
     <record id="view_mrp_master_order_kanban" model="ir.ui.view">
         <field name="name">mrp.master.order.kanban</field>
         <field name="model">mrp.master.order</field>
@@ -7,22 +48,30 @@
             <kanban class="o_kanban_mobile" sample="1" create="0">
                 <field name="name"/>
                 <field name="product_id"/>
-                <field name="uom_id"/> <field name="global_demand"/>
+                <field name="uom_id"/>
+                <field name="global_demand"/>
                 <field name="total_produced"/>
                 <field name="progress_percentage"/>
                 <field name="state"/>
+                <field name="date_deadline"/>
+                <field name="semaforo"/>
+                <field name="deadline_delta"/>
+                <field name="date_type"/>
+                <field name="main_date_start"/>
                 <field name="kanban_indicators_html"/>
+                <field name="workcenters_json"/>
+                <field name="estimated_progress"/>
+                <field name="estimated_qty"/>
                 <templates>
                     <t t-name="card">
                         <div class="oe_kanban_global_click p-0 d-flex flex-column h-100">
-                            
+
                             <div t-attf-class="text-center py-2 text-white fw-bold 
                                 {{ record.state.raw_value == 'done' ? 'bg-success' : 
                                 record.state.raw_value == 'cancel' ? 'bg-danger' : 
                                 record.state.raw_value == 'to_close' ? 'bg-warning' : 
                                 record.state.raw_value == 'progress' ? 'bg-info' : 
-                                record.state.raw_value == 'confirmed' ? 'bg-primary' : 'bg-secondary' }}" 
-                                style="font-size: 1.1em;">
+                                record.state.raw_value == 'confirmed' ? 'bg-primary' : 'bg-secondary' }}" style="font-size: 1.1em;">
                                 <field name="state"/>
                             </div>
 
@@ -30,39 +79,237 @@
                                 <strong class="d-block mb-1 fs-5">
                                     <field name="name"/>
                                 </strong>
-                                <div class="text-muted mb-3">
+                                <div class="text-muted mb-1">
                                     <field name="product_id"/>
                                 </div>
 
-                                <div class="row text-center mb-3 border rounded p-1 mx-0 align-items-center" style="background-color: rgba(255,255,255,0.05);">
+                                <div class="mb-3" t-if="record.date_deadline.raw_value">
+
+                                    <!-- SEMÁFORO ROJO -->
+                                    <t t-if="record.semaforo.raw_value === 'red'">
+                                        <span class="o_semaforo_badge o_semaforo_red">
+                                            <i class="fa fa-times-circle"/>
+                                            <field name="date_deadline"/>
+                                        </span>
+                                        <small class="d-block mt-1 ms-1 o_semaforo_delta o_semaforo_red_text" t-att-title="record.date_type.raw_value == 'deadline' ? 'Programada para: ' + (record.main_date_start.value || 'Sin programar') : 'Inicio Programado'">
+                                            <i t-attf-class="fa {{ record.date_type.raw_value == 'start' ? 'fa-play-circle' : 'fa-clock-o' }} me-1"/>
+                                            <field name="deadline_delta"/>
+                                        </small>
+                                    </t>
+
+                                    <!-- SEMÁFORO NARANJA -->
+                                    <t t-elif="record.semaforo.raw_value === 'orange'">
+                                        <span class="o_semaforo_badge o_semaforo_orange">
+                                            <i class="fa fa-exclamation-triangle"/>
+                                            <field name="date_deadline"/>
+                                        </span>
+                                        <small class="d-block mt-1 ms-1 o_semaforo_delta o_semaforo_orange_text" t-att-title="record.date_type.raw_value == 'deadline' ? 'Programada para: ' + (record.main_date_start.value || 'Sin programar') : 'Inicio Programado'">
+                                            <i t-attf-class="fa {{ record.date_type.raw_value == 'start' ? 'fa-play-circle' : 'fa-clock-o' }} me-1"/>
+                                            <field name="deadline_delta"/>
+                                        </small>
+                                    </t>
+
+                                    <!-- SEMÁFORO AZUL -->
+                                    <t t-elif="record.semaforo.raw_value === 'blue'">
+                                        <span class="o_semaforo_badge o_semaforo_blue">
+                                            <i class="fa fa-info-circle"/>
+                                            <field name="date_deadline"/>
+                                        </span>
+                                        <small class="d-block mt-1 ms-1 o_semaforo_delta o_semaforo_blue_text" t-att-title="'Inicio Programado'">
+                                            <i class="fa fa-play-circle me-1"/>
+                                            <field name="deadline_delta"/>
+                                        </small>
+                                    </t>
+
+                                    <!-- SEMÁFORO VERDE -->
+                                    <t t-elif="record.semaforo.raw_value === 'green'">
+                                        <span class="o_semaforo_badge o_semaforo_green">
+                                            <i class="fa fa-check-circle"/>
+                                            <field name="date_deadline"/>
+                                        </span>
+                                        <small class="d-block mt-1 ms-1 o_semaforo_delta o_semaforo_green_text" t-att-title="record.date_type.raw_value == 'deadline' ? 'Programada para: ' + (record.main_date_start.value || 'Sin programar') : 'Inicio Programado'">
+                                            <i t-attf-class="fa {{ record.date_type.raw_value == 'start' ? 'fa-play-circle' : 'fa-clock-o' }} me-1"/>
+                                            <field name="deadline_delta"/>
+                                        </small>
+                                    </t>
+
+                                    <!-- SIN SEMÁFORO -->
+                                    <t t-else="">
+                                        <small class="text-muted d-block" t-att-title="record.date_type.raw_value == 'deadline' ? 'Programada para: ' + (record.main_date_start.value || 'Sin programar') : 'Inicio Programado'">
+                                            <i t-attf-class="fa {{ record.date_type.raw_value == 'start' ? 'fa-play-circle' : 'fa-calendar-o' }} me-1"/>
+                                            <field name="date_deadline"/>
+                                        </small>
+                                    </t>
+                                </div>
+
+                                <!-- KPI -->
+                                <div class="row text-center mb-3 border rounded p-2 mx-0 align-items-center" style="background-color: rgba(255,255,255,0.05);">
+
+                                    <!-- Meta global  -->
                                     <div class="col-4 border-end border-secondary px-0">
-                                        <div class="fw-bold fs-5" style="color: #875A7B;">
+                                        <div class="fw-bold fs-5 text-nowrap" style="color: #875A7B;">
                                             <field name="global_demand"/>
                                         </div>
-                                        <small class="text-muted"><field name="uom_id"/></small>
+                                        <small class="text-muted d-block mt-1">
+                                            <field name="uom_id"/>
+                                        </small>
                                     </div>
+
+                                    <!-- Avance estimado  -->
                                     <div class="col-4 border-end border-secondary px-0">
-                                        <div class="text-success fw-bold fs-5">
+                                        <div t-attf-class="fw-bold fs-5 text-nowrap {{ record.estimated_progress.raw_value == 100 ? 'text-success' : 'text-info' }}">
+                                            <field name="estimated_qty" widget="float" digits="[16,2]"/>
+                                        </div>
+                                        <div t-attf-class="d-flex justify-content-center align-items-center text-nowrap {{ record.estimated_progress.raw_value == 100 ? 'text-success' : 'text-info' }}" style="font-size: 0.85em;">
+                                            <field name="estimated_progress" widget="float" digits="[16,1]"/>
+                                            <span style="margin-left: 2px;">%</span>
+                                        </div>
+                                        <small class="text-muted d-block mt-1" title="Basado en el cuello de botella">
+                                            Estimado
+                                        </small>
+                                    </div>
+
+                                    <!-- avance real -->
+                                    <div class="col-4 px-0">
+                                        <div class="text-success fw-bold fs-5 text-nowrap">
                                             <field name="total_produced"/>
                                         </div>
-                                        <small class="text-muted">Producido</small>
-                                    </div>
-                                    <div class="col-4 px-0">
-                                        <div t-attf-class="fw-bold fs-5 {{ record.progress_percentage.raw_value == 100 ? 'text-success' : 'text-danger' }}">
-                                            <field name="progress_percentage" widget="float" digits="[16,1]"/>%
+                                        <div class="d-flex justify-content-center align-items-center text-success text-nowrap" style="font-size: 0.85em;">
+                                            <field name="progress_percentage" widget="float" digits="[16,1]"/>
+                                            <span style="margin-left: 2px;">%</span>
                                         </div>
-                                        <small class="text-muted">Avance</small>
+                                        <small class="text-muted d-block mt-1" title="Piezas totalmente terminadas">
+                                            Producido
+                                        </small>
+                                    </div>
+
+                                </div>
+
+                                <div class="p-2 rounded flex-grow-1" style="background-color: rgba(255,255,255,0.05);">
+
+                                    <field name="components_json" invisible="1"/>
+                                    <t t-set="components" t-value="record.components_json.raw_value ? JSON.parse(record.components_json.raw_value) : []"/>
+                                    <t t-set="comp_count" t-value="components.length"/>
+
+                                    <a data-bs-toggle="collapse" t-attf-href="#collapseComp_{{record.id.raw_value}}" role="button" aria-expanded="false" class="text-muted d-flex justify-content-between align-items-center fw-bold border-bottom border-secondary pb-1 text-decoration-none">
+
+                                        <span class="d-flex align-items-center">
+                                            <i class="fa fa-cubes me-1"/>
+ Componentes
+                                            <span class="badge rounded-pill bg-secondary ms-2" style="font-size: 0.75em; opacity: 0.8;">
+                                                <t t-esc="comp_count"/>
+                                            </span>
+                                        </span>
+
+                                        <i class="fa fa-chevron-down" style="font-size: 0.8em;"/>
+                                    </a>
+
+                                    <div t-attf-id="collapseComp_{{record.id.raw_value}}" class="collapse mt-2">
+                                        <t t-if="comp_count === 0">
+                                            <div class="text-muted text-center mt-2">
+                                                <small>Sin componentes fabricados</small>
+                                            </div>
+                                        </t>
+                                        <div t-else="" class="d-flex flex-column w-100">
+                                            <t t-foreach="components" t-as="comp" t-key="comp.product_id">
+                                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                                    <a type="object" name="action_open_specific_component" t-attf-context="{'ctx_product_id': {{comp.product_id}}}" class="text-truncate fw-bold text-primary" style="font-size: 0.875em; text-decoration: none; cursor: pointer;">
+                                                        <t t-esc="comp.name"/>
+                                                    </a>
+                                                    <small class="fw-bold">
+                                                        <t t-esc="comp.pct"/>
+%
+                                                    </small>
+                                                </div>
+                                            </t>
+                                        </div>
                                     </div>
                                 </div>
 
-                                <div class="p-2 rounded flex-grow-1 border border-secondary" style="background-color: rgba(255,255,255,0.05);">
-                                    <small class="text-muted d-block mb-2 fw-bold border-bottom border-secondary pb-1">Componentes</small>
-                                    <field name="kanban_indicators_html" widget="html" options="{'sanitize': False}"/>
-                                </div>
+                                <div class="p-2 rounded mt-2" style="background-color: rgba(255,255,255,0.05);">
 
-                               <div class="mt-3 text-end" t-if="record.state.raw_value != 'done' and record.state.raw_value != 'cancel'">
-                                    <button name="action_close_definitive" type="object" class="btn btn-sm btn-outline-danger" confirm="¿Seguro que desea cerrar definitivamente este proyecto y cancelar las órdenes pendientes?">
-                                        <i class="fa fa-lock me-1"/> Cerrar
+                                    <t t-set="workcenters" t-value="record.workcenters_json.raw_value ? JSON.parse(record.workcenters_json.raw_value) : []"/>
+                                    <t t-set="wc_count" t-value="workcenters.length"/>
+
+                                    <a data-bs-toggle="collapse" t-attf-href="#collapseWC_{{record.id.raw_value}}" role="button" aria-expanded="false" class="text-muted d-flex justify-content-between align-items-center fw-bold border-bottom border-secondary pb-1 text-decoration-none">
+
+                                        <span class="d-flex align-items-center">
+                                            <i class="fa fa-wrench me-1"/>
+ Centros de trabajo
+                                            
+                                            <span class="badge rounded-pill bg-secondary ms-2" style="font-size: 0.75em; opacity: 0.8;">
+                                                <t t-esc="wc_count"/>
+                                            </span>
+                                        </span>
+
+                                        <i class="fa fa-chevron-down" style="font-size: 0.8em;"/>
+                                    </a>
+
+                                    <div t-attf-id="collapseWC_{{record.id.raw_value}}" class="collapse mt-2">
+                                        <t t-if="wc_count === 0">
+                                            <div class="text-muted text-center mt-2">
+                                                <small>Sin operaciones registradas</small>
+                                            </div>
+                                        </t>
+                                        <div t-else="" class="d-flex flex-column w-100 mt-1">
+                                            <t t-foreach="workcenters" t-as="wc" t-key="wc.id">
+                                                <div class="o_kanban_wc_row">
+                                                    <!-- Nombre + cantidades -->
+                                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                                        <small class="text-muted text-truncate o_kanban_wc_name">
+                                                            <i class="fa fa-circle me-1" style="font-size: 0.5em; vertical-align: middle;"/>
+                                                            <t t-esc="wc.name"/>
+                                                        </small>
+                                                        <small class="text-muted ms-1 text-nowrap">
+                                                            <t t-esc="wc.prod_qty"/>
+                                                            <span class="o_kanban_wc_sep">/</span>
+                                                            <t t-esc="wc.total_qty"/>
+                                                        </small>
+                                                    </div>
+                                                    <!-- Pastillas de estado -->
+                                                    <div class="d-flex flex-wrap gap-1 mb-1">
+                                                        <t t-if="wc.terminada > 0">
+                                                            <span class="o_wc_state_pill o_wc_pill_done" title="Terminadas">
+                                                                <i class="fa fa-check-circle"/>
+                                                                <t t-esc="wc.terminada"/>
+                                                            </span>
+                                                        </t>
+                                                        <t t-if="wc.en_proceso > 0">
+                                                            <span class="o_wc_state_pill o_wc_pill_progress" title="En proceso">
+                                                                <i class="fa fa-cogs"/>
+                                                                <t t-esc="wc.en_proceso"/>
+                                                            </span>
+                                                        </t>
+                                                        <t t-if="wc.pendiente > 0">
+                                                            <span class="o_wc_state_pill o_wc_pill_pending" title="Por hacer">
+                                                                <i class="fa fa-clock-o"/>
+                                                                <t t-esc="wc.pendiente"/>
+                                                            </span>
+                                                        </t>
+                                                        <t t-if="wc.bloqueada > 0">
+                                                            <span class="o_wc_state_pill o_wc_pill_blocked" title="Bloqueadas">
+                                                                <i class="fa fa-ban"/>
+                                                                <t t-esc="wc.bloqueada"/>
+                                                            </span>
+                                                        </t>
+                                                    </div>
+                                                    <!-- Barra de progreso -->
+                                                    <div class="o_kanban_wc_track">
+                                                        <div t-att-class="'o_kanban_wc_fill ' + (wc.pct >= 100 ? 'fill-done' : wc.pct >= 50 ? 'fill-mid' : 'fill-low')" t-att-style="'width:' + Math.min(wc.pct, 100) + '%'"/>
+                                                    </div>
+                                                    <div class="text-end" style="font-size:0.65rem; color: var(--o-secondary-text-color, #6b7280);">
+                                                        <t t-esc="wc.pct"/>
+%
+                                                    </div>
+                                                </div>
+                                            </t>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mt-3 text-end" t-if="record.state.raw_value == 'to_close'">
+                                    <button name="action_close_definitive" type="object" class="btn btn-sm btn-success" confirm="¿Seguro que desea dar por terminada esta orden?">
+                                        <i class="fa fa-check-circle me-1"/>
+ Validar Cierre
                                     </button>
                                 </div>
                             </div>
@@ -79,7 +326,7 @@
         <field name="arch" type="xml">
             <form string="Consola Maestra">
                 <header>
-                    <button name="action_close_definitive" string="Cerrar orden" type="object" class="oe_highlight" invisible="state == 'done'" confirm="¿Seguro que desea cerrar definitivamente esta orden y cancelar los remanentes?"/>
+                    <button name="action_close_definitive" string="Cerrar orden" type="object" class="oe_highlight" invisible="state not in ('to_close', 'done')" confirm="¿Seguro que desea dar por terminada esta orden?"/>
                     <field name="state" widget="statusbar"/>
                 </header>
                 <sheet>
@@ -92,10 +339,15 @@
                         <group>
                             <field name="product_id" readonly="1"/>
                             <field name="global_demand" readonly="1"/>
+                            <field name="date_deadline" readonly="1"/>
+                            <field name="semaforo" invisible="1"/>
+                            <field name="semaforo_label" readonly="1" invisible="not date_deadline" widget="badge" decoration-danger="semaforo == 'red'" decoration-warning="semaforo == 'orange'" decoration-success="semaforo == 'green'"/>
+                            <field name="deadline_delta" readonly="1" invisible="not date_deadline"/>
                         </group>
                         <group>
                             <field name="total_produced" readonly="1"/>
                             <field name="missing_quantity" readonly="1"/>
+                            <field name="main_production_id" readonly="1" invisible="not main_production_id"/>
                         </group>
                     </group>
 
@@ -104,8 +356,10 @@
                             <field name="subproduct_ids" readonly="1">
                                 <list decoration-success="progress_percentage == 100">
                                     <field name="product_id"/>
-                                    <field name="demand_qty" string="Meta Total"/> <field name="produced_qty" string="Terminado"/>
+                                    <field name="demand_qty" string="Meta Total"/>
+                                    <field name="produced_qty" string="Terminado"/>
                                     <field name="progress_percentage" widget="progressbar" string="% Avance"/>
+                                    <button name="action_view_productions" type="object" icon="fa-cogs" string="Ver órden" title="Abrir órdenes de fabricación de este componente" class="btn btn-sm btn-outline-primary"/>
                                 </list>
                             </field>
                         </page>
@@ -121,9 +375,28 @@
                                 </list>
                             </field>
                         </page>
+
                     </notebook>
                 </sheet>
             </form>
+        </field>
+    </record>
+
+    <record id="view_mrp_master_order_search" model="ir.ui.view">
+        <field name="name">mrp.master.order.search</field>
+        <field name="model">mrp.master.order</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name" string="Referencia"/>
+                <field name="product_id" string="Producto"/>
+                <filter string="Confirmadas" name="filter_done" domain="[('state', '=', 'confirmed')]"/>
+                <filter string="En progreso" name="filter_done" domain="[('state', '=', 'progress')]"/>
+                <filter string="En borrador" name="filter_done" domain="[('state', '=', 'progress')]"/>
+                <filter string="Hechas" name="filter_done" domain="[('state', '=', 'done')]"/>
+                <filter string="Canceladas" name="filter_cancel" domain="[('state', '=', 'cancel')]"/>
+                <filter string="Estado" name="group_by_state" context="{'group_by': 'state'}"/>
+                <filter string="Producto" name="group_by_product" context="{'group_by': 'product_id'}"/>
+            </search>
         </field>
     </record>
 </odoo>

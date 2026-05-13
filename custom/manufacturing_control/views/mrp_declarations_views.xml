@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_mrp_shift_declaration_pivot" model="ir.ui.view">
+        <field name="name">mrp.shift.declaration.pivot</field>
+        <field name="model">mrp.shift.declaration</field>
+        <field name="arch" type="xml">
+            <pivot string="Declaraciones" sample="1">
+                <field name="date_declared" type="row" interval="day"/>
+                <field name="workcenter_name" type="col"/>
+                <field name="qty_declared" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="view_mrp_shift_declaration_graph" model="ir.ui.view">
+        <field name="name">mrp.shift.declaration.graph</field>
+        <field name="model">mrp.shift.declaration</field>
+        <field name="arch" type="xml">
+            <graph string="Declaraciones" type="bar" sample="1">
+                <field name="workcenter_name"/>
+                <field name="qty_declared" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="action_my_mrp_shift_declaration" model="ir.actions.act_window">
+        <field name="name">Declaraciones</field>
+        <field name="res_model">mrp.shift.declaration</field>
+        <field name="view_mode">list,pivot,graph,form</field>
+    </record>
+</odoo>

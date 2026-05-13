@@ -1,23 +1,40 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <record id="action_mrp_master_order" model="ir.actions.act_window">
-        <field name="name">Consola Maestra de Producción</field>
+        <field name="name">Panel de producción</field>
         <field name="res_model">mrp.master.order</field>
-        <field name="view_mode">kanban,list,form</field>
+        <field name="view_mode">kanban,list,pivot,form</field>
+        <field name="context">{'search_default_group_by_state': 1}</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
-                No hay órdenes maestras activas.
+                No hay órdenes activas.
             </p>
         </field>
     </record>
 
-    <menuitem id="menu_mrp_master_root" 
-              name="Consola Maestra" 
+    <!-- ── Menú raíz ─────────────────────────────────────────────── -->
+    <menuitem id="menu_mrp_master_root"
+              name="Panel de producción"
               sequence="10"/>
 
-    <menuitem id="menu_mrp_master_dashboard" 
-              name="Tablero Maestro" 
-              parent="menu_mrp_master_root" 
-              action="action_mrp_master_order" 
+    <!-- ── Panel Ejecutivo ─────────────────────── -->
+    <menuitem id="menu_mfg_executive_dashboard"
+              name="Panel ejecutivo"
+              parent="menu_mrp_master_root"
+              action="action_mfg_executive_dashboard"
+              sequence="5"/>
+
+    <!-- ── Órdenes principales ───────────── -->
+    <menuitem id="menu_mrp_master_dashboard"
+              name="Órdenes principales"
+              parent="menu_mrp_master_root"
+              action="action_mrp_master_order"
               sequence="10"/>
+
+    <!-- ── Declaraciones ───────────── -->
+    <menuitem id="menu_mrp_master_declaraciones"
+              name="Declaraciones"
+              parent="menu_mrp_master_root"
+              action="action_my_mrp_shift_declaration" 
+              sequence="20"/>
 </odoo>

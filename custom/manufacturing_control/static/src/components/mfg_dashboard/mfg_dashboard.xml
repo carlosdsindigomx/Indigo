@@ -1,0 +1,332 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+<t t-name="manufacturing_control.ManufacturingDashboard">
+<div class="o_mfg_dashboard">
+
+    <!-- ═══════════════════ LOADING ═══════════════════ -->
+    <t t-if="state.loading">
+        <div class="o_mfg_loading">
+            <div class="o_mfg_spinner">
+                <i class="fa fa-industry fa-spin"/>
+            </div>
+            <p>Cargando...</p>
+        </div>
+    </t>
+
+    <!-- ══════════════════ DASHBOARD ══════════════════ -->
+    <t t-elif="state.data">
+        <div class="o_mfg_inner">
+
+            <!-- ── HEADER ────────────────────────────── -->
+            <div class="o_mfg_header">
+                <div class="o_mfg_header_text">
+                    <h2>Panel ejecutivo</h2>
+                    <span>Resumen de producción</span>
+                </div>
+                <button class="o_mfg_refresh" t-on-click="_loadData">
+                    <i class="fa fa-refresh"/> Actualizar
+                </button>
+            </div>
+
+            <!-- ── FILTRO DE FECHAS ──────────────────────── -->
+            <div class="o_mfg_filter_bar">
+                <div class="o_mfg_presets">
+                    <button t-att-class="'o_preset_btn' + (state.activePreset === 'week'       ? ' active' : '')"
+                            t-on-click="() => this._setPreset('week')">
+                        <i class="fa fa-calendar-o"/> Esta semana
+                    </button>
+                    <button t-att-class="'o_preset_btn' + (state.activePreset === 'month'      ? ' active' : '')"
+                            t-on-click="() => this._setPreset('month')">
+                        <i class="fa fa-calendar"/> Este mes
+                    </button>
+                    <button t-att-class="'o_preset_btn' + (state.activePreset === 'last_month' ? ' active' : '')"
+                            t-on-click="() => this._setPreset('last_month')">
+                        <i class="fa fa-chevron-left"/> Mes anterior
+                    </button>
+                    <button t-att-class="'o_preset_btn' + (state.activePreset === 'year'       ? ' active' : '')"
+                            t-on-click="() => this._setPreset('year')">
+                        <i class="fa fa-calendar-check-o"/> Este año
+                    </button>
+                </div>
+                <div class="o_mfg_date_range">
+                    <label class="o_date_label">Desde</label>
+                    <input type="date" class="o_date_input"
+                           t-att-value="state.dateFrom"
+                           t-on-change="onDateFromChange"/>
+                    <span class="o_date_sep">—</span>
+                    <label class="o_date_label">Hasta</label>
+                    <input type="date" class="o_date_input"
+                           t-att-value="state.dateTo"
+                           t-on-change="onDateToChange"/>
+                </div>
+            </div>
+
+            <!-- ── KPI CARDS ──────────────────────────── -->
+            <div class="o_mfg_kpi_grid">
+
+                <!-- Confirmadas -->
+                <div class="o_kpi_card o_kpi_blue" t-on-click="() => this._openView('confirmed')">
+                    <i class="fa fa-check-circle-o o_kpi_icon"/>
+                    <div class="o_kpi_value" t-esc="state.data.confirmadas"/>
+                    <div class="o_kpi_name">Confirmadas</div>
+                    <div class="o_kpi_sub">Listas para iniciar</div>
+                </div>
+
+                <!-- En Proceso -->
+                <div class="o_kpi_card o_kpi_teal" t-on-click="() => this._openView('progress')">
+                    <i class="fa fa-cogs o_kpi_icon"/>
+                    <div class="o_kpi_value" t-esc="state.data.en_proceso"/>
+                    <div class="o_kpi_name">En Proceso</div>
+                    <div class="o_kpi_sub">Produciendo ahora</div>
+                </div>
+
+                <!-- Terminadas -->
+                <div class="o_kpi_card o_kpi_green" t-on-click="() => this._openView('done')">
+                    <i class="fa fa-trophy o_kpi_icon"/>
+                    <div class="o_kpi_value" t-esc="state.data.terminadas"/>
+                    <div class="o_kpi_name">Terminadas</div>
+                    <div class="o_kpi_sub">En el período</div>
+                </div>
+
+                <!-- Atrasadas -->
+                <div class="o_kpi_card o_kpi_orange" t-on-click="() => this._openView('atrasadas')">
+                    <i class="fa fa-clock-o o_kpi_icon"/>
+                    <div class="o_kpi_value" t-esc="state.data.atrasadas"/>
+                    <div class="o_kpi_name">Atrasadas</div>
+                    <div class="o_kpi_sub">Fecha límite vencida</div>
+                </div>
+
+                <!-- Bloqueadas -->
+                <div class="o_kpi_card o_kpi_red" t-on-click="() => this._openView('bloqueadas')">
+                    <i class="fa fa-ban o_kpi_icon"/>
+                    <div class="o_kpi_value" t-esc="state.data.bloqueadas"/>
+                    <div class="o_kpi_name">Bloqueadas</div>
+                    <div class="o_kpi_sub">Esperando material</div>
+                </div>
+
+            </div>
+
+            <!-- ── DISTRIBUCIÓN ───────────────────────── -->
+            <div class="o_mfg_section">
+                <div class="o_mfg_section_header">
+                    <strong>Distribución de Órdenes</strong>
+                    <span class="o_mfg_total_badge">
+                        <t t-esc="totalOrders"/> total
+                    </span>
+                </div>
+
+                <div class="o_mfg_bar_wrap">
+                    <div class="o_mfg_progress_bar">
+                        <div t-if="state.data.borrador"
+                             class="o_bar_seg o_bar_gray"
+                             t-att-style="'width:' + pctBorrador + '%'"
+                             t-att-title="'Borrador: ' + state.data.borrador"/>
+                         <div t-if="state.data.confirmadas"
+                             class="o_bar_seg o_bar_blue"
+                             t-att-style="'width:' + pctConfirmadas + '%'"
+                             t-att-title="'Confirmadas: ' + state.data.confirmadas"/>
+                        <div t-if="state.data.en_proceso"
+                             class="o_bar_seg o_bar_teal"
+                             t-att-style="'width:' + pctEnProceso + '%'"
+                             t-att-title="'En proceso: ' + state.data.en_proceso"/>
+                        <div t-if="state.data.por_cerrar"
+                             class="o_bar_seg o_bar_amber"
+                             t-att-style="'width:' + pctPorCerrar + '%'"
+                             t-att-title="'Por cerrar: ' + state.data.por_cerrar"/>
+                        <div t-if="state.data.terminadas"
+                             class="o_bar_seg o_bar_green"
+                             t-att-style="'width:' + pctTerminadas + '%'"
+                             t-att-title="'Terminadas: ' + state.data.terminadas"/>
+                    </div>
+                </div>
+
+                <div class="o_mfg_legend">
+                    <span class="o_legend_item">
+                        <span class="o_dot o_dot_gray"/>
+                        Borrador (<t t-esc="state.data.borrador"/>)
+                    </span>
+                    <span class="o_legend_item">
+                        <span class="o_dot o_dot_blue"/>
+                        Confirmadas (<t t-esc="state.data.confirmadas"/>)
+                    </span>
+                    <span class="o_legend_item">
+                        <span class="o_dot o_dot_teal"/>
+                        En proceso (<t t-esc="state.data.en_proceso"/>)
+                    </span>
+                    <span class="o_legend_item">
+                        <span class="o_dot o_dot_amber"/>
+                        Por cerrar (<t t-esc="state.data.por_cerrar"/>)
+                    </span>
+                    
+                    <span class="o_legend_item">
+                        <span class="o_dot o_dot_green"/>
+                        Terminadas (<t t-esc="state.data.terminadas"/>)
+                    </span>
+                </div>
+            </div>
+
+            <!-- ── PRODUCTOS PRINCIPALES ──────────────── -->
+            <div class="o_mfg_section">
+                <div class="o_mfg_section_header">
+                    <strong><i class="fa fa-cube me-2"/>Productos Principales</strong>
+                    <span class="o_mfg_section_hint">
+                        <t t-esc="state.data.products.length"/> productos activos
+                    </span>
+                </div>
+
+                <t t-if="!state.data.products.length">
+                    <div class="o_wc_empty">
+                        <i class="fa fa-check-circle o_wc_empty_icon"/>
+                        <span>Sin productos con órdenes activas</span>
+                    </div>
+                </t>
+
+                <t t-else="">
+                    <div class="o_prod_table">
+                        <div class="o_prod_header">
+                            <div class="o_prod_col_name">Producto</div>
+                            <div class="o_prod_col_states">Estados</div>
+                            <div class="o_prod_col_progress">Avance global</div>
+                        </div>
+                        <t t-foreach="state.data.products" t-as="prod" t-key="prod.id">
+                            <div class="o_prod_row"
+                                 t-on-click="() => this._openViewByProduct(prod.id, null)">
+                                <div class="o_prod_col_name">
+                                    <div class="o_prod_name" t-esc="prod.name"/>
+                                    <div class="o_prod_meta">
+                                        <t t-esc="prod.abiertas + prod.terminadas"/> Órdenes
+                                        <!-- <t t-esc="prod.total_produced"/> / -->
+                                        <!-- <t t-esc="prod.total_demand"/> uds -->
+                                    </div>
+                                </div>
+                                <div class="o_prod_col_states">
+                                    <t t-if="prod.en_proceso">
+                                        <span class="o_prod_pill o_pill_teal"
+                                              t-on-click.stop="() => this._openViewByProduct(prod.id, 'progress')"
+                                              t-att-title="'En proceso: ' + prod.en_proceso">
+                                            <i class="fa fa-cogs"/>
+                                            <t t-esc="prod.en_proceso"/>
+                                        </span>
+                                    </t>
+                                    <t t-if="prod.confirmadas">
+                                        <span class="o_prod_pill o_pill_blue"
+                                              t-on-click.stop="() => this._openViewByProduct(prod.id, 'confirmed')"
+                                              t-att-title="'Confirmadas: ' + prod.confirmadas">
+                                            <i class="fa fa-check"/>
+                                            <t t-esc="prod.confirmadas"/>
+                                        </span>
+                                    </t>
+                                    <t t-if="prod.por_cerrar">
+                                        <span class="o_prod_pill o_pill_amber"
+                                              t-on-click.stop="() => this._openViewByProduct(prod.id, 'to_close')"
+                                              t-att-title="'Por cerrar: ' + prod.por_cerrar">
+                                            <i class="fa fa-hourglass-half"/>
+                                            <t t-esc="prod.por_cerrar"/>
+                                        </span>
+                                    </t>
+                                    <t t-if="prod.borrador">
+                                        <span class="o_prod_pill o_pill_gray"
+                                              t-on-click.stop="() => this._openViewByProduct(prod.id, 'draft')"
+                                              t-att-title="'Borrador: ' + prod.borrador">
+                                            <i class="fa fa-file-o"/>
+                                            <t t-esc="prod.borrador"/>
+                                        </span>
+                                    </t>
+                                    <t t-if="prod.terminadas">
+                                        <span class="o_prod_pill o_pill_green"
+                                              t-on-click.stop="() => this._openViewByProduct(prod.id, 'done')"
+                                              t-att-title="'Terminadas: ' + prod.terminadas">
+                                            <i class="fa fa-check-circle"/>
+                                            <t t-esc="prod.terminadas"/>
+                                        </span>
+                                    </t>
+                                </div>
+                                <div class="o_prod_col_progress">
+                                    <div class="o_prod_progress_wrap">
+                                        <div class="o_prod_progress_track">
+                                            <div t-att-class="'o_prod_progress_fill ' + (prod.progress >= 100 ? 'fill-done' : prod.progress >= 50 ? 'fill-mid' : 'fill-low')"
+                                                 t-att-style="'width:' + Math.min(prod.progress, 100) + '%'"/>
+                                        </div>
+                                        <span class="o_prod_pct">
+                                            <t t-esc="prod.progress"/>%
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </t>
+                    </div>
+                </t>
+            </div>
+
+            <!-- ── CENTROS DE TRABAJO ─────────────────── -->
+            <div class="o_mfg_section">
+                <div class="o_mfg_section_header">
+                    <strong><i class="fa fa-industry me-2"/>Carga por Centro de Trabajo</strong>
+                </div>
+
+                <t t-if="!state.data.workcenters.length">
+                    <div class="o_wc_empty">
+                        <i class="fa fa-check-circle o_wc_empty_icon"/>
+                        <span>Sin órdenes de trabajo pendientes</span>
+                    </div>
+                </t>
+
+                <t t-else="">
+                    <div class="o_wc_grid">
+                        <t t-foreach="state.data.workcenters" t-as="wc" t-key="wc.id">
+                            <div class="o_wc_card" 
+                                t-on-click="() => this._openWorkcenterGantt(wc.id, wc.name)" 
+                                style="cursor: pointer; transition: transform 0.2s;">
+                                
+                                <div t-att-class="'o_wc_badge ' + wcBadgeClass(wc.pending)">
+                                    <t t-esc="wc.count"/>
+                                </div>
+                                
+                                <div class="o_wc_info">
+                                    <div class="o_wc_name" t-esc="wc.name"/>
+                                    <div class="o_wc_stats d-flex justify-content-between align-items-center mb-1">
+                                        
+                                        <span class="o_wc_stat_pending text-muted" style="font-size: 0.85em;">
+                                            <t t-esc="wc.count"/> ops | <t t-esc="wc.pending"/> hrs | <t t-esc="wc.units"/> uds
+                                        </span>
+                                        
+                                        <div class="d-flex align-items-center gap-2">
+                                            <t t-if="wc.late_count > 0">
+                                                <span class="text-danger fw-bold" t-att-title="wc.late_count + ' operaciones atrasadas'" style="font-size: 0.85em;">
+                                                    <i class="fa fa-warning"/> <t t-esc="wc.late_count"/>
+                                                </span>
+                                            </t>
+                                            
+                                            <span t-att-class="'o_wc_stat_prog ' + (wc.in_progress ? 'active' : '')">
+                                                <t t-esc="wc.in_progress"/> en curso
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div class="o_wc_bar_track">
+                                        <div t-att-class="'o_wc_bar_fill ' + wcBarClass(wc.pending)"
+                                            t-att-style="'width:' + wcBarWidth(wc.pending) + '%'"/>
+                                    </div>
+                                </div>
+                            </div>
+                        </t>
+                    </div>
+                </t>
+            </div>
+
+        </div>
+    </t>
+
+    <!--ERROR -->
+    <t t-else="">
+        <div class="o_mfg_loading">
+            <i class="fa fa-exclamation-triangle" style="font-size:3rem;color:#e6a817;"/>
+            <p>No se pudo cargar el panel.</p>
+            <button class="o_mfg_refresh" t-on-click="_loadData">Reintentar</button>
+        </div>
+    </t>
+
+</div>
+</t>
+
+</templates>

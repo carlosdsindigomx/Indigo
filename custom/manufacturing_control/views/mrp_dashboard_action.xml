@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Acción del cliente para el Panel Ejecutivo (Nivel 0).
+        El tag apunta al componente OWL registrado en el registry de acciones.
+    -->
+    <record id="action_mfg_executive_dashboard" model="ir.actions.client">
+        <field name="name">Panel Ejecutivo de Producción</field>
+        <field name="tag">manufacturing_control.dashboard</field>
+    </record>
+</odoo>
