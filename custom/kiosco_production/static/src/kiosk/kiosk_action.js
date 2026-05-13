@@ -401,7 +401,21 @@ class KioskAction extends Component {
     }
 
     logoutEmployee() {
-        this.resetKiosk();
+        this.state.empBarcode = "";
+        this.state.empError = "";
+        this.state.empData = null;
+        this.state.moBarcode = "";
+        this.state.moError = "";
+        this.state.moData = null;
+        this.state.familyOrders = [];
+        this.state.selectedWO = null;
+        this.state.qtyDeclared = "";
+        this.state.overproductionWarning = "";
+        this.state.overproductionBlock = "";
+        this.state.isProcessing = false;
+        this.state.successMessage = "";
+        this.state.screen = "employee";
+        this._focusCurrent();
     }
 }
 
