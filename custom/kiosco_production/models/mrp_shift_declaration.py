@@ -536,17 +536,32 @@ class MrpShiftDeclaration(models.Model):
 
         shifts = self.env['tdmx.shift'].sudo().search([])
         best_shift = None
-        min_diff = float('inf')
+        min_diff_to_end = float('inf')
 
         for shift in shifts:
-            # Calcular la diferencia absoluta considerando el cruce de medianoche (24 horas)
-            diff = abs(shift.end_time - current_hour)
-            diff = min(diff, 24.0 - diff)
+            s = shift.start_time
+            e = shift.end_time
+            # Ajuste para turnos que cruzan la medianoche
+            e_adj = e if e >= s else e + 24.0
             
-            # Buscar el turno cuya hora de cierre se acerque más, con margen de +/- 1 hora
-            if diff <= 1.0 and diff < min_diff:
-                min_diff = diff
-                best_shift = shift
+            t1 = current_hour
+            t2 = current_hour + 24.0
+            
+            def dist_to_range(t):
+                if s <= t <= e_adj:
+                    return 0.0
+                return min(abs(t - s), abs(t - e_adj))
+                
+            # Distancia de la hora actual al rango del turno
+            d_range = min(dist_to_range(t1), dist_to_range(t2))
+            
+            # Es candidato si estamos DENTRO del horario o en su margen de +/- 1 hora
+            if d_range <= 1.0:
+                # De los candidatos, buscamos el que tenga la hora de cierre más cercana
+                d_end = min(abs(t1 - e_adj), abs(t2 - e_adj))
+                if d_end < min_diff_to_end:
+                    min_diff_to_end = d_end
+                    best_shift = shift
 
         if best_shift:
             shift_id = best_shift.id
