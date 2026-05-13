@@ -12,6 +12,7 @@
         'views/mrp_dashboard_action.xml',
         'views/mrp_master_order_views.xml',
         'views/mrp_declarations_views.xml',
+        'views/mrp_shift_views.xml',
         'views/mrp_master_menus.xml',
     ],
     'assets': {

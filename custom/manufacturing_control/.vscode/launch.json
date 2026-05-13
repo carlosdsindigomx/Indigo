@@ -1,0 +1,40 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Odoo: Debug Manufacturing-control",
+            "type": "debugpy",
+            "request": "launch",
+            "python": "/Users/seb/Desktop/indigo/odoo/odoo/venv/bin/python",
+            "program": "/Users/seb/Desktop/indigo/odoo/odoo/odoo-bin",
+            "args": [
+                "-d", "odoo-indigo",
+                "-r", "odoo",
+                "-w", "postgres",
+                "-u", "manufacturing_control",
+                "--addons-path=addons,/Users/seb/Desktop/indigo/train-odoo/Indigo/custom,/Users/seb/Desktop/indigo/train-odoo/enterprise",
+                "--workers=0"
+            ],
+            "cwd": "/Users/seb/Desktop/indigo/odoo/odoo",
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Odoo: Run (sin update)",
+            "type": "debugpy",
+            "request": "launch",
+            "python": "/Users/seb/Desktop/indigo/odoo/odoo/venv/bin/python",
+            "program": "/Users/seb/Desktop/indigo/odoo/odoo/odoo-bin",
+            "args": [
+                "-d", "odoo-indigo",
+                "-r", "odoo",
+                "-w", "postgres",
+                "--addons-path=addons,/Users/seb/Desktop/indigo/train-odoo/Indigo/custom,/Users/seb/Desktop/indigo/train-odoo/enterprise",
+                "--workers=0"
+            ],
+            "cwd": "/Users/seb/Desktop/indigo/odoo/odoo",
+            "console": "integratedTerminal",
+            "justMyCode": false
+        }
+    ]
+}

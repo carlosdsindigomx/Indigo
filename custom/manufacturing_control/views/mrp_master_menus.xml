@@ -14,27 +14,34 @@
 
     <!-- ── Menú raíz ─────────────────────────────────────────────── -->
     <menuitem id="menu_mrp_master_root"
-              name="Panel de producción"
-              sequence="10"/>
+        name="Panel de producción"
+        sequence="10" />
 
     <!-- ── Panel Ejecutivo ─────────────────────── -->
     <menuitem id="menu_mfg_executive_dashboard"
-              name="Panel ejecutivo"
-              parent="menu_mrp_master_root"
-              action="action_mfg_executive_dashboard"
-              sequence="5"/>
+        name="Panel ejecutivo"
+        parent="menu_mrp_master_root"
+        action="action_mfg_executive_dashboard"
+        sequence="5" />
 
     <!-- ── Órdenes principales ───────────── -->
     <menuitem id="menu_mrp_master_dashboard"
-              name="Órdenes principales"
-              parent="menu_mrp_master_root"
-              action="action_mrp_master_order"
-              sequence="10"/>
+        name="Órdenes principales"
+        parent="menu_mrp_master_root"
+        action="action_mrp_master_order"
+        sequence="10" />
 
     <!-- ── Declaraciones ───────────── -->
     <menuitem id="menu_mrp_master_declaraciones"
-              name="Declaraciones"
-              parent="menu_mrp_master_root"
-              action="action_my_mrp_shift_declaration" 
-              sequence="20"/>
+        name="Declaraciones"
+        parent="menu_mrp_master_root"
+        action="action_my_mrp_shift_declaration"
+        sequence="20" />
+
+    <!-- ── Turnos ───────────── -->
+    <menuitem id="menu_mrp_master_shifts"
+        name="Turnos"
+        parent="menu_mrp_master_root"
+        action="action_my_mrp_shift"
+        sequence="30" />
 </odoo>
