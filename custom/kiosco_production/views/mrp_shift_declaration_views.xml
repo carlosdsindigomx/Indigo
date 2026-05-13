@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ════════════════════════════════════════════════════════════
+         SHIFT DECLARATION — Tree View
+         ════════════════════════════════════════════════════════════ -->
+    <record id="mrp_shift_declaration_tree_view" model="ir.ui.view">
+        <field name="name">mrp.shift.declaration.tree</field>
+        <field name="model">mrp.shift.declaration</field>
+        <field name="arch" type="xml">
+            <list string="Declaraciones de Turno"
+                  decoration-success="state=='done'"
+                  decoration-danger="state=='error'">
+                <field name="date_declared"/>
+                <field name="production_name"/>
+                <field name="product_id"/>
+                <field name="workorder_name" string="Operación"/>
+                <field name="workcenter_name" string="Centro de Trabajo"/>
+                <field name="employee_id"/>
+                <field name="qty_declared" sum="Total Declarado"/>
+                <field name="state" widget="badge"
+                    decoration-success="state == 'done'"
+                    decoration-danger="state == 'error'"
+                    decoration-info="state == 'draft'"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ════════════════════════════════════════════════════════════
+         SHIFT DECLARATION — Form View
+         ════════════════════════════════════════════════════════════ -->
+    <record id="mrp_shift_declaration_form_view" model="ir.ui.view">
+        <field name="name">mrp.shift.declaration.form</field>
+        <field name="model">mrp.shift.declaration</field>
+        <field name="arch" type="xml">
+            <form string="Declaración de Turno">
+                <header>
+                    <button name="action_process_declaration"
+                        string="Procesar"
+                        type="object"
+                        class="oe_highlight"
+                        invisible="state != 'draft'"/>
+                    <field name="state" widget="statusbar"
+                        statusbar_visible="draft,done"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group string="Orden de Trabajo">
+                            <field name="workorder_id"/>
+                            <field name="production_id"/>
+                            <field name="production_name"/>
+                            <field name="product_id"/>
+                            <field name="workcenter_id"/>
+                            <field name="production_qty"/>
+                            <field name="production_state"/>
+                        </group>
+                        <group string="Declaración del Turno">
+                            <field name="employee_id"/>
+                            <field name="qty_declared"/>
+                            <field name="date_declared"/>
+                        </group>
+                    </group>
+                    <group string="Trazabilidad" invisible="state == 'draft'">
+                        <field name="error_message"
+                            invisible="state != 'error'"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ════════════════════════════════════════════════════════════
+         SHIFT DECLARATION — Action & Menu
+         ════════════════════════════════════════════════════════════ -->
+    <record id="action_mrp_shift_declaration" model="ir.actions.act_window">
+        <field name="name">Declaraciones de Turno</field>
+        <field name="res_model">mrp.shift.declaration</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No hay declaraciones de turno registradas.
+            </p>
+            <p>
+                Las declaraciones se crean automáticamente desde el Kiosco de Producción.
+            </p>
+        </field>
+    </record>
+
+    <menuitem id="menu_mrp_shift_declaration"
+        name="Declaraciones de Turno"
+        parent="menu_manufacturing_control_root"
+        action="action_mrp_shift_declaration"
+        sequence="10"/>
+
+</odoo>

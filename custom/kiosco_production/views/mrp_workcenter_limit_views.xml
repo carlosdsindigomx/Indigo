@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         List View: Límites de Declaración por Centro de Trabajo
+         ═══════════════════════════════════════════════════════════════ -->
+    <record id="mrp_workcenter_limit_view_list" model="ir.ui.view">
+        <field name="name">mrp.workcenter.limit.list</field>
+        <field name="model">mrp.workcenter.limit</field>
+        <field name="arch" type="xml">
+            <list editable="bottom">
+                <field name="workcenter_id" />
+                <field name="limit_value" />
+            </list>
+        </field>
+    </record>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         Form View: Límites de Declaración por Centro de Trabajo
+         ═══════════════════════════════════════════════════════════════ -->
+    <record id="mrp_workcenter_limit_view_form" model="ir.ui.view">
+        <field name="name">mrp.workcenter.limit.form</field>
+        <field name="model">mrp.workcenter.limit</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <group string="Centro de Trabajo">
+                            <field name="workcenter_id" />
+                        </group>
+                        <group string="Regla de Límite">
+                            <field name="limit_value" />
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         Action + Menu
+         ═══════════════════════════════════════════════════════════════ -->
+    <record id="mrp_workcenter_limit_action" model="ir.actions.act_window">
+        <field name="name">Límites de Declaración por CT</field>
+        <field name="res_model">mrp.workcenter.limit</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Configurar límites de declaración por centro de trabajo
+            </p>
+            <p>
+                Establezca el máximo de unidades que un operario puede
+                declarar en una sola vez por centro de trabajo.
+            </p>
+        </field>
+    </record>
+
+    <menuitem id="mrp_workcenter_limit_menu"
+        name="Límites de Declaración por CT"
+        parent="mrp.menu_mrp_configuration"
+        action="mrp_workcenter_limit_action"
+        sequence="50" />
+
+</odoo>

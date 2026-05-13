@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         Workorder Form: Declaraciones Kiosco tab + Limit fields
+         ═══════════════════════════════════════════════════════════════ -->
+    <record id="mrp_workorder_form_view_inherit_kiosk" model="ir.ui.view">
+        <field name="name">mrp.workorder.form.kiosk</field>
+        <field name="model">mrp.workorder</field>
+        <field name="inherit_id" ref="mrp.mrp_production_workorder_form_view_inherit" />
+        <field name="arch" type="xml">
+            <!-- Notebook page: Declaraciones Kiosco -->
+            <xpath expr="//notebook" position="inside">
+                <page string="Declaraciones Kiosco" name="kiosk_production">
+                    <group string="Límite de Declaración (Excepción)">
+                        <field name="limit_value" />
+                    </group>
+                    <field name="shift_declaration_ids" readonly="1">
+                        <list decoration-success="state=='done'" decoration-danger="state=='error'">
+                            <field name="date_declared" />
+                            <field name="employee_id" />
+                            <field name="qty_declared" sum="Total" />
+                            <field name="state" widget="badge" decoration-success="state == 'done'"
+                                decoration-danger="state == 'error'"
+                                decoration-info="state == 'draft'" />
+                        </list>
+                    </field>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         MO Form: Add limit columns to the workorder inline list
+         ═══════════════════════════════════════════════════════════════ -->
+    <record id="mrp_production_workorder_tree_limit" model="ir.ui.view">
+        <field name="name">mrp.production.workorder.tree.limit</field>
+        <field name="model">mrp.workorder</field>
+        <field name="inherit_id" ref="mrp.mrp_production_workorder_tree_editable_view" />
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='workcenter_id']" position="after">
+                <field name="limit_value" optional="hide"
+                    string="Límite por Declaración" />
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

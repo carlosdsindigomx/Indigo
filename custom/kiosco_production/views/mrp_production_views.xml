@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ════════════════════════════════════════════════════════════
+         MRP WORKORDER — Extend Form View
+         Adds: stat button, and notebook page "Declaraciones Kiosco"
+              next to Components tab showing all kiosk declarations
+         ════════════════════════════════════════════════════════════ -->
+    <record id="mrp_production_form_view_inherit" model="ir.ui.view">
+        <field name="name">mrp.production.form.manufacturing_control</field>
+        <field name="model">mrp.production</field>
+        <field name="inherit_id" ref="mrp.mrp_production_form_view" />
+        <field name="arch" type="xml">
+
+            <!-- Stat button: Declaraciones de Turno -->
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="action_view_shift_declarations"
+                    type="object"
+                    class="oe_stat_button"
+                    icon="fa-clipboard"
+                    invisible="shift_total_declared == 0">
+                    <field name="shift_total_declared" string="Declarado" widget="statinfo" />
+                </button>
+            </xpath>
+
+        </field>
+    </record>
+
+</odoo>
