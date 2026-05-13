@@ -1,6 +1,6 @@
 /** @odoo-module */
 
-import { Component, useState, useRef, onMounted, onWillStart } from "@odoo/owl";
+import { Component, useState, useRef, onMounted } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 
@@ -16,8 +16,8 @@ class KioskAction extends Component {
 
         this.state = useState({
             // ─── Screen control ───────────────────────────────
-            // "employee" | "config" | "production" | "success"
-            screen: "config",
+            // "loading" | "employee" | "config" | "production" | "success"
+            screen: "loading",
 
             // ─── Employee session ─────────────────────────────
             empBarcode: "",
@@ -48,7 +48,7 @@ class KioskAction extends Component {
             successMessage: "",
         });
 
-        onWillStart(async () => {
+        onMounted(async () => {
             // Check if session already has work centers configured
             const sessionCheck = await this.orm.call(
                 "mrp.shift.declaration",
@@ -63,9 +63,6 @@ class KioskAction extends Component {
                 await this._loadWorkcenters();
                 this.state.screen = "config";
             }
-        });
-
-        onMounted(() => {
             this._focusCurrent();
         });
     }

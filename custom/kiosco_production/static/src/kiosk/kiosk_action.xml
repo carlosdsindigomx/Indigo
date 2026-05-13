@@ -53,6 +53,18 @@
             <div class="mc_kiosk_body" t-if="state.screen !== 'success'">
 
                 <!-- ═══════════════════════════════════════════════
+                     SCREEN: Loading
+                     ═══════════════════════════════════════════════ -->
+                <t t-if="state.screen === 'loading'">
+                    <div class="mc_kiosk_center_card" style="background: transparent; box-shadow: none;">
+                        <div class="mc_kiosk_loading" style="font-size: 24px; color: var(--mc-text-muted);">
+                            <i class="fa fa-spinner fa-spin fa-2x mb-3 d-block text-center"/>
+                            <div class="text-center">Preparando terminal...</div>
+                        </div>
+                    </div>
+                </t>
+
+                <!-- ═══════════════════════════════════════════════
                      SCREEN: Employee Login
                      ═══════════════════════════════════════════════ -->
                 <t t-if="state.screen === 'employee'">
