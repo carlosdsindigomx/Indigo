@@ -52,7 +52,6 @@ class MrpShiftDeclaration(models.Model):
     shift_id = fields.Many2one(
         'tdmx.shift',
         string="Turno",
-        readonly=True,
         index=True,
     )
 
