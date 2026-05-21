@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <menuitem id="menu_sat_auditor_root" name="Auditor SAT"/>
+        <menuitem id="menu_sat_auditor_xml" name="Operaciones" parent="menu_sat_auditor_root" action="action_sat_xml_raw" sequence="10"/>
+    </data>
+</odoo>
