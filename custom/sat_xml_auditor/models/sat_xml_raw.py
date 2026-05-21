@@ -35,20 +35,23 @@ class SatXmlRaw(models.Model):
         ('pending', 'Pendiente de Validar'),
         ('match', 'Sincronizado'),
         ('discrepancy', 'Discrepancia de Estatus'),
-        ('missing', 'Faltante')
+        ('missing', 'Faltante'),
+        ('wrong_company', 'RFC Ajeno')
     ], string='Estatus', default='pending')
 
     move_id = fields.Many2one('account.move', string='Factura en Odoo', readonly=True)
 
-    @api.depends('rfc_emisor')
+    @api.depends('rfc_emisor', 'rfc_receptor')
     def _compute_tipo_operacion(self):
         for record in self:
-            # Comparamos el RFC del emisor con el RFC de la compañía (res.company)
-            if record.rfc_emisor and record.env.company.vat:
-                if record.rfc_emisor == record.env.company.vat:
+            mi_rfc = record.env.company.vat
+            if mi_rfc:
+                if record.rfc_emisor == mi_rfc:
                     record.tipo_operacion = 'emitido'
-                else:
+                elif record.rfc_receptor == mi_rfc:
                     record.tipo_operacion = 'recibido'
+                else:
+                    record.tipo_operacion = False
             else:
                 record.tipo_operacion = False
                 
@@ -101,9 +104,14 @@ class SatXmlRaw(models.Model):
                     record.uuid = nodo_timbre.get('UUID')
 
                 record._compute_tipo_operacion()
+                
+                mi_rfc = record.env.company.vat
+                
+                # Verificamos si el XML nos pertenece
+                if mi_rfc and mi_rfc not in [record.rfc_emisor, record.rfc_receptor]:
+                    record.match_state = 'wrong_company'
 
-                #  Buscar la factura en Odoo
-                if record.uuid:
+                elif record.uuid: 
                     factura_existente = self.env['account.move'].search([
                         ('l10n_mx_edi_cfdi_uuid', '=', record.uuid)
                     ], limit=1)

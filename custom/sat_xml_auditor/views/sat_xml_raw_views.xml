@@ -5,7 +5,12 @@
             <field name="name">sat.xml.raw.list</field>
             <field name="model">sat.xml.raw</field>
             <field name="arch" type="xml">
-                <list js_class="sat_xml_list" decoration-success="match_state == 'match'" decoration-danger="match_state == 'missing'" decoration-warning="match_state == 'discrepancy'" decoration-info="match_state == 'pending'">
+                <list js_class="sat_xml_list" 
+                decoration-success="match_state == 'match'" 
+                decoration-danger="match_state == 'missing'" 
+                decoration-warning="match_state == 'discrepancy'" 
+                decoration-info="match_state == 'pending'"
+                decoration-muted="match_state == 'wrong_company'" >
                     <field name="date_emission"/>
                     <field name="uuid"/>
                     <field name="nombre_emisor"/>
