@@ -3,7 +3,6 @@ from datetime import datetime, timedelta
 import logging
 from odoo import models, fields, api, exceptions
 
-# NUEVAS RUTAS EXACTAS PARA satcfdi 4.4.16
 from satcfdi.models import Signer
 from satcfdi.pacs.sat import SAT
 
