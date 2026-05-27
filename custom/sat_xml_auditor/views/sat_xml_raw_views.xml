@@ -5,12 +5,7 @@
             <field name="name">sat.xml.raw.list</field>
             <field name="model">sat.xml.raw</field>
             <field name="arch" type="xml">
-                <list js_class="sat_xml_list" 
-                decoration-success="match_state == 'match'" 
-                decoration-danger="match_state == 'missing'" 
-                decoration-warning="match_state == 'discrepancy'" 
-                decoration-info="match_state == 'pending'"
-                decoration-muted="match_state == 'wrong_company'" >
+                <list js_class="sat_xml_list" decoration-success="match_state == 'match'" decoration-danger="match_state == 'missing'" decoration-warning="match_state == 'discrepancy'" decoration-info="match_state == 'pending'" decoration-muted="match_state == 'wrong_company'">
                     <field name="date_emission"/>
                     <field name="uuid"/>
                     <field name="nombre_emisor"/>
@@ -43,9 +38,11 @@
                                 <field name="xml_filename" invisible="1"/>
                                 <field name="xml_file" filename="xml_filename"/>
                             </group>
-                            <group string="Resultado de Auditoría">
+                            <group string="Detalles del Comprobante">
                                 <field name="tipo_operacion" readonly="1" widget="badge"/>
-                                <field name="move_id" readonly="1" invisible="not move_id"/>
+                                <field name="date_emission" readonly="1"/>
+                                <field name="cfdi_type" readonly="1"/>
+                                <field name="amount_total" readonly="1"/>
                             </group>
                         </group>
                         <group>
@@ -56,13 +53,6 @@
                             <group string="Datos del Receptor">
                                 <field name="rfc_receptor" readonly="1"/>
                                 <field name="nombre_receptor" readonly="1"/>
-                            </group>
-                        </group>
-                        <group>
-                            <group string="Detalles del Comprobante">
-                                <field name="date_emission" readonly="1"/>
-                                <field name="cfdi_type" readonly="1"/>
-                                <field name="amount_total" readonly="1"/>
                             </group>
                         </group>
                     </sheet>
@@ -93,5 +83,19 @@
             <field name="res_model">sat.xml.raw</field>
             <field name="view_mode">list,form</field>
         </record>
+
+        <record id="action_generar_facturas_masivo" model="ir.actions.server">
+            <field name="name">Generar factura</field>
+            <field name="model_id" ref="model_sat_xml_raw"/>
+            <field name="binding_model_id" ref="model_sat_xml_raw"/>
+            <field name="binding_view_types">list</field>
+            <field name="state">code</field>
+            <field name="code">
+                if records:
+                    action = records.action_generar_facturas()
+            </field>
+        </record>
+
+
     </data>
 </odoo>

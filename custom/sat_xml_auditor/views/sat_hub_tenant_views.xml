@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="view_sat_hub_tenant_form" model="ir.ui.view">
+            <field name="name">sat.hub.tenant.form</field>
+            <field name="model">sat.hub.tenant</field>
+            <field name="arch" type="xml">
+                <form string="Configuración de Cliente">
+                    <header>
+                        <!-- <button name="action_probar_conexion_sat" string="Probar conexión" type="object" class="oe_highlight"/> -->
+                    </header>
+                    <sheet>
+                        <div class="oe_title">
+                            <label for="name" class="oe_edit_only"/>
+                            <h1>
+                                <field name="name" placeholder="Ej. Innovación y Desarrollo SA de CV"/>
+                            </h1>
+                        </div>
+                        <group>
+                            <group string="Identificación de la Empresa">
+                                <field name="partner_id" placeholder="Buscar contacto"/>
+                                <field name="rfc" placeholder="Ej. XEXX010101000"/>
+                            </group>
+                            
+                            <group string="Credenciales">
+                                <field name="fiel_cert" filename="fiel_cert_name"/>
+                                <field name="fiel_cert_name" invisible="1"/>
+
+                                <field name="fiel_key" filename="fiel_key_name"/>
+                                <field name="fiel_key_name" invisible="1"/>
+
+                                <field name="fiel_password" password="True"/>
+                            </group>
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_sat_hub_tenant" model="ir.actions.act_window">
+            <field name="name">Empresas</field>
+            <field name="res_model">sat.hub.tenant</field>
+            <field name="view_mode">list,form</field>
+        </record>
+    </data>
+</odoo>

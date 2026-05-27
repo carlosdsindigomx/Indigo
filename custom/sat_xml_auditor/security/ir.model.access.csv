@@ -1,3 +1,5 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_sat_xml_raw_user,sat.xml.raw.user,model_sat_xml_raw,base.group_user,1,1,1,1
 access_sat_xml_import_wizard,sat.xml.import.wizard,model_sat_xml_import_wizard,base.group_user,1,1,1,1
+access_sat_hub_tenant_user,sat.hub.tenant.user,model_sat_hub_tenant,base.group_user,1,1,1,1
+access_sat_xml_download_request,sat.xml.download.request,model_sat_xml_download_request,base.group_user,1,1,1,1

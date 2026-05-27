@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="view_sat_xml_download_request_list" model="ir.ui.view">
+            <field name="name">sat.xml.download.request.list</field>
+            <field name="model">sat.xml.download.request</field>
+            <field name="arch" type="xml">
+                <list decoration-info="state == 'draft'" decoration-warning="state == 'requested'" decoration-success="state in ('verified', 'downloaded')" decoration-danger="state == 'error'">
+                    <field name="create_date" string="Fecha Registro"/>
+                    <field name="tenant_id"/>
+                    <field name="tipo_solicitud" widget="badge"/>
+                    <field name="tipo_operacion"/>
+                    <field name="date_start"/>
+                    <field name="date_end"/>
+                    <field name="id_solicitud"/>
+                    <field name="state" widget="badge"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_sat_xml_download_request_form" model="ir.ui.view">
+            <field name="name">sat.xml.download.request.form</field>
+            <field name="model">sat.xml.download.request</field>
+            <field name="arch" type="xml">
+                <form string="Petición de Descarga Masiva">
+                    <header>
+                        <button name="action_solicitar_sat" string="Solicitar" type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                        <button name="action_verificar_descargar_sat" string="Descargar" type="object" class="oe_highlight" invisible="state not in ('requested', 'verified')"/>
+                        <button name="action_extraer_e_importar_xml" string="Cargar XMLs" type="object" class="oe_highlight" invisible="state != 'downloaded'"/>
+                        <field name="state" widget="statusbar" statusbar_visible="draft,requested,verified,downloaded"/>
+                    </header>
+                    <sheet>
+                        <group string="Busqueda">
+                            <group>
+                                <field name="tenant_id" readonly="state != 'draft'"/>
+                                <field name="tipo_solicitud" readonly="state != 'draft'"/>
+                                <field name="tipo_operacion" readonly="state != 'draft'"/>
+                            </group>
+                            <group>
+                                <field name="date_start" readonly="state != 'draft'"/>
+                                <field name="date_end" readonly="state != 'draft'"/>
+                            </group>
+                        </group>
+                        <group string="Respuesta" invisible="state == 'draft'">
+                            <group>
+                                <field name="id_solicitud" readonly="1"/>
+                                <field name="cod_estatus" readonly="1"/>
+                            </group>
+                            <group>
+                                <field name="mensaje" readonly="1"/>
+                            </group>
+                        </group>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_sat_xml_download_request" model="ir.actions.act_window">
+            <field name="name">Solicitudes de descarga</field>
+            <field name="res_model">sat.xml.download.request</field>
+            <field name="view_mode">list,form</field>
+        </record>
+    </data>
+</odoo>

@@ -1,6 +1,7 @@
 import base64
 from lxml import etree
 from odoo import models, fields, api, exceptions
+from satcfdi.cfdi import CFDI
 
 class SatXmlRaw(models.Model):
     _name = 'sat.xml.raw'
@@ -57,7 +58,7 @@ class SatXmlRaw(models.Model):
                 
     def action_procesar_xml(self):
         """
-        Lee el archivo XML adjunto, extrae los nodos del CFDI 4.0,
+        Lee el archivo XML adjunto usando satcfdi, 
         rellena los campos y busca la factura en Odoo para auditarla.
         """
         for record in self:
@@ -65,50 +66,45 @@ class SatXmlRaw(models.Model):
                 raise exceptions.UserError("Por favor, sube un archivo XML antes de procesar.")
 
             try:
-                # Decodificar el archivo binario guardado en Odoo
+                # Decodificar el archivo
                 xml_content = base64.b64decode(record.xml_file)
                 
-                # Parsear el XML con lxml
-                root = etree.fromstring(xml_content)
+                # Cargar el XML con satcfdi
+                invoice = CFDI.from_string(xml_content)
                 
-                # Definir los Namespaces del SAT obligatorios para poder buscar los nodos
-                namespaces = {
-                    'cfdi': 'http://www.sat.gob.mx/cfd/4',
-                    'tfd': 'http://www.sat.gob.mx/TimbreFiscalDigital'
-                }
-
-                # Extraer atributos principales del nodo raíz (<cfdi:Comprobante>)
-                record.date_emission = root.get('Fecha')[:10] if root.get('Fecha') else False
-                record.amount_total = float(root.get('Total', 0.0))
+                # Extraer atributos principales
+                fecha_factura = invoice.get('Fecha')
+                if fecha_factura:
+                    record.date_emission = fecha_factura.date() if hasattr(fecha_factura, 'date') else fecha_factura
+                else:
+                    record.date_emission = False
+                record.amount_total = float(invoice.get('Total', 0.0))
                 
-                # Mapear el Tipo de Comprobante (I, E, T, P, N)
-                tipo_letra = root.get('TipoDeComprobante')
+                # Mapear el tipo de comprobante
+                tipo_letra = invoice.get('TipoDeComprobante')
                 mapa_tipos = {'I': 'ingreso', 'E': 'egreso', 'T': 'traslado', 'P': 'pago', 'N': 'nomina'}
                 record.cfdi_type = mapa_tipos.get(tipo_letra, False)
 
-                # Extraer datos del Emisor (<cfdi:Emisor>)
-                nodo_emisor = root.find('.//cfdi:Emisor', namespaces)
-                if nodo_emisor is not None:
-                    record.rfc_emisor = nodo_emisor.get('Rfc')
-                    record.nombre_emisor = nodo_emisor.get('Nombre')
-
-                # Extraer datos del Receptor (<cfdi:Receptor>)
-                nodo_receptor = root.find('.//cfdi:Receptor', namespaces)
-                if nodo_receptor is not None:
-                    record.rfc_receptor = nodo_receptor.get('Rfc')
-                    record.nombre_receptor = nodo_receptor.get('Nombre')
-
-                # Extraer el UUID del Timbre Fiscal (<tfd:TimbreFiscalDigital>)
-                nodo_timbre = root.find('.//tfd:TimbreFiscalDigital', namespaces)
-                if nodo_timbre is not None:
-                    record.uuid = nodo_timbre.get('UUID')
-
-                record._compute_tipo_operacion()
+                # Extraer datos del emisor y receptor
+                record.rfc_emisor = invoice['Emisor'].get('Rfc')
+                record.nombre_emisor = invoice['Emisor'].get('Nombre')
                 
+                record.rfc_receptor = invoice['Receptor'].get('Rfc')
+                record.nombre_receptor = invoice['Receptor'].get('Nombre')
+
+                # Extraer el UUID del timbre fiscal
+                complemento = invoice.get('Complemento', {})
+                if 'TimbreFiscalDigital' in complemento:
+                    record.uuid = complemento['TimbreFiscalDigital'].get('UUID')
+
+                # Tipo de operacion
+                record._compute_tipo_operacion() 
                 mi_rfc = record.env.company.vat
                 
-                # Verificamos si el XML nos pertenece
-                if mi_rfc and mi_rfc not in [record.rfc_emisor, record.rfc_receptor]:
+                # Limpiar prefijo de país si Odoo lo tiene 
+                mi_rfc_limpio = mi_rfc.replace('MX', '') if mi_rfc else False
+                
+                if mi_rfc_limpio and mi_rfc_limpio not in [record.rfc_emisor, record.rfc_receptor]:
                     record.match_state = 'wrong_company'
 
                 elif record.uuid: 
@@ -117,17 +113,116 @@ class SatXmlRaw(models.Model):
                     ], limit=1)
                     
                     if factura_existente:
-                        # Si existe, la vinculamos al registro
                         record.move_id = factura_existente.id
-                        
-                        # Si en Odoo la factura está cancelada, marcamos discrepancia
                         if factura_existente.state == 'cancel':
                             record.match_state = 'discrepancy'
                         else:
                             record.match_state = 'match'
                     else:
-                        # Si no existe en Odoo, la marcamos como faltante
                         record.match_state = 'missing'
 
             except Exception as e:
                 raise exceptions.UserError(f"Error al procesar el archivo XML: {str(e)}")
+            
+    def action_generar_facturas(self):
+        """
+        Toma los registros 'Faltantes', crea los contactos si no existen,
+        lee el XML original para extraer los conceptos exactos y 
+        genera las facturas en estado Borrador.
+        """
+        partner_obj = self.env['res.partner']
+        move_obj = self.env['account.move']
+        facturas_creadas = 0
+        
+        # Filtramos para procesar únicamente los Faltantes
+        faltantes = self.filtered(lambda r: r.match_state == 'missing')
+        
+        if not faltantes:
+            raise exceptions.UserError("Solo se puede crear facturas para registros en estatus 'Faltante'.")
+            
+        for record in faltantes:
+            # 1. Determinar tipo de comprobante y RFC
+            if record.tipo_operacion == 'recibido':
+                move_type = 'in_invoice'  # Factura de Proveedor (Gasto/Compra)
+                rfc_target = record.rfc_emisor
+                name_target = record.nombre_emisor
+            elif record.tipo_operacion == 'emitido':
+                move_type = 'out_invoice' # Factura de Cliente (Ingreso/Venta)
+                rfc_target = record.rfc_receptor
+                name_target = record.nombre_receptor
+            else:
+                continue
+                
+            # 2. Buscar o crear al Contacto (res.partner)
+            partner = partner_obj.search([('vat', '=', rfc_target)], limit=1)
+            if not partner:
+                mx_country = self.env.ref('base.mx', raise_if_not_found=False)
+                partner = partner_obj.create({
+                    'name': name_target,
+                    'vat': rfc_target,
+                    'is_company': True,
+                    'country_id': mx_country.id if mx_country else False
+                })
+                
+            # 3. EXTRAER CONCEPTOS DIRECTO DEL XML
+            invoice_lines = []
+            try:
+                # Decodificamos el XML y lo leemos con satcfdi
+                xml_content = base64.b64decode(record.xml_file)
+                cfdi = CFDI.from_string(xml_content)
+                
+                # Iteramos sobre cada partida de la factura
+                conceptos = cfdi.get('Conceptos', [])
+                for concepto in conceptos:
+                    descripcion = concepto.get('Descripcion', 'Sin descripción')
+                    cantidad = float(concepto.get('Cantidad', 1.0))
+                    precio_unitario = float(concepto.get('ValorUnitario', 0.0))
+                    
+                    # Agregamos la línea al arreglo de creación de Odoo
+                    # Odoo usa la sintaxis (0, 0, {valores}) para crear registros hijos
+                    invoice_lines.append((0, 0, {
+                        'name': descripcion,
+                        'quantity': cantidad,
+                        'price_unit': precio_unitario,
+                    }))
+            except Exception as e:
+                # Fallback de seguridad: Si falla la lectura, metemos el total global
+                invoice_lines = [(0, 0, {
+                    'name': 'Concepto global (Error al desglosar)',
+                    'quantity': 1,
+                    'price_unit': record.amount_total,
+                })]
+                
+            # 4. Crear la Factura en estado Borrador
+            move_vals = {
+                'move_type': move_type,
+                'partner_id': partner.id,
+                'invoice_date': record.date_emission,
+                'l10n_mx_edi_cfdi_uuid': record.uuid,
+                'ref': f"XML Automático",
+                'invoice_line_ids': invoice_lines  # Inyectamos todas las partidas aquí
+            }
+            
+            nuevo_move = move_obj.create(move_vals)
+            facturas_creadas += 1
+            
+            # 5. Adjuntar el XML a la factura (Para el visor o contabilidad)
+            self.env['ir.attachment'].create({
+                'name': record.xml_filename,
+                'type': 'binary',
+                'datas': record.xml_file,
+                'res_model': 'account.move',
+                'res_id': nuevo_move.id,
+                'mimetype': 'application/xml'
+            })
+            
+            # 6. Marcar como procesado
+            record.write({
+                'move_id': nuevo_move.id,
+                'match_state': 'match'
+            })
+            
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'reload',
+        }
