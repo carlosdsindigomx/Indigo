@@ -85,7 +85,7 @@ class SatHubTenant(models.Model):
                 'type': 'ir.actions.client',
                 'tag': 'display_notification',
                 'params': {
-                    'title': '¡Firma Validada!',
+                    'title': 'Firma Validada',
                     'message': f'La e.firma de {signer.rfc} es correcta.',
                     'type': 'success',
                     'sticky': False,

@@ -1,5 +1,4 @@
 import base64
-from lxml import etree
 from odoo import models, fields, api, exceptions
 from satcfdi.cfdi import CFDI
 
@@ -37,7 +36,7 @@ class SatXmlRaw(models.Model):
         ('match', 'Sincronizado'),
         ('discrepancy', 'Discrepancia de Estatus'),
         ('missing', 'Faltante'),
-        ('wrong_company', 'RFC Ajeno')
+        ('wrong_company', 'RFC invalido')
     ], string='Estatus', default='pending')
 
     move_id = fields.Many2one('account.move', string='Factura en Odoo', readonly=True)
@@ -59,7 +58,7 @@ class SatXmlRaw(models.Model):
     def action_procesar_xml(self):
         """
         Lee el archivo XML adjunto usando satcfdi, 
-        rellena los campos y busca la factura en Odoo para auditarla.
+        rellena los campos y busca la factura en Odoo.
         """
         for record in self:
             if not record.xml_file:
@@ -72,6 +71,25 @@ class SatXmlRaw(models.Model):
                 # Cargar el XML con satcfdi
                 invoice = CFDI.from_string(xml_content)
                 
+                complemento = invoice.get('Complemento', {})
+                uuid_extraido = False
+                if 'TimbreFiscalDigital' in complemento:
+                    uuid_extraido = complemento['TimbreFiscalDigital'].get('UUID')
+
+                # Validación de duplicados basada en UUID
+                if uuid_extraido:
+                    duplicado = self.env['sat.xml.raw'].search([
+                        ('uuid', '=', uuid_extraido),
+                        ('id', '!=', record.id) 
+                    ], limit=1)
+                    
+                    if duplicado:
+                        record.unlink()
+                        raise exceptions.UserError(f"Este XML ya fue cargado previamente en el sistema: {uuid_extraido}")
+                
+                # Si pasa la validación, le asignamos el UUID 
+                record.uuid = uuid_extraido
+
                 # Extraer atributos principales
                 fecha_factura = invoice.get('Fecha')
                 if fecha_factura:
@@ -92,22 +110,16 @@ class SatXmlRaw(models.Model):
                 record.rfc_receptor = invoice['Receptor'].get('Rfc')
                 record.nombre_receptor = invoice['Receptor'].get('Nombre')
 
-                # Extraer el UUID del timbre fiscal
-                complemento = invoice.get('Complemento', {})
-                if 'TimbreFiscalDigital' in complemento:
-                    record.uuid = complemento['TimbreFiscalDigital'].get('UUID')
-
-                # Tipo de operacion
                 record._compute_tipo_operacion() 
                 mi_rfc = record.env.company.vat
                 
-                # Limpiar prefijo de país si Odoo lo tiene 
                 mi_rfc_limpio = mi_rfc.replace('MX', '') if mi_rfc else False
                 
                 if mi_rfc_limpio and mi_rfc_limpio not in [record.rfc_emisor, record.rfc_receptor]:
                     record.match_state = 'wrong_company'
 
                 elif record.uuid: 
+                    # Busqueda de facturas
                     factura_existente = self.env['account.move'].search([
                         ('l10n_mx_edi_cfdi_uuid', '=', record.uuid)
                     ], limit=1)
@@ -121,6 +133,8 @@ class SatXmlRaw(models.Model):
                     else:
                         record.match_state = 'missing'
 
+            except exceptions.UserError as ue:
+                raise ue 
             except Exception as e:
                 raise exceptions.UserError(f"Error al procesar el archivo XML: {str(e)}")
             
@@ -141,19 +155,19 @@ class SatXmlRaw(models.Model):
             raise exceptions.UserError("Solo se puede crear facturas para registros en estatus 'Faltante'.")
             
         for record in faltantes:
-            # 1. Determinar tipo de comprobante y RFC
+            # Determinar tipo de comprobante y RFC
             if record.tipo_operacion == 'recibido':
-                move_type = 'in_invoice'  # Factura de Proveedor (Gasto/Compra)
+                move_type = 'in_invoice'  # Factura de Proveedor
                 rfc_target = record.rfc_emisor
                 name_target = record.nombre_emisor
             elif record.tipo_operacion == 'emitido':
-                move_type = 'out_invoice' # Factura de Cliente (Ingreso/Venta)
+                move_type = 'out_invoice' # Factura de Cliente
                 rfc_target = record.rfc_receptor
                 name_target = record.nombre_receptor
             else:
                 continue
                 
-            # 2. Buscar o crear al Contacto (res.partner)
+            # Buscar o crear al Contacto
             partner = partner_obj.search([('vat', '=', rfc_target)], limit=1)
             if not partner:
                 mx_country = self.env.ref('base.mx', raise_if_not_found=False)
@@ -164,10 +178,9 @@ class SatXmlRaw(models.Model):
                     'country_id': mx_country.id if mx_country else False
                 })
                 
-            # 3. EXTRAER CONCEPTOS DIRECTO DEL XML
+            # Extraer conceptos
             invoice_lines = []
             try:
-                # Decodificamos el XML y lo leemos con satcfdi
                 xml_content = base64.b64decode(record.xml_file)
                 cfdi = CFDI.from_string(xml_content)
                 
@@ -179,21 +192,20 @@ class SatXmlRaw(models.Model):
                     precio_unitario = float(concepto.get('ValorUnitario', 0.0))
                     
                     # Agregamos la línea al arreglo de creación de Odoo
-                    # Odoo usa la sintaxis (0, 0, {valores}) para crear registros hijos
                     invoice_lines.append((0, 0, {
                         'name': descripcion,
                         'quantity': cantidad,
                         'price_unit': precio_unitario,
                     }))
             except Exception as e:
-                # Fallback de seguridad: Si falla la lectura, metemos el total global
+                # Si falla la lectura, metemos el total global
                 invoice_lines = [(0, 0, {
-                    'name': 'Concepto global (Error al desglosar)',
+                    'name': 'Concepto global',
                     'quantity': 1,
                     'price_unit': record.amount_total,
                 })]
                 
-            # 4. Crear la Factura en estado Borrador
+            # Crear la Factura en borrador
             move_vals = {
                 'move_type': move_type,
                 'partner_id': partner.id,
@@ -206,7 +218,7 @@ class SatXmlRaw(models.Model):
             nuevo_move = move_obj.create(move_vals)
             facturas_creadas += 1
             
-            # 5. Adjuntar el XML a la factura (Para el visor o contabilidad)
+            # Adjuntar el XML a la factura
             self.env['ir.attachment'].create({
                 'name': record.xml_filename,
                 'type': 'binary',
@@ -216,7 +228,7 @@ class SatXmlRaw(models.Model):
                 'mimetype': 'application/xml'
             })
             
-            # 6. Marcar como procesado
+            #Marcar como procesado
             record.write({
                 'move_id': nuevo_move.id,
                 'match_state': 'match'

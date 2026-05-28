@@ -25,7 +25,7 @@
                     <header>
                         <button name="action_procesar_xml" string="Procesar XML" type="object" class="oe_highlight" invisible="match_state != 'pending'"/>
                         <button name="action_procesar_xml" string="Procesar" type="object" invisible="match_state == 'pending'"/>
-                        <field name="match_state" widget="statusbar" statusbar_visible="pending,match,discrepancy,missing"/>
+                        <field name="match_state" widget="statusbar" statusbar_visible="pending,match,discrepancy,missing,wrong_company"/>
                     </header>
                     <sheet>
                         <div class="oe_title">

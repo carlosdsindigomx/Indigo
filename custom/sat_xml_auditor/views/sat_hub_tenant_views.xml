@@ -7,7 +7,7 @@
             <field name="arch" type="xml">
                 <form string="Configuración de Cliente">
                     <header>
-                        <!-- <button name="action_probar_conexion_sat" string="Probar conexión" type="object" class="oe_highlight"/> -->
+                        <button name="action_probar_conexion_sat" string="Validar" type="object" class="oe_highlight"/>
                     </header>
                     <sheet>
                         <div class="oe_title">
