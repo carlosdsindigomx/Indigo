@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+    
+    <t t-name="sat_xml_auditor.ListView.Buttons" t-inherit="web.ListView.Buttons" t-inherit-mode="primary">
+        
+        <xpath expr="." position="inside">
+            
+            <button type="button" class="btn btn-secondary d-inline-flex align-items-center" t-on-click="openImportWizard">
+                <i class="fa fa-upload me-1"/> Importar XML
+            </button>
+            
+        </xpath>
+        
+    </t>
+    
+</templates>

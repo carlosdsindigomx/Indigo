@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="view_sat_xml_raw_list" model="ir.ui.view">
+            <field name="name">sat.xml.raw.list</field>
+            <field name="model">sat.xml.raw</field>
+            <field name="arch" type="xml">
+                <list js_class="sat_xml_list" decoration-success="match_state == 'match'" decoration-danger="match_state == 'missing'" decoration-warning="match_state == 'discrepancy'" decoration-info="match_state == 'pending'" decoration-muted="match_state == 'wrong_company'">
+                    <field name="date_emission"/>
+                    <field name="uuid"/>
+                    <field name="nombre_emisor"/>
+                    <field name="nombre_receptor"/>
+                    <field name="cfdi_type"/>
+                    <field name="amount_total" sum="Total"/>
+                    <field name="match_state" widget="badge"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_sat_xml_raw_form" model="ir.ui.view">
+            <field name="name">sat.xml.raw.form</field>
+            <field name="model">sat.xml.raw</field>
+            <field name="arch" type="xml">
+                <form>
+                    <header>
+                        <button name="action_procesar_xml" string="Procesar XML" type="object" class="oe_highlight" invisible="match_state != 'pending'"/>
+                        <button name="action_procesar_xml" string="Procesar" type="object" invisible="match_state == 'pending'"/>
+                        <field name="match_state" widget="statusbar" statusbar_visible="pending,match,discrepancy,missing,wrong_company"/>
+                    </header>
+                    <sheet>
+                        <div class="oe_title">
+                            <h1>
+                                <field name="uuid" readonly="1" placeholder="El UUID se extraerá al procesar..."/>
+                            </h1>
+                        </div>
+                        <group>
+                            <group string="Carga de Archivo">
+                                <field name="xml_filename" invisible="1"/>
+                                <field name="xml_file" filename="xml_filename"/>
+                            </group>
+                            <group string="Detalles del Comprobante">
+                                <field name="tipo_operacion" readonly="1" widget="badge"/>
+                                <field name="date_emission" readonly="1"/>
+                                <field name="cfdi_type" readonly="1"/>
+                                <field name="amount_total" readonly="1"/>
+                            </group>
+                        </group>
+                        <group>
+                            <group string="Datos del Emisor">
+                                <field name="rfc_emisor" readonly="1"/>
+                                <field name="nombre_emisor" readonly="1"/>
+                            </group>
+                            <group string="Datos del Receptor">
+                                <field name="rfc_receptor" readonly="1"/>
+                                <field name="nombre_receptor" readonly="1"/>
+                            </group>
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <record id="view_sat_xml_raw_search" model="ir.ui.view">
+            <field name="name">sat.xml.raw.search</field>
+            <field name="model">sat.xml.raw</field>
+            <field name="arch" type="xml">
+                <search>
+                    <field name="uuid"/>
+                    <field name="rfc_emisor"/>
+                    <field name="nombre_emisor"/>
+                    <filter string="Faltantes" name="missing" domain="[('match_state', '=', 'missing')]"/>
+                    <filter string="Con Discrepancia" name="discrepancy" domain="[('match_state', '=', 'discrepancy')]"/>
+                    <filter string="Sincronizados" name="filter_match" domain="[('match_state', '=', 'match')]"/>
+                    <separator/>
+                    <filter string="Facturas Emitidas" name="emitidas" domain="[('tipo_operacion', '=', 'emitido')]"/>
+                    <filter string="Facturas Recibidas" name="recibidas" domain="[('tipo_operacion', '=', 'recibido')]"/>
+                </search>
+            </field>
+        </record>
+
+        <record id="action_sat_xml_raw" model="ir.actions.act_window">
+            <field name="name">XMLs</field>
+            <field name="res_model">sat.xml.raw</field>
+            <field name="view_mode">list,form</field>
+        </record>
+
+        <record id="action_generar_facturas_masivo" model="ir.actions.server">
+            <field name="name">Generar factura</field>
+            <field name="model_id" ref="model_sat_xml_raw"/>
+            <field name="binding_model_id" ref="model_sat_xml_raw"/>
+            <field name="binding_view_types">list</field>
+            <field name="state">code</field>
+            <field name="code">
+                if records:
+                    action = records.action_generar_facturas()
+            </field>
+        </record>
+
+
+    </data>
+</odoo>

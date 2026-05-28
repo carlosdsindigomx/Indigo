@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <menuitem id="menu_sat_auditor_root" name="Auditor SAT"/>
+        <menuitem id="menu_sat_auditor_xml" name="Operaciones" parent="menu_sat_auditor_root" action="action_sat_xml_raw" sequence="10"/>
+        <menuitem id="menu_sat_hub_tenant" name="Clientes" parent='menu_sat_auditor_root' action="action_sat_hub_tenant" sequence="20"/>
+        <menuitem id="menu_sat_xml_download_request" name="Descargas" parent="menu_sat_auditor_root" action="action_sat_xml_download_request" sequence="30"/>
+    </data>
+</odoo>
