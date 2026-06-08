@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_report_sat_xml_raw" model="ir.actions.report">
+        <field name="name">Reporte PDF</field>
+        <field name="model">sat.xml.raw</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">sat_xml_auditor.report_sat_xml_template</field>
+        <field name="report_file">sat_xml_auditor.report_sat_xml_template</field>
+        <field name="binding_model_id" ref="model_sat_xml_raw"/>
+        <field name="binding_type">report</field>
+        <field name="print_report_name">(object.uuid or 'CFDI_Sin_UUID')</field>
+    </record>
+
+    <template id="report_sat_xml_template">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="doc">
+                <t t-call="web.basic_layout">
+                    <div class="page" style="color: #333; font-family: sans-serif; font-size: 12px;">
+                        
+                        <t t-set="data" t-value="xml_data[doc.id]"/>
+
+                        <div class="row align-items-center mb-3" style="border-bottom: 2px solid #333; padding-bottom: 10px;">
+                            <div class="col-8">
+                                <h3 style="margin: 0; font-weight: bold; color: #000;">
+                                    CFDI <span t-esc="data['version']"/>: <span t-field="doc.cfdi_type"/>
+                                </h3>
+                                <div style="color: #555;">Folio: <strong><span t-esc="data['serie_folio']"/></strong></div>
+                                <div style="color: #555; font-size: 11px;">UUID: <span t-field="doc.uuid"/></div>
+                            </div>
+                            <div class="col-4 text-end">
+                                <div><strong>Emisión: </strong> <span t-field="doc.date_emission"/></div>
+                                <div><strong>C.P. Expedición: </strong> <span t-esc="data['lugar_expedicion']"/></div>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3" style="background-color: #f0f0f0; padding: 10px; border-radius: 4px; border: 1px solid #ddd;">
+                            <div class="col-3">
+                                <strong>Forma de Pago:</strong> <br/><span t-esc="data['forma_pago']"/>
+                            </div>
+                            <div class="col-3">
+                                <strong>Método de Pago:</strong> <br/><span t-esc="data['metodo_pago']"/>
+                            </div>
+                            <div class="col-3">
+                                <strong>Moneda:</strong> <br/><span t-esc="data['moneda']"/>
+                            </div>
+                            <div class="col-3">
+                                <strong>Uso CFDI:</strong> <br/><span t-esc="data['uso_cfdi']"/>
+                            </div>
+                        </div>
+
+                        <div class="row mb-4">
+                            <div class="col-6">
+                                <div style="padding: 10px; height: 100%;">
+                                    <h6 style="border-bottom: 1px solid #eee; padding-bottom: 5px; margin-top: 0; color: #000;">EMISOR</h6>
+                                    <strong>RFC:</strong> <span t-field="doc.rfc_emisor"/><br/>
+                                    <strong>Nombre:</strong> <span t-field="doc.nombre_emisor"/><br/>
+                                    <strong>Régimen:</strong> <span t-esc="data['regimen_emisor']"/>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div style="padding: 10px; height: 100%;">
+                                    <h6 style="border-bottom: 1px solid #eee; padding-bottom: 5px; margin-top: 0; color: #000;">RECEPTOR</h6>
+                                    <strong>RFC:</strong> <span t-field="doc.rfc_receptor"/><br/>
+                                    <strong>Nombre:</strong> <span t-field="doc.nombre_receptor"/><br/>
+                                    <strong>Régimen:</strong> <span t-esc="data['regimen_receptor']"/><br/>
+                                    <strong>C.P. Domicilio:</strong> <span t-esc="data['cp_receptor']"/>
+                                </div>
+                            </div>
+                        </div>
+
+                        <table class="table table-sm" style="border-top: 1px solid #ccc; border-bottom: 1px solid #ccc;">
+                            <thead style="background-color: #f9f9f9; color: #000;">
+                                <tr>
+                                    <th>Clave</th>
+                                    <th>Descripción</th>
+                                    <th class="text-end">Cant.</th>
+                                    <th class="text-end">P. Unitario</th>
+                                    <th class="text-end">Importe</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-foreach="data['conceptos']" t-as="linea">
+                                    <tr style="border-bottom: 1px solid #eee;">
+                                        <td><t t-esc="linea.get('ClaveProdServ', '')"/></td>
+                                        <td><t t-esc="linea.get('Descripcion', 'N/A')"/></td>
+                                        <td class="text-end"><t t-esc="linea.get('Cantidad', '0')"/></td>
+                                        <td class="text-end">$ <t t-esc="linea.get('ValorUnitario', '0.00')"/></td>
+                                        <td class="text-end">$ <t t-esc="linea.get('Importe', '0.00')"/></td>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+
+                        <div class="row justify-content-end mt-3">
+                            <div class="col-5">
+                                <table class="table table-sm table-borderless text-end">
+                                    <tr>
+                                        <td>Subtotal:</td>
+                                        <td>$ <span t-esc="data['subtotal']"/></td>
+                                    </tr>
+                                    <tr t-if="float(data.get('descuento', 0)) > 0">
+                                        <td>Descuento:</td>
+                                        <td>$ <span t-esc="data['descuento']"/></td>
+                                    </tr>
+                                    <tr t-if="float(data.get('total_retenidos', 0)) > 0">
+                                        <td>Retenciones:</td>
+                                        <td>$ <span t-esc="data['total_retenidos']"/></td>
+                                    </tr>
+                                    <tr t-if="float(data.get('total_trasladados', 0)) > 0">
+                                        <td>Traslados:</td>
+                                        <td>$ <span t-esc="data['total_trasladados']"/></td>
+                                    </tr>
+                                    <tr style="border-top: 1px solid #000;">
+                                        <td><strong>Total:</strong></td>
+                                        <td><strong>$ <span t-field="doc.amount_total"/></strong></td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>

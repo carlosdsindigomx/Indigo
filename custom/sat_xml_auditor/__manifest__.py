@@ -14,6 +14,8 @@
     },
     'data': [
         'security/ir.model.access.csv',
+        'data/ir_cron_data.xml',
+        'reports/report_sat_xml_template.xml',
         'views/sat_xml_import_wizard_views.xml',
         'views/sat_xml_raw_views.xml',
         'views/sat_hub_tenant_views.xml',

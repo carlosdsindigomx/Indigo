@@ -4,8 +4,9 @@ from satcfdi.cfdi import CFDI
 
 class SatXmlRaw(models.Model):
     _name = 'sat.xml.raw'
-    _description = 'Registro Crudo de XML del SAT'
+    _description = 'Registro de XML del SAT'
     _rec_name = 'uuid'
+    _inherit = ['mail.thread', 'mail.activity.mixin']
 
     xml_file = fields.Binary(string='Archivo XML', required=True, attachment=True)
     uuid = fields.Char(string='UUID', index=True, copy=False)
@@ -39,7 +40,9 @@ class SatXmlRaw(models.Model):
         ('wrong_company', 'RFC invalido')
     ], string='Estatus', default='pending')
 
-    move_id = fields.Many2one('account.move', string='Factura en Odoo', readonly=True)
+    move_id = fields.Many2one('account.move', string='Factura', readonly=True)
+    
+    revised = fields.Boolean(string='Revisado', default=False)
 
     @api.depends('rfc_emisor', 'rfc_receptor')
     def _compute_tipo_operacion(self):
@@ -54,6 +57,54 @@ class SatXmlRaw(models.Model):
                     record.tipo_operacion = False
             else:
                 record.tipo_operacion = False
+                
+    def _buscar_pago_manual_odoo(self, cfdi):
+        """
+        Busca un pago manual en Odoo basándose en el UUID de la factura
+        relacionada dentro del complemento de pago XML.
+        """
+        self.ensure_one()
+        try:
+            complemento = cfdi.get('Complemento', {})
+            pagos = complemento.get('Pagos', {})
+            
+            if not pagos:
+                return False
+                
+            lista_pagos = pagos.get('Pago', [])
+            if not isinstance(lista_pagos, list):
+                lista_pagos = [lista_pagos]
+                
+            for pago in lista_pagos:
+                monto_total_pago = float(pago.get('Monto', 0.0))
+                
+                # Extraer los documentos relacionados
+                doctos = pago.get('DoctoRelacionado', [])
+                if not isinstance(doctos, list):
+                    doctos = [doctos]
+                    
+                for doc in doctos:
+                    uuid_factura = doc.get('IdDocumento')
+                    if not uuid_factura:
+                        continue
+                        
+                    # Buscamos la Factura Original usando su UUID
+                    factura_odoo = self.env['account.move'].search([
+                        ('l10n_mx_edi_cfdi_uuid', '=', uuid_factura.upper())
+                    ], limit=1)
+                    
+                    if factura_odoo:
+                        # Obtenemos los pagos
+                        pagos_aplicados = factura_odoo._get_reconciled_payments()
+                        
+                        for pago_manual in pagos_aplicados:
+                            # Comparamos el monto
+                            if abs(pago_manual.amount - monto_total_pago) < 0.1:
+                                return pago_manual.move_id # Retornamos el asiento contable del pago
+            return False
+        except Exception as e:
+            _logger.warning("Fallo en la búsqueda inteligente de pago: %s", str(e))
+            return False
                 
     def action_procesar_xml(self):
         """
@@ -119,7 +170,7 @@ class SatXmlRaw(models.Model):
                     record.match_state = 'wrong_company'
 
                 elif record.uuid: 
-                    # Busqueda de facturas
+                    # 1. Búsqueda directa (por si el pago manual ya tenía el UUID capturado)
                     factura_existente = self.env['account.move'].search([
                         ('l10n_mx_edi_cfdi_uuid', '=', record.uuid)
                     ], limit=1)
@@ -130,6 +181,30 @@ class SatXmlRaw(models.Model):
                             record.match_state = 'discrepancy'
                         else:
                             record.match_state = 'match'
+                            
+                    # 2. Búsqueda Inteligente (Solo para Pagos huérfanos)
+                    elif record.cfdi_type == 'pago':
+                        pago_encontrado_move = record._buscar_pago_manual_odoo(invoice)
+                        
+                        if pago_encontrado_move:
+                            record.move_id = pago_encontrado_move.id
+                            record.match_state = 'match'
+                            
+                            # Al adjuntar el XML al registro nativo del pago, 
+                            # Odoo absorberá el UUID automáticamente en el campo nativo.
+                            self.env['ir.attachment'].create({
+                                'name': record.xml_filename,
+                                'type': 'binary',
+                                'datas': record.xml_file,
+                                'res_model': 'account.move',
+                                'res_id': pago_encontrado_move.id,
+                                'mimetype': 'application/xml'
+                            })
+                            
+                            if hasattr(record, 'message_post'):
+                                record.message_post(body=f"Vinculado automáticamente con el pago: {pago_encontrado_move.name}")
+                        else:
+                            record.match_state = 'missing'
                     else:
                         record.match_state = 'missing'
 
@@ -153,8 +228,13 @@ class SatXmlRaw(models.Model):
         
         if not faltantes:
             raise exceptions.UserError("Solo se puede crear facturas para registros en estatus 'Faltante'.")
-            
+           
         for record in faltantes:
+            
+            if record.cfdi_type not in ['ingreso', 'egreso']:
+                record.message_post(body=f"No se genera factura para documentos de tipo {record.cfdi_type}.")
+                continue
+            
             # Determinar tipo de comprobante y RFC
             if record.tipo_operacion == 'recibido':
                 move_type = 'in_invoice'  # Factura de Proveedor

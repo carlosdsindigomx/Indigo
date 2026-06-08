@@ -33,6 +33,54 @@ class SatHubTenant(models.Model):
     token_sat = fields.Text(string='Token', readonly=True)
     token_expiration = fields.Datetime(string='Vigencia del token', readonly=True)
     
+    auto_download = fields.Boolean(string='Descarga automática', default=False)
+    auto_download_days = fields.Integer(
+        string='Días hacia atrás', 
+        default=1,
+        help="Número de días hacia atrás que el sistema consultará automáticamente."
+    )
+    
+    @api.model
+    def _cron_solicitar_descargas_diarias(self):
+        """
+        Método llamado por el Cron para generar peticiones automáticas.
+        Busca todos los tenants que tengan la opción activada.
+        """
+        tenants_activos = self.search([('auto_download', '=', True)])
+        request_obj = self.env['sat.xml.download.request']
+        
+        for tenant in tenants_activos:
+            try:
+                # Calcular fechas
+                hoy = fields.Datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+                fecha_inicio = hoy - timedelta(days=tenant.auto_download_days)
+                fecha_fin = hoy - timedelta(seconds=1)
+
+                # Crear solicitud para Emitidos
+                req_emitidos = request_obj.create({
+                    'tenant_id': tenant.id,
+                    'tipo_solicitud': 'cfdi',
+                    'tipo_operacion': 'emitido',
+                    'date_start': fecha_inicio,
+                    'date_end': fecha_fin,
+                })
+                req_emitidos.action_solicitar_sat()
+
+                # Crear solicitud para Recibidos
+                req_recibidos = request_obj.create({
+                    'tenant_id': tenant.id,
+                    'tipo_solicitud': 'cfdi',
+                    'tipo_operacion': 'recibido',
+                    'date_start': fecha_inicio,
+                    'date_end': fecha_fin,
+                })
+                req_recibidos.action_solicitar_sat()
+                
+                self.env.cr.commit() 
+                
+            except Exception as e:
+                _logger.error(f"Error en cron de solicitud automática para el cliente {tenant.name}: {str(e)}")
+    
     @api.onchange('partner_id')
     def _onchange_partner_id(self):
         if self.partner_id:

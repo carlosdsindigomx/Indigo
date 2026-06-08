@@ -21,7 +21,7 @@
                                 <field name="partner_id" placeholder="Buscar contacto"/>
                                 <field name="rfc" placeholder="Ej. XEXX010101000"/>
                             </group>
-                            
+
                             <group string="Credenciales">
                                 <field name="fiel_cert" filename="fiel_cert_name"/>
                                 <field name="fiel_cert_name" invisible="1"/>
@@ -30,6 +30,11 @@
                                 <field name="fiel_key_name" invisible="1"/>
 
                                 <field name="fiel_password" password="True"/>
+                            </group>
+
+                            <group string="Automatización">
+                                <field name="auto_download" widget="boolean_toggle"/>
+                                <field name="auto_download_days" invisible="auto_download == False"/>
                             </group>
                         </group>
                     </sheet>

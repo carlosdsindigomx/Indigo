@@ -50,6 +50,63 @@ class SatXmlDownloadRequest(models.Model):
         ('downloaded', 'Descargado'),
         ('error', 'Error')
     ], string='Estatus', default='draft', readonly=True, copy=False, tracking=True)
+    
+    @api.constrains('date_start', 'date_end', 'tipo_operacion', 'tipo_solicitud', 'tenant_id')
+    def _check_overlapping_requests(self):
+        """
+        Evita que se creen o envíen solicitudes que se empalmen en fechas 
+        con peticiones que ya están en proceso o descargadas.
+        """
+        for record in self:
+            if not record.date_start or not record.date_end:
+                continue
+
+            # La lógica de intersección de fechas es: 
+            # (Inicio_A <= Fin_B) y (Fin_A >= Inicio_B)
+            domain = [
+                ('id', '!=', record.id),
+                ('tenant_id', '=', record.tenant_id.id),
+                ('tipo_operacion', '=', record.tipo_operacion),
+                ('tipo_solicitud', '=', record.tipo_solicitud),
+                ('state', 'in', ['requested', 'verified', 'downloaded']), 
+                ('date_start', '<=', record.date_end),
+                ('date_end', '>=', record.date_start),
+            ]
+            
+            empalme = self.search(domain, limit=1)
+            
+            if empalme:
+                fecha_ini_str = empalme.date_start.strftime('%d/%m/%Y %H:%M')
+                fecha_fin_str = empalme.date_end.strftime('%d/%m/%Y %H:%M')
+                
+                raise exceptions.ValidationError(
+                    f"Conflicto de fechas. Ya existe una solicitud "
+                    f"({empalme.id_solicitud or 'En proceso'}) para comprobantes "
+                    f"'{record.tipo_operacion}' que abarca del {fecha_ini_str} al {fecha_fin_str}.\n\n"
+                    f"Por favor, ajusta las fechas."
+                )
+    
+    @api.model
+    def _cron_verificar_y_extraer_descargas(self):
+        """
+        Método llamado por el Cron para verificar el estatus en el SAT.
+        Procesa solicitudes en estado 'requested' o 'verified'.
+        """
+        # Buscamos las que están pendientes de verificar
+        solicitudes_pendientes = self.search([('state', 'in', ['requested', 'verified'])])
+        
+        for solicitud in solicitudes_pendientes:
+            try:
+                # Reutilizamos tu método manual
+                solicitud.action_verificar_descargar_sat()
+                
+                # Si la verificación fue exitosa y pasó a estado descargado, extraemos
+                if solicitud.state == 'downloaded':
+                    solicitud.action_extraer_e_importar_xml()
+                    
+                self.env.cr.commit()
+            except Exception as e:
+                _logger.error(f"Error en cron de verificación SAT para la solicitud {solicitud.id}: {str(e)}")
 
     def action_solicitar_sat(self):
         """
@@ -168,6 +225,8 @@ class SatXmlDownloadRequest(models.Model):
                 res_status = cliente_sat.recover_comprobante_status(record.id_solicitud)
                 est_solicitud = res_status.get("EstadoSolicitud")
                 mensaje_estado = res_status.get("Mensaje")
+                
+                codigo_estado = res_status.get("CodigoEstadoSolicitud")
 
                 if est_solicitud == EstadoSolicitud.TERMINADA:
                     paquetes_ids = res_status.get('IdsPaquetes', [])
@@ -201,26 +260,33 @@ class SatXmlDownloadRequest(models.Model):
                     })
                     record.message_post(body=f"Descarga Exitosa: {msg_exito}")
 
-                elif est_solicitud == EstadoSolicitud.ACEPTADA or est_solicitud == EstadoSolicitud.ENPROCESO:
+                elif est_solicitud == EstadoSolicitud.ACEPTADA or est_solicitud == EstadoSolicitud.EN_PROCESO:
                     msg_proceso = f'Procesando la solicitud. Estado: {est_solicitud}). Intenta de nuevo en unos minutos.'
                     record.write({
                         'mensaje': msg_proceso
                     })
                     record.message_post(body=f"Intento de verificación: {msg_proceso}")
                 
-                elif est_solicitud == EstadoSolicitud.RECHAZADA or est_solicitud == EstadoSolicitud.ERROR:
-                    msg_error_sat = f'Se rechazó la solicitud o marcó error. Detalle: {mensaje_estado}'
-                    record.write({
-                        'state': 'error',
-                        'mensaje': msg_error_sat
-                    })
-                    # NUEVO: Registro de error desde el SAT
-                    record.message_post(body=f"Error en consulta: {msg_error_sat}")
+                elif est_solicitud == EstadoSolicitud.RECHAZADA:
+                    if str(codigo_estado) == '5004':
+                        msg_vacio = 'No se encontró facturas para este RFC en el rango de fechas solicitado.'
+                        record.write({
+                            'state': 'verified', 
+                            'mensaje': msg_vacio
+                        })
+                        record.message_post(body=f"Consulta Finalizada: {msg_vacio}")
+                    else:
+                        msg_rechazo = f'La solicitud fue rechazada. Código: {codigo_estado}. Detalles: {mensaje_estado}'
+                        record.write({
+                            'state': 'error',
+                            'mensaje': msg_rechazo
+                        })
+                        record.message_post(body=f"Rechazo de Solicitud: {msg_rechazo}")
                     
             except Exception as e:
                 _logger.error("Error al verificar/descargar: %s", str(e))
                 record.message_post(body=f"Error general de conexión: {str(e)}")
-                raise exceptions.UserError(f"Ocurrió un error en la comuniación: {str(e)}")
+                raise exceptions.UserError(f"Ocurrió un error en la comunicación: {str(e)}")
             
             
     def action_extraer_e_importar_xml(self):

@@ -5,7 +5,7 @@
             <field name="name">sat.xml.raw.list</field>
             <field name="model">sat.xml.raw</field>
             <field name="arch" type="xml">
-                <list js_class="sat_xml_list" decoration-success="match_state == 'match'" decoration-danger="match_state == 'missing'" decoration-warning="match_state == 'discrepancy'" decoration-info="match_state == 'pending'" decoration-muted="match_state == 'wrong_company'">
+                <list multi_edit="1" js_class="sat_xml_list" decoration-success="match_state == 'match'" decoration-danger="match_state == 'missing'" decoration-warning="match_state == 'discrepancy'" decoration-info="match_state == 'pending'" decoration-muted="match_state == 'wrong_company'">
                     <field name="date_emission"/>
                     <field name="uuid"/>
                     <field name="nombre_emisor"/>
@@ -13,6 +13,7 @@
                     <field name="cfdi_type"/>
                     <field name="amount_total" sum="Total"/>
                     <field name="match_state" widget="badge"/>
+                    <field name="revised"/>
                 </list>
             </field>
         </record>
@@ -25,6 +26,7 @@
                     <header>
                         <button name="action_procesar_xml" string="Procesar XML" type="object" class="oe_highlight" invisible="match_state != 'pending'"/>
                         <button name="action_procesar_xml" string="Procesar" type="object" invisible="match_state == 'pending'"/>
+                        <button name="%(sat_xml_auditor.action_report_sat_xml_raw)d" string="Descargar PDF" type="action" class="oe_highlight" invisible="cfdi_type == 'pago' or not uuid"/>
                         <field name="match_state" widget="statusbar" statusbar_visible="pending,match,discrepancy,missing,wrong_company"/>
                     </header>
                     <sheet>
@@ -37,12 +39,14 @@
                             <group string="Carga de Archivo">
                                 <field name="xml_filename" invisible="1"/>
                                 <field name="xml_file" filename="xml_filename"/>
+                                <field name="revised"/>
                             </group>
                             <group string="Detalles del Comprobante">
                                 <field name="tipo_operacion" readonly="1" widget="badge"/>
                                 <field name="date_emission" readonly="1"/>
                                 <field name="cfdi_type" readonly="1"/>
                                 <field name="amount_total" readonly="1"/>
+                                <field name="move_id" readonly="1"/>
                             </group>
                         </group>
                         <group>
@@ -56,6 +60,7 @@
                             </group>
                         </group>
                     </sheet>
+                    <chatter/>
                 </form>
             </field>
         </record>
@@ -68,6 +73,8 @@
                     <field name="uuid"/>
                     <field name="rfc_emisor"/>
                     <field name="nombre_emisor"/>
+                    <filter string="Por revisar" name="not_revised" domain="[('revised', '=', False)]"/>
+                    <separator/>
                     <filter string="Faltantes" name="missing" domain="[('match_state', '=', 'missing')]"/>
                     <filter string="Con Discrepancia" name="discrepancy" domain="[('match_state', '=', 'discrepancy')]"/>
                     <filter string="Sincronizados" name="filter_match" domain="[('match_state', '=', 'match')]"/>
@@ -82,6 +89,7 @@
             <field name="name">XMLs</field>
             <field name="res_model">sat.xml.raw</field>
             <field name="view_mode">list,form</field>
+            <field name="context">{'search_default_not_revised': 1}</field>
         </record>
 
         <record id="action_generar_facturas_masivo" model="ir.actions.server">

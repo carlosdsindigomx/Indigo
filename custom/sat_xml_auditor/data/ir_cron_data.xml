@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <record id="cron_sat_solicitud_diaria" model="ir.cron">
+            <field name="name">SAT: Solicitud automática de XMLs</field>
+            <field name="model_id" ref="model_sat_hub_tenant"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_solicitar_descargas_diarias()</field>
+            <field name="user_id" ref="base.user_root"/>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="nextcall" eval="(DateTime.now().replace(hour=7, minute=0, second=0) + timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')"/>
+        </record>
+
+        <record id="cron_sat_verificacion_frecuente" model="ir.cron">
+            <field name="name">SAT: Verificar estatus y extraer XMLs</field>
+            <field name="model_id" ref="model_sat_xml_download_request"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_verificar_y_extraer_descargas()</field>
+            <field name="user_id" ref="base.user_root"/>
+            <field name="interval_number">2</field>
+            <field name="interval_type">hours</field>
+        </record>
+
+    </data>
+</odoo>
