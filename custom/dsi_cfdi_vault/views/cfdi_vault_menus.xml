@@ -1,0 +1,58 @@
+<odoo>
+
+    <menuitem id="menu_cfdi_vault_root" name="Bóveda CFDI" sequence="15"
+              web_icon="dsi_cfdi_vault,static/description/icon.png"
+              groups="group_cfdi_vault_user"/>
+
+    <menuitem id="menu_cfdi_document" name="CFDI" parent="menu_cfdi_vault_root"
+              action="action_cfdi_document" sequence="10"/>
+
+    <menuitem id="menu_cfdi_import_wizard" name="Importar CFDI" parent="menu_cfdi_vault_root"
+              action="action_cfdi_import_wizard" sequence="20"/>
+
+    <menuitem id="menu_cfdi_vault_por_tipo" name="Por tipo" parent="menu_cfdi_vault_root" sequence="25"/>
+
+    <menuitem id="menu_cfdi_document_ingresos" name="Ingresos"
+              parent="menu_cfdi_vault_por_tipo" action="action_cfdi_document_ingresos" sequence="10"/>
+
+    <menuitem id="menu_cfdi_document_egresos" name="Egresos"
+              parent="menu_cfdi_vault_por_tipo" action="action_cfdi_document_egresos" sequence="20"/>
+
+    <menuitem id="menu_cfdi_document_pagos" name="Pagos (REP)"
+              parent="menu_cfdi_vault_por_tipo" action="action_cfdi_document_pagos" sequence="30"/>
+
+    <menuitem id="menu_cfdi_document_nomina" name="Nómina"
+              parent="menu_cfdi_vault_por_tipo" action="action_cfdi_document_nomina" sequence="40"/>
+
+    <menuitem id="menu_cfdi_document_traslados" name="Traslados"
+              parent="menu_cfdi_vault_por_tipo" action="action_cfdi_document_traslados" sequence="50"/>
+
+    <menuitem id="menu_cfdi_vault_discrepancies" name="Discrepancias" parent="menu_cfdi_vault_root" sequence="30"/>
+
+    <menuitem id="menu_cfdi_document_no_move" name="CFDI sin factura" parent="menu_cfdi_vault_discrepancies"
+              action="action_cfdi_document_no_move" sequence="10"/>
+
+    <menuitem id="menu_move_no_cfdi_document" name="Facturas sin CFDI" parent="menu_cfdi_vault_discrepancies"
+              action="action_move_no_cfdi_document" sequence="20"/>
+
+    <menuitem id="menu_cfdi_document_discrepancy" name="CFDI cancelados que siguen contabilizados"
+              parent="menu_cfdi_vault_discrepancies" action="action_cfdi_document_discrepancy" sequence="30"/>
+
+    <menuitem id="menu_cfdi_document_efos_risk" name="Proveedores en lista 69-B"
+              parent="menu_cfdi_vault_discrepancies" action="action_cfdi_document_efos_risk" sequence="40"/>
+
+    <menuitem id="menu_cfdi_document_payment_no_move" name="Pagos (REP) sin vincular"
+              parent="menu_cfdi_vault_discrepancies" action="action_cfdi_document_payment_no_move" sequence="50"/>
+
+    <menuitem id="menu_cfdi_document_payroll_no_move" name="CFDI de nómina sin factura"
+              parent="menu_cfdi_vault_discrepancies" action="action_cfdi_document_payroll_no_move" sequence="60"/>
+
+    <menuitem id="menu_cfdi_efos_entry" name="Lista 69-B (EFOS)" parent="menu_cfdi_vault_root"
+              action="action_cfdi_efos_entry" sequence="40"
+              groups="account.group_account_manager"/>
+
+    <menuitem id="menu_cfdi_efos_import_wizard" name="Cargar lista 69-B" parent="menu_cfdi_vault_root"
+              action="action_cfdi_efos_import_wizard" sequence="41"
+              groups="account.group_account_manager"/>
+
+</odoo>

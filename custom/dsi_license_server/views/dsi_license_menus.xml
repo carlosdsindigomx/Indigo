@@ -1,0 +1,13 @@
+<odoo>
+
+    <menuitem id="menu_dsi_license_root" name="Licenciamiento DS Indigo" sequence="20"
+              web_icon="dsi_license_server,static/description/icon.png"
+              groups="group_dsi_license_manager"/>
+
+    <menuitem id="menu_dsi_license" name="Licencias" parent="menu_dsi_license_root"
+              action="action_dsi_license" sequence="10"/>
+
+    <menuitem id="menu_dsi_license_product" name="Productos" parent="menu_dsi_license_root"
+              action="action_dsi_license_product" sequence="20"/>
+
+</odoo>

@@ -1,0 +1,10 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_cfdi_document_user,cfdi.document.user,model_cfdi_document,group_cfdi_vault_user,1,1,1,0
+access_cfdi_document_manager,cfdi.document.manager,model_cfdi_document,account.group_account_manager,1,1,1,1
+access_cfdi_import_wizard_user,cfdi.import.wizard.user,model_cfdi_import_wizard,group_cfdi_vault_user,1,1,1,1
+access_cfdi_import_wizard_line_user,cfdi.import.wizard.line.user,model_cfdi_import_wizard_line,group_cfdi_vault_user,1,1,1,1
+access_cfdi_efos_entry_user,dsi.cfdi.efos.entry.user,model_dsi_cfdi_efos_entry,group_cfdi_vault_user,1,0,0,0
+access_cfdi_efos_entry_manager,dsi.cfdi.efos.entry.manager,model_dsi_cfdi_efos_entry,account.group_account_manager,1,1,1,1
+access_cfdi_efos_import_wizard_user,dsi.cfdi.efos.import.wizard.user,model_dsi_cfdi_efos_import_wizard,account.group_account_manager,1,1,1,1
+access_cfdi_match_suggestion_wizard_user,cfdi.match.suggestion.wizard.user,model_cfdi_match_suggestion_wizard,group_cfdi_vault_user,1,1,1,1
+access_cfdi_match_suggestion_wizard_line_user,cfdi.match.suggestion.wizard.line.user,model_cfdi_match_suggestion_wizard_line,group_cfdi_vault_user,1,1,1,1

@@ -1,0 +1,8 @@
+<odoo>
+
+    <record id="group_sat_credential_manager" model="res.groups">
+        <field name="name">Bóveda CFDI / Custodio de e.firma</field>
+        <field name="comment">Único grupo con permiso para cargar, ver o revocar la e.firma de la empresa. Deliberadamente separado del grupo de uso normal de la Bóveda CFDI.</field>
+    </record>
+
+</odoo>

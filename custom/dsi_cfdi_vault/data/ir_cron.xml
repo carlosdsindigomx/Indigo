@@ -1,0 +1,23 @@
+<odoo>
+
+    <record id="ir_cron_verify_sat_status" model="ir.cron">
+        <field name="name">Bóveda CFDI: verificación de estatus SAT</field>
+        <field name="model_id" ref="model_cfdi_document"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_verify_sat_status()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="active">True</field>
+    </record>
+
+    <record id="ir_cron_refresh_efos_list" model="ir.cron">
+        <field name="name">Bóveda CFDI: refresco automático de la lista 69-B (best-effort)</field>
+        <field name="model_id" ref="model_dsi_cfdi_efos_entry"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_refresh_from_sat()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">weeks</field>
+        <field name="active">True</field>
+    </record>
+
+</odoo>

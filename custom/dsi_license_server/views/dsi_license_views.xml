@@ -1,0 +1,132 @@
+<odoo>
+
+    <record id="view_dsi_license_list" model="ir.ui.view">
+        <field name="name">dsi.license.list</field>
+        <field name="model">dsi.license</field>
+        <field name="arch" type="xml">
+            <list string="Licencias" decoration-danger="state in ('expired', 'revoked')"
+                  decoration-warning="state == 'suspended'" decoration-muted="state == 'draft'">
+                <field name="key"/>
+                <field name="partner_id"/>
+                <field name="product_id"/>
+                <field name="edition" widget="badge"/>
+                <field name="rfc_authorized"/>
+                <field name="license_type"/>
+                <field name="date_end"/>
+                <field name="active_instance_count" string="Instancias activas"/>
+                <field name="max_instances" string="Cupo"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'active'"
+                       decoration-warning="state == 'suspended'"
+                       decoration-danger="state in ('expired', 'revoked')"
+                       decoration-muted="state == 'draft'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_dsi_license_form" model="ir.ui.view">
+        <field name="name">dsi.license.form</field>
+        <field name="model">dsi.license</field>
+        <field name="arch" type="xml">
+            <form string="Licencia">
+                <header>
+                    <button name="action_activate" type="object" string="Activar" class="btn-primary"
+                            invisible="state == 'active'"/>
+                    <button name="action_suspend" type="object" string="Suspender"
+                            invisible="state != 'active'"/>
+                    <button name="action_revoke" type="object" string="Revocar" confirm="¿Revocar esta licencia? Todas sus instancias activas se liberarán."
+                            invisible="state == 'revoked'"/>
+                    <button name="action_reset_to_draft" type="object" string="Regresar a borrador"
+                            invisible="state != 'suspended'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,active"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="key" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="partner_id"/>
+                            <field name="product_id"/>
+                            <field name="edition"/>
+                            <field name="rfc_authorized"/>
+                        </group>
+                        <group>
+                            <field name="license_type"/>
+                            <field name="date_start"/>
+                            <field name="date_end"/>
+                            <field name="max_instances"/>
+                            <field name="odoo_versions"/>
+                            <field name="sale_reference"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Instancias">
+                            <field name="instance_ids">
+                                <list editable="bottom" decoration-muted="state == 'inactive'">
+                                    <field name="database_uuid" string="UUID de la base"/>
+                                    <field name="base_url" string="URL base"/>
+                                    <field name="odoo_version" string="Versión de Odoo"/>
+                                    <field name="module_version" string="Versión del módulo"/>
+                                    <field name="is_production" string="Producción"/>
+                                    <field name="date_first_activation" string="Primera activación"/>
+                                    <field name="date_last_heartbeat" string="Último heartbeat"/>
+                                    <field name="state" widget="badge"
+                                           decoration-success="state == 'active'"
+                                           decoration-muted="state == 'inactive'"/>
+                                    <button name="action_release" type="object" string="Liberar" icon="fa-times"
+                                            invisible="state == 'inactive'"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Bitácora">
+                            <field name="log_ids" readonly="1">
+                                <list>
+                                    <field name="create_date" string="Fecha"/>
+                                    <field name="endpoint" string="Endpoint"/>
+                                    <field name="success" string="Éxito" widget="boolean_toggle"/>
+                                    <field name="ip_address" string="Dirección IP"/>
+                                    <field name="error_message" string="Mensaje de error"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_dsi_license_search" model="ir.ui.view">
+        <field name="name">dsi.license.search</field>
+        <field name="model">dsi.license</field>
+        <field name="arch" type="xml">
+            <search string="Buscar licencias">
+                <field name="key"/>
+                <field name="rfc_authorized"/>
+                <field name="partner_id"/>
+                <filter string="Activas" name="filter_active" domain="[('state', '=', 'active')]"/>
+                <filter string="Suspendidas" name="filter_suspended" domain="[('state', '=', 'suspended')]"/>
+                <filter string="Expiradas o revocadas" name="filter_ended" domain="[('state', 'in', ('expired', 'revoked'))]"/>
+                <group>
+                    <filter string="Producto" name="group_product" context="{'group_by': 'product_id'}"/>
+                    <filter string="Estado" name="group_state" context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_dsi_license" model="ir.actions.act_window">
+        <field name="name">Licencias</field>
+        <field name="res_model">dsi.license</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_dsi_license_search"/>
+    </record>
+
+    <record id="action_dsi_license_product" model="ir.actions.act_window">
+        <field name="name">Productos licenciables</field>
+        <field name="res_model">dsi.license.product</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+</odoo>

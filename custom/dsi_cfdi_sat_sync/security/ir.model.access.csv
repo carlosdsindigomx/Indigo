@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_sat_credential_manager,sat.credential.manager,model_sat_credential,group_sat_credential_manager,1,1,1,1
+access_sat_credential_import_wizard_manager,sat.credential.import.wizard.manager,model_sat_credential_import_wizard,group_sat_credential_manager,1,1,1,1
+access_sat_download_request_manager,sat.download.request.manager,model_sat_download_request,group_sat_credential_manager,1,1,1,1
+access_sat_sync_schedule_manager,sat.sync.schedule.manager,model_sat_sync_schedule,group_sat_credential_manager,1,1,1,1

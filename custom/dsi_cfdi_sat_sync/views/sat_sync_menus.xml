@@ -1,0 +1,19 @@
+<odoo>
+
+    <menuitem id="menu_sat_sync_root" name="Descarga Masiva SAT"
+              parent="dsi_cfdi_vault.menu_cfdi_vault_root" sequence="20"
+              groups="dsi_cfdi_sat_sync.group_sat_credential_manager"/>
+
+    <menuitem id="menu_sat_sync_schedule" name="Descarga automática"
+              parent="menu_sat_sync_root" action="action_sat_sync_schedule" sequence="5"/>
+
+    <menuitem id="menu_sat_download_request" name="Solicitudes"
+              parent="menu_sat_sync_root" action="action_sat_download_request" sequence="10"/>
+
+    <menuitem id="menu_sat_credential" name="e.firma"
+              parent="menu_sat_sync_root" action="action_sat_credential" sequence="20"/>
+
+    <menuitem id="menu_sat_credential_import_wizard" name="Cargar e.firma"
+              parent="menu_sat_sync_root" action="action_sat_credential_import_wizard" sequence="30"/>
+
+</odoo>

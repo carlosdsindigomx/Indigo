@@ -1,0 +1,68 @@
+<odoo>
+    <!--
+      Bloque 03 del plan: vistas de trabajo separadas por tipo de comprobante.
+      El tipo ya se guardaba en cada CFDI; lo que faltaba era poder trabajar
+      cada uno por separado sin filtrar a mano en cada consulta.
+    -->
+
+    <record id="action_cfdi_document_ingresos" model="ir.actions.act_window">
+        <field name="name">Ingresos</field>
+        <field name="res_model">cfdi.document</field>
+        <field name="view_mode">list,kanban,form</field>
+        <field name="domain">[('move_type', '=', 'I')]</field>
+        <field name="search_view_id" ref="view_cfdi_document_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Sin comprobantes de ingreso.</p>
+            <p>Las facturas: lo que te facturan tus proveedores y lo que tú facturas.</p>
+        </field>
+    </record>
+
+    <record id="action_cfdi_document_egresos" model="ir.actions.act_window">
+        <field name="name">Egresos</field>
+        <field name="res_model">cfdi.document</field>
+        <field name="view_mode">list,kanban,form</field>
+        <field name="domain">[('move_type', '=', 'E')]</field>
+        <field name="search_view_id" ref="view_cfdi_document_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Sin comprobantes de egreso.</p>
+            <p>Notas de crédito y devoluciones, que restan de lo facturado.</p>
+        </field>
+    </record>
+
+    <record id="action_cfdi_document_pagos" model="ir.actions.act_window">
+        <field name="name">Pagos (REP)</field>
+        <field name="res_model">cfdi.document</field>
+        <field name="view_mode">list,kanban,form</field>
+        <field name="domain">[('move_type', '=', 'P')]</field>
+        <field name="search_view_id" ref="view_cfdi_document_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Sin complementos de pago.</p>
+            <p>Los comprobantes que acreditan el pago de facturas a plazos o diferidas.</p>
+        </field>
+    </record>
+
+    <record id="action_cfdi_document_nomina" model="ir.actions.act_window">
+        <field name="name">Nómina</field>
+        <field name="res_model">cfdi.document</field>
+        <field name="view_mode">list,kanban,form</field>
+        <field name="domain">[('move_type', '=', 'N')]</field>
+        <field name="search_view_id" ref="view_cfdi_document_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Sin comprobantes de nómina.</p>
+            <p>Los recibos timbrados de tu personal.</p>
+        </field>
+    </record>
+
+    <record id="action_cfdi_document_traslados" model="ir.actions.act_window">
+        <field name="name">Traslados</field>
+        <field name="res_model">cfdi.document</field>
+        <field name="view_mode">list,kanban,form</field>
+        <field name="domain">[('move_type', '=', 'T')]</field>
+        <field name="search_view_id" ref="view_cfdi_document_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Sin comprobantes de traslado.</p>
+            <p>Movimientos de mercancía que no implican una venta.</p>
+        </field>
+    </record>
+
+</odoo>

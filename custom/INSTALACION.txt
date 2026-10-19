@@ -1,0 +1,307 @@
+================================================================================
+ ADDOBI - Boveda CFDI y Servidor de Licencias
+ Guia de instalacion
+ Paquete generado el 2026-10-12  -  Odoo 19
+================================================================================
+
+QUE TRAE ESTE PAQUETE
+---------------------
+
+  servidor-licencias/          -> va en el Odoo de DS INDIGO
+      dsi_license_server         Emite y valida las licencias.
+
+  cliente/                     -> va en el Odoo de CADA CLIENTE
+      dsi_license_client         Activa y verifica la licencia. Obligatorio.
+      dsi_cfdi_vault             La boveda de CFDI. Es el producto.
+      dsi_cfdi_sat_sync          Descarga automatica del SAT con e.firma.
+                                 Opcional: instalalo solo si el cliente
+                                 va a descargar sus CFDI directo del SAT.
+
+  Orden de instalacion en el cliente: dsi_cfdi_vault instala solo
+  dsi_license_client porque depende de el. dsi_cfdi_sat_sync va despues.
+
+
+REQUISITOS
+----------
+
+  * Odoo 19 ENTERPRISE. No funciona en Community: dsi_cfdi_vault depende de
+    l10n_mx_edi, que es un modulo Enterprise (licencia OEEL-1). El cliente
+    necesita su propia suscripcion de Odoo Enterprise vigente.
+
+  * Localizacion mexicana instalada (l10n_mx) con el catalogo de cuentas
+    mexicano cargado. Con un catalogo generico el mapeo de impuestos no
+    encuentra los impuestos correctos.
+
+  * Python: la libreria 'cryptography'. Ya viene con Odoo 19.
+
+
+================================================================================
+ PASO 1 - LA LLAVE DE LICENCIAMIENTO   (una sola vez, en DS Indigo)
+================================================================================
+
+El modulo del cliente YA trae embebida la llave PUBLICA de produccion de
+DS Indigo, asi que no hay que tocar ningun archivo.
+
+Lo que si hace falta es que el SERVIDOR de licencias tenga la llave PRIVADA
+que le corresponde. Es la que genero DS Indigo y que debe estar guardada en
+el gestor de secretos de la empresa.
+
+  En Odoo.sh NO se puede usar odoo.conf ni variables de entorno: la
+  plataforma gestiona la configuracion y reconstruye el contenedor en cada
+  push. Ahi la llave va como PARAMETRO DE SISTEMA (ver paso 2.4).
+
+  En un servidor propio, es preferible dejarla FUERA de la base de datos:
+
+      [options]
+      dsi_license_private_key = <la privada>
+
+  o en la variable de entorno DSI_LICENSE_PRIVATE_KEY.
+
+SI LA LLAVE PRIVADA SE FILTRA
+-----------------------------
+Hay que generar un par nuevo, sustituir la publica en dsi_license_client y
+liberar una actualizacion a TODOS los clientes. Los tokens ya emitidos con
+la llave vieja no se pueden revocar.
+
+SI ALGUN DIA HAY QUE GENERAR UN PAR NUEVO
+-----------------------------------------
+    python3 -c "
+    import base64
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from cryptography.hazmat.primitives import serialization as s
+    k = Ed25519PrivateKey.generate()
+    print('PRIVADA (solo al servidor):', base64.b64encode(k.private_bytes(s.Encoding.Raw, s.PrivateFormat.Raw, s.NoEncryption())).decode())
+    print('PUBLICA (va en dsi_license_client/crypto.py):', base64.b64encode(k.public_key().public_bytes(s.Encoding.Raw, s.PublicFormat.Raw)).decode())
+    "
+
+
+================================================================================
+ PASO 2 - INSTALAR EL SERVIDOR DE LICENCIAS   (en el Odoo de DS Indigo)
+================================================================================
+
+  2.1  Copia la carpeta del modulo al addons-path del servidor:
+
+           cp -R servidor-licencias/dsi_license_server  /ruta/a/tus/addons/
+
+  2.2  Confirma que esa ruta este en el addons_path.
+
+  2.3  Reinicia Odoo y actualiza la lista de aplicaciones:
+
+           Ajustes > Activar modo desarrollador
+           Aplicaciones > Actualizar lista de aplicaciones
+
+  2.4  Busca "DS Indigo" e instala "DS Indigo - Servidor de Licencias".
+
+  2.4  Guarda la llave PRIVADA (obligatorio antes de emitir licencias):
+
+           Ajustes > Tecnico > Parametros del sistema > Nuevo
+             Clave: dsi_license_private_key
+             Valor: <la llave privada>
+
+       En Odoo.sh esta es la UNICA via. Ten presente que asi la llave queda
+       en la base y por tanto en cada respaldo: tratalos como material
+       sensible. En un servidor propio, usa odoo.conf (ver paso 1).
+
+  2.5  Comprueba que responde:
+
+           curl -s -o /dev/null -w "%{http_code}\n" \
+             https://obi-dsindigo.odoo.com/dsi/license/v1/activate
+
+       Un 405 o 400 esta bien: significa que la ruta existe y rechaza el
+       GET. Un 404 significa que el modulo no esta instalado o la base no
+       se esta resolviendo.
+
+
+================================================================================
+ PASO 3 - DAR DE ALTA LA LICENCIA DEL CLIENTE   (en el servidor)
+================================================================================
+
+  Menu: Licencias DS Indigo > Licencias > Nuevo
+
+  Captura:
+    - Cliente          el contacto
+    - Producto         el producto licenciado
+    - RFC autorizado   el RFC del cliente. LA LICENCIA QUEDA ATADA A ESTE
+                       RFC: si no coincide con el de la empresa en el Odoo
+                       del cliente, la activacion falla.
+    - Versiones Odoo   19.0  (o "19.0,20.0" si el cliente corre Odoo 20:
+                       el cliente manda su version y el servidor la compara
+                       contra esta lista; si no coincide, rechaza la
+                       activacion aunque todo lo demas este bien)
+    - Max. instancias  cuantas bases puede activar (produccion + pruebas)
+    - Vigencia         fecha de inicio y, si aplica, de fin
+
+  Guarda y copia la CLAVE DE LICENCIA que se genera. Esa clave es la que
+  captura el cliente.
+
+
+================================================================================
+ PASO 4 - INSTALAR EN EL ODOO DEL CLIENTE
+================================================================================
+
+  4.1  Copia las carpetas al addons-path del cliente:
+
+           cp -R cliente/dsi_license_client  /ruta/a/tus/addons/
+           cp -R cliente/dsi_cfdi_vault      /ruta/a/tus/addons/
+           cp -R cliente/dsi_cfdi_sat_sync   /ruta/a/tus/addons/    (opcional)
+
+       La llave publica ya viene embebida: no hay que editar nada.
+
+  4.2  Si vas a instalar dsi_cfdi_sat_sync, genera la llave maestra que
+       cifra la e.firma del cliente:
+
+           python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+
+       y ponla en el CLIENTE. En un servidor propio, en odoo.conf:
+
+           [options]
+           dsi_sat_credential_master_key = <la llave generada>
+
+       En Odoo.sh, como parametro de sistema (Ajustes > Tecnico >
+       Parametros del sistema), clave dsi_sat_credential_master_key.
+
+       AVISO: la e.firma cifrada vive en la base. Si la llave que la
+       descifra se guarda TAMBIEN en la base, las dos acaban juntas en cada
+       respaldo y el cifrado deja de proteger a quien obtenga uno. Para la
+       e.firma de un cliente real, usa un servidor donde puedas configurar
+       la llave fuera de la base.
+
+       Esta llave es por cliente, NO se reutiliza entre clientes, y nunca
+       se guarda en la base de datos: si se pierde, la e.firma guardada
+       deja de poder descifrarse y hay que volver a cargarla.
+
+  4.3  Reinicia Odoo, actualiza la lista de aplicaciones e instala:
+
+           "Boveda CFDI"                        (instala el cliente de
+                                                 licencias por dependencia)
+           "Boveda CFDI - Descarga Masiva SAT"  (opcional)
+
+  4.4  Captura el RFC de la empresa si no esta:
+
+           Ajustes > Usuarios y empresas > Empresas > (tu empresa) > NIF/RFC
+
+       Tiene que ser EXACTAMENTE el RFC autorizado del paso 3.
+
+
+================================================================================
+ PASO 5 - ACTIVAR LA LICENCIA   (en el Odoo del cliente)
+================================================================================
+
+  Menu: Ajustes > Tecnico > Licenciamiento DS Indigo
+
+  Captura la clave de licencia del paso 3 y pulsa "Activar".
+
+  El servidor de licencias NO es configurable desde la interfaz: viene fijo
+  de fabrica en el modulo. Si hay que cambiarlo, se cambia la constante
+  DEFAULT_ACTIVATION_URL en dsi_license_client y se libera una
+  actualizacion del modulo.
+
+  Si todo esta bien el estado queda en "Vigente". El token dura 30 dias y
+  se renueva solo; si el servidor no responde, hay 15 dias de gracia.
+
+  Errores frecuentes:
+
+    "La firma del token de licencia no es valida"
+        La llave publica del cliente no corresponde a la privada del
+        servidor. Revisa el paso 1.
+
+    "No se pudo procesar la solicitud. Verifica la clave y el RFC"
+        El RFC de la empresa no coincide con el RFC autorizado de la
+        licencia. Corrigelo en Ajustes > Empresas.
+
+    "Este modulo se instalo sin llave publica de licenciamiento"
+        Te falto el paso 1.3.
+
+
+================================================================================
+ PASO 6 - CARGAR LA e.firma   (solo si instalaste dsi_cfdi_sat_sync)
+================================================================================
+
+  Menu: Boveda CFDI > Descarga Masiva SAT > Cargar e.firma
+
+  Sube el .cer, el .key y la contrasena de la llave privada. El sistema
+  valida que el par corresponda, que el RFC coincida con el de la empresa
+  y que el certificado no este vencido.
+
+  La llave privada y la contrasena se guardan CIFRADAS con la llave maestra
+  del paso 4.2. La llave maestra nunca se guarda en la base.
+
+  IMPORTANTE: la e.firma se usa SOLO PARA DESCARGAR. El sistema no timbra,
+  no cancela y no reporta nada al SAT. Las tres integraciones con el SAT
+  (consulta de estatus, lista 69-B y Descarga Masiva) son de solo lectura.
+
+
+================================================================================
+ PASO 7 - PROGRAMAR LA DESCARGA AUTOMATICA   (opcional)
+================================================================================
+
+  Menu: Boveda CFDI > Descarga Masiva SAT > Descarga automatica > Nuevo
+
+    - Traer desde       desde que fecha se empieza a descargar
+    - Periodicidad      Diaria, Semanal o Quincenal
+                        (las quincenas son naturales: 1-15 y 16 a fin de mes)
+    - Dias de recuper.  vuelve a pedir los ultimos N dias de cada periodo ya
+                        cubierto, para atrapar lo que el proveedor timbro
+                        tarde. Los duplicados se descartan por folio fiscal.
+
+  A partir de ahi, dos tareas programadas hacen el resto: una diaria genera
+  el periodo que toca y lo manda al SAT, y otra cada hora verifica y
+  descarga lo que ya este listo.
+
+  El SAT tarda de minutos a varias horas en preparar un paquete. Es normal
+  que una solicitud pase un rato en "Verificando".
+
+
+================================================================================
+ USO DIARIO
+================================================================================
+
+  Boveda CFDI > CFDI                   todos los comprobantes
+  Boveda CFDI > Por tipo               Ingresos, Egresos, Pagos, Nomina...
+  Boveda CFDI > Discrepancias          lo que no cuadra contra contabilidad
+
+  CREAR LA FACTURA DE PROVEEDOR
+  Abre un comprobante de Ingreso o Egreso que no este vinculado y pulsa
+  "Crear factura de proveedor". Tambien funciona seleccionando varios desde
+  la lista. Se crea un BORRADOR por comprobante con sus partidas e
+  impuestos; tu completas producto y cuenta y lo confirmas.
+
+  La factura NUNCA se contabiliza sola. Es deliberado: un mapeo equivocado
+  multiplicado por cientos de facturas cuesta mas que el tiempo que ahorra.
+
+  Si algo no se pudo resolver (un impuesto sin equivalente configurado, por
+  ejemplo) la factura queda marcada como PENDIENTE DE REVISION y el detalle
+  aparece en su chatter.
+
+  No se convierten: los CFDI de Pago, Nomina y Traslado (no son cuentas por
+  pagar) ni los cancelados en el SAT.
+
+
+================================================================================
+ ACTUALIZAR A UNA VERSION NUEVA
+================================================================================
+
+  1. Respalda la base de datos.
+  2. Sustituye las carpetas de los modulos por las nuevas.
+  3. Reinicia Odoo con la actualizacion:
+
+         odoo-bin -d <base> -u dsi_cfdi_vault,dsi_cfdi_sat_sync --stop-after-init
+
+  4. Vuelve a levantar Odoo normalmente.
+
+  Un cambio en codigo Python o en reglas de acceso SIEMPRE necesita el -u y
+  un reinicio: Odoo no recarga eso en caliente.
+
+
+================================================================================
+ SOPORTE
+================================================================================
+
+  DS Indigo  -  soporte@dsindigo.com
+
+  Si reportas un problema, incluye:
+    - version de Odoo y si es Enterprise
+    - que modulos tienes instalados
+    - el texto COMPLETO del error
+    - para problemas de licencia: el estado que muestra la pantalla de
+      Licenciamiento y el RFC de la empresa

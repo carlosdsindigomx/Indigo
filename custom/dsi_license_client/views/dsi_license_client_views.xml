@@ -1,0 +1,48 @@
+<odoo>
+
+    <record id="view_dsi_license_client_state_form" model="ir.ui.view">
+        <field name="name">dsi.license.client.state.form</field>
+        <field name="model">dsi.license.client.state</field>
+        <field name="arch" type="xml">
+            <form string="Licenciamiento DS Indigo">
+                <header>
+                    <button name="action_activate" type="object" string="Activar" class="btn-primary"
+                            invisible="state not in ('not_activated', 'restricted')"/>
+                    <button name="action_deactivate" type="object" string="Desactivar"
+                            invisible="state not in ('active', 'grace')"
+                            confirm="¿Liberar esta instancia en el servidor de licencias? Podrás volver a activarla más tarde."/>
+                    <field name="state" widget="statusbar" statusbar_visible="not_activated,active"/>
+                </header>
+                <sheet>
+                    <widget name="web_ribbon" title="Restringido" bg_color="text-bg-danger"
+                            invisible="state != 'restricted'"/>
+                    <widget name="web_ribbon" title="En gracia" bg_color="text-bg-warning"
+                            invisible="state != 'grace'"/>
+                    <group>
+                        <group string="Activación">
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="activation_url" invisible="1"/>
+                            <field name="license_key" placeholder="DSI-XXXX-XXXX-XXXX"/>
+                        </group>
+                        <group string="Estado">
+                            <field name="edition"/>
+                            <field name="features"/>
+                            <field name="license_end"/>
+                            <field name="token_expires"/>
+                            <field name="last_check"/>
+                            <field name="last_error"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_dsi_license_client_state" model="ir.actions.act_window">
+        <field name="name">Licenciamiento DS Indigo</field>
+        <field name="res_model">dsi.license.client.state</field>
+        <field name="view_mode">form</field>
+        <field name="res_id" eval="ref('dsi_license_client_state_default')"/>
+    </record>
+
+</odoo>

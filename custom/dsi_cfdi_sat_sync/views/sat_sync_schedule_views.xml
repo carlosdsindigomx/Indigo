@@ -1,0 +1,88 @@
+<odoo>
+
+    <record id="view_sat_sync_schedule_list" model="ir.ui.view">
+        <field name="name">sat.sync.schedule.list</field>
+        <field name="model">sat.sync.schedule</field>
+        <field name="arch" type="xml">
+            <list string="Descarga automática" decoration-muted="not active">
+                <field name="periodicity"/>
+                <field name="date_start"/>
+                <field name="date_covered_to"/>
+                <field name="last_run"/>
+                <field name="request_count" string="Solicitudes"/>
+                <field name="last_error" optional="show"/>
+                <field name="active" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_sat_sync_schedule_form" model="ir.ui.view">
+        <field name="name">sat.sync.schedule.form</field>
+        <field name="model">sat.sync.schedule</field>
+        <field name="arch" type="xml">
+            <form string="Descarga automática">
+                <header>
+                    <button name="action_generar_ahora" type="object" class="btn-primary"
+                            string="Generar el siguiente periodo ahora"/>
+                </header>
+                <sheet>
+                    <widget name="web_ribbon" title="Archivada" bg_color="text-bg-secondary"
+                            invisible="active"/>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_ver_solicitudes" type="object" class="oe_stat_button"
+                                icon="fa-cloud-download">
+                            <field name="request_count" widget="statinfo" string="Solicitudes"/>
+                        </button>
+                    </div>
+
+                    <div class="alert alert-info" role="alert">
+                        Configura esto una vez y el sistema se encarga: cada día genera las
+                        solicitudes del periodo que toque, y cada hora revisa cuáles ya están
+                        listas en el SAT para descargarlas. No hace falta volver a entrar aquí.
+                    </div>
+
+                    <group>
+                        <group string="Qué traer">
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="credential_id"/>
+                            <field name="date_start"/>
+                            <field name="periodicity"/>
+                            <field name="lookback_days"/>
+                        </group>
+                        <group string="Alcance">
+                            <field name="sync_received"/>
+                            <field name="sync_issued"/>
+                            <field name="download_xml"/>
+                            <field name="download_metadata"/>
+                            <field name="active"/>
+                        </group>
+                    </group>
+
+                    <group string="Avance">
+                        <field name="date_covered_to"/>
+                        <field name="last_run"/>
+                        <field name="last_error"/>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_sat_sync_schedule" model="ir.actions.act_window">
+        <field name="name">Descarga automática</field>
+        <field name="res_model">sat.sync.schedule</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Configura la descarga automática y olvídate del proceso manual.
+            </p>
+            <p>
+                Solo necesitas decir desde qué fecha traer los comprobantes y cada cuánto.
+                El sistema genera las solicitudes al SAT, espera a que estén listas y las
+                descarga solo.
+            </p>
+        </field>
+    </record>
+
+</odoo>

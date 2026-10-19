@@ -1,0 +1,262 @@
+<odoo>
+
+    <record id="view_cfdi_document_list" model="ir.ui.view">
+        <field name="name">cfdi.document.list</field>
+        <field name="model">cfdi.document</field>
+        <field name="arch" type="xml">
+            <list string="CFDI" decoration-danger="is_discrepancy or is_efos_risk" decoration-muted="match_state == 'pending'">
+                <field name="invoice_date"/>
+                <field name="uuid"/>
+                <field name="direction" widget="badge" decoration-info="direction == 'issued'" decoration-success="direction == 'received'"/>
+                <field name="move_type"/>
+                <field name="partner_rfc_issuer" optional="hide"/>
+                <field name="partner_name_issuer" string="Emisor"/>
+                <field name="partner_rfc_receiver" optional="hide"/>
+                <field name="partner_name_receiver" string="Receptor" optional="hide"/>
+                <field name="amount_total" sum="Total"/>
+                <field name="currency_id" invisible="1"/>
+                <field name="sat_status" widget="badge"
+                       decoration-success="sat_status == 'valid'"
+                       decoration-danger="sat_status == 'canceled'"
+                       decoration-warning="sat_status in ('not_verified', 'not_found')"/>
+                <field name="match_state" widget="badge"
+                       decoration-success="match_state in ('matched', 'manual')"
+                       decoration-warning="match_state == 'pending'"/>
+                <field name="move_id"/>
+                <field name="is_discrepancy" invisible="1"/>
+                <field name="is_efos_risk" invisible="1"/>
+                <field name="parse_state" invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_cfdi_document_kanban" model="ir.ui.view">
+        <field name="name">cfdi.document.kanban</field>
+        <field name="model">cfdi.document</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="match_state">
+                <field name="uuid"/>
+                <field name="sat_status"/>
+                <field name="match_state"/>
+                <field name="amount_total"/>
+                <field name="currency_id"/>
+                <field name="is_discrepancy"/>
+                <field name="is_efos_risk"/>
+                <templates>
+                    <t t-name="card">
+                        <div class="oe_kanban_global_click p-2">
+                            <div class="d-flex justify-content-between">
+                                <strong t-out="record.uuid.value"/>
+                                <span t-if="record.is_discrepancy.raw_value" class="badge text-bg-danger">Discrepancia</span>
+                                <span t-elif="record.is_efos_risk.raw_value" class="badge text-bg-danger">Riesgo 69-B</span>
+                            </div>
+                            <div>
+                                <field name="partner_name_issuer" invisible="direction != 'received'"/>
+                                <field name="partner_name_receiver" invisible="direction != 'issued'"/>
+                            </div>
+                            <div class="d-flex justify-content-between mt-1">
+                                <field name="amount_total" widget="monetary"/>
+                                <field name="sat_status" widget="badge"
+                                       decoration-success="sat_status == 'valid'"
+                                       decoration-danger="sat_status == 'canceled'"
+                                       decoration-warning="sat_status in ('not_verified', 'not_found')"/>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="view_cfdi_document_form" model="ir.ui.view">
+        <field name="name">cfdi.document.form</field>
+        <field name="model">cfdi.document</field>
+        <field name="arch" type="xml">
+            <form string="CFDI">
+                <header>
+                    <button name="action_verify_sat_status" type="object" string="Verificar estatus SAT" class="btn-primary"/>
+                    <button name="action_match_automatically" type="object" string="Conciliar automáticamente"
+                            invisible="move_id"/>
+                    <button name="action_open_match_suggestions" type="object" string="Ver sugerencias"
+                            invisible="move_id"/>
+                    <button name="action_crear_factura_proveedor" type="object" class="btn-primary"
+                            string="Crear factura de proveedor"
+                            invisible="move_id or direction != 'received' or move_type not in ['I', 'E']"/>
+                    <button name="action_unlink_move" type="object" string="Desvincular"
+                            invisible="not move_id" confirm="¿Desvincular este CFDI de su factura?"/>
+                    <field name="match_state" widget="statusbar" statusbar_visible="pending,matched,manual"/>
+                </header>
+                <sheet>
+                    <widget name="web_ribbon" title="Discrepancia crítica" bg_color="text-bg-danger" invisible="not is_discrepancy"/>
+                    <widget name="web_ribbon" title="Riesgo 69-B" bg_color="text-bg-danger"
+                            invisible="is_discrepancy or not is_efos_risk"/>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_open_move" type="object" class="oe_stat_button" icon="fa-file-text-o"
+                                invisible="not move_id">
+                            <div class="o_stat_info">
+                                <span class="o_stat_text">Factura</span>
+                            </div>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <h1><field name="uuid" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group string="Comprobante">
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="direction"/>
+                            <field name="move_type"/>
+                            <field name="invoice_date"/>
+                            <field name="amount_total"/>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="payment_method"/>
+                            <field name="payment_way"/>
+                        </group>
+                        <group string="Partes">
+                            <field name="partner_rfc_issuer"/>
+                            <field name="partner_name_issuer"/>
+                            <field name="partner_rfc_receiver"/>
+                            <field name="partner_name_receiver"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Conciliación">
+                            <field name="move_id"/>
+                            <field name="match_method" invisible="not move_id"/>
+                        </group>
+                        <group string="Estatus SAT">
+                            <field name="sat_status" widget="badge"
+                                   decoration-success="sat_status == 'valid'"
+                                   decoration-danger="sat_status == 'canceled'"
+                                   decoration-warning="sat_status in ('not_verified', 'not_found')"/>
+                            <field name="sat_last_check"/>
+                        </group>
+                    </group>
+                    <group string="Origen del registro">
+                        <field name="source"/>
+                        <field name="xml_attachment_id"/>
+                        <field name="pdf_attachment_id"/>
+                        <field name="parse_state" widget="badge"
+                               decoration-success="parse_state == 'ok'"
+                               decoration-warning="parse_state == 'partial'"
+                               decoration-danger="parse_state == 'error'"/>
+                        <field name="parse_error" invisible="parse_state == 'ok'"/>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_cfdi_document_search" model="ir.ui.view">
+        <field name="name">cfdi.document.search</field>
+        <field name="model">cfdi.document</field>
+        <field name="arch" type="xml">
+            <search string="Buscar CFDI">
+                <field name="uuid"/>
+                <field name="partner_rfc_issuer"/>
+                <field name="partner_rfc_receiver"/>
+                <field name="partner_name_issuer"/>
+                <field name="partner_name_receiver"/>
+                <field name="move_id"/>
+                <filter string="Emitidos" name="filter_issued" domain="[('direction', '=', 'issued')]"/>
+                <filter string="Recibidos" name="filter_received" domain="[('direction', '=', 'received')]"/>
+                <separator/>
+                <filter string="Sin factura" name="filter_no_move" domain="[('move_id', '=', False)]"/>
+                <filter string="Con factura" name="filter_with_move" domain="[('move_id', '!=', False)]"/>
+                <filter string="Discrepancias críticas" name="filter_discrepancy" domain="[('is_discrepancy', '=', True)]"/>
+                <filter string="Riesgo 69-B" name="filter_efos_risk" domain="[('is_efos_risk', '=', True)]"/>
+                <separator/>
+                <filter string="Sin verificar en el SAT" name="filter_not_verified" domain="[('sat_status', '=', 'not_verified')]"/>
+                <filter string="Cancelados" name="filter_canceled" domain="[('sat_status', '=', 'canceled')]"/>
+                <group>
+                    <filter string="Dirección" name="group_direction" context="{'group_by': 'direction'}"/>
+                    <filter string="Tipo de comprobante" name="group_move_type" context="{'group_by': 'move_type'}"/>
+                    <filter string="Conciliación" name="group_match_state" context="{'group_by': 'match_state'}"/>
+                    <filter string="Estatus SAT" name="group_sat_status" context="{'group_by': 'sat_status'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_cfdi_document" model="ir.actions.act_window">
+        <field name="name">CFDI</field>
+        <field name="res_model">cfdi.document</field>
+        <field name="view_mode">list,kanban,form</field>
+        <field name="search_view_id" ref="view_cfdi_document_search"/>
+        <field name="context">{'search_default_group_match_state': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Todavía no hay CFDI en la bóveda.
+            </p>
+            <p>
+                Importa uno o varios XML (o un ZIP) desde el botón "Importar CFDI".
+            </p>
+        </field>
+    </record>
+
+    <record id="action_cfdi_document_no_move" model="ir.actions.act_window">
+        <field name="name">CFDI sin factura</field>
+        <field name="res_model">cfdi.document</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('move_id', '=', False)]</field>
+        <field name="search_view_id" ref="view_cfdi_document_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No hay CFDI pendientes de vincular a una factura.
+            </p>
+        </field>
+    </record>
+
+    <record id="action_cfdi_document_discrepancy" model="ir.actions.act_window">
+        <field name="name">CFDI cancelados que siguen contabilizados</field>
+        <field name="res_model">cfdi.document</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('is_discrepancy', '=', True)]</field>
+        <field name="search_view_id" ref="view_cfdi_document_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Sin discrepancias.
+            </p>
+            <p>
+                Aquí aparecerían los CFDI cancelados en el SAT que siguen vinculados a una factura.
+            </p>
+        </field>
+    </record>
+
+    <record id="action_cfdi_document_payment_no_move" model="ir.actions.act_window">
+        <field name="name">Pagos (REP) sin vincular</field>
+        <field name="res_model">cfdi.document</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('move_type', '=', 'P'), ('move_id', '=', False)]</field>
+        <field name="search_view_id" ref="view_cfdi_document_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No hay complementos de pago (REP) sin vincular.
+            </p>
+            <p>
+                Aquí aparecen los CFDI de tipo Pago (complemento REP) que todavía no están
+                vinculados a un asiento de pago en la contabilidad — señal de que el pago
+                se recibió/emitió fiscalmente pero no se ha registrado en Odoo.
+            </p>
+        </field>
+    </record>
+
+    <record id="action_cfdi_document_payroll_no_move" model="ir.actions.act_window">
+        <field name="name">CFDI de nómina sin factura</field>
+        <field name="res_model">cfdi.document</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('move_type', '=', 'N'), ('move_id', '=', False)]</field>
+        <field name="search_view_id" ref="view_cfdi_document_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No hay CFDI de nómina sin factura.
+            </p>
+            <p>
+                Aquí aparecen los CFDI de tipo Nómina que todavía no están vinculados al
+                asiento contable del periodo correspondiente.
+            </p>
+        </field>
+    </record>
+
+</odoo>

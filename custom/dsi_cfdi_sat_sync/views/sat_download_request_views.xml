@@ -1,0 +1,81 @@
+<odoo>
+
+    <record id="view_sat_download_request_list" model="ir.ui.view">
+        <field name="name">sat.download.request.list</field>
+        <field name="model">sat.download.request</field>
+        <field name="arch" type="xml">
+            <list string="Solicitudes de Descarga Masiva" decoration-danger="state in ('rejected', 'expired')">
+                <field name="create_date" string="Creada"/>
+                <field name="request_type"/>
+                <field name="direction"/>
+                <field name="date_from"/>
+                <field name="date_to"/>
+                <field name="imported_count"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'processed'"
+                       decoration-danger="state in ('rejected', 'expired')"
+                       decoration-info="state in ('authenticated', 'requested', 'verifying', 'downloading')"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_sat_download_request_form" model="ir.ui.view">
+        <field name="name">sat.download.request.form</field>
+        <field name="model">sat.download.request</field>
+        <field name="arch" type="xml">
+            <form string="Solicitud de Descarga Masiva">
+                <header>
+                    <button name="action_autenticar" type="object" string="1. Autenticar" class="btn-primary"
+                            invisible="state != 'draft'"/>
+                    <button name="action_solicitar" type="object" string="2. Solicitar descarga" class="btn-primary"
+                            invisible="state != 'authenticated'"/>
+                    <button name="action_verificar" type="object" string="3. Verificar" class="btn-primary"
+                            invisible="state not in ('requested', 'verifying')"/>
+                    <button name="action_descargar_y_procesar" type="object" string="4. Descargar y procesar" class="btn-primary"
+                            invisible="state != 'downloading'"/>
+                    <button name="action_reintentar" type="object" string="Corregir y reintentar"
+                            invisible="state != 'rejected'"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,authenticated,requested,verifying,downloading,processed"/>
+                </header>
+                <sheet>
+                    <widget name="web_ribbon" title="Rechazado" bg_color="text-bg-danger" invisible="state != 'rejected'"/>
+                    <group>
+                        <group string="Solicitud">
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="credential_id" readonly="state != 'draft'"/>
+                            <field name="request_type" readonly="state != 'draft'"/>
+                            <field name="direction" readonly="state != 'draft'"/>
+                            <field name="date_from" readonly="state != 'draft'"/>
+                            <field name="date_to" readonly="state != 'draft'"/>
+                            <field name="estado_comprobante" readonly="state != 'draft'"/>
+                        </group>
+                        <group string="Resultado">
+                            <field name="sat_request_id"/>
+                            <field name="imported_count"/>
+                        </group>
+                    </group>
+                    <group string="Último error" invisible="not error_message">
+                        <field name="error_message" nolabel="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_sat_download_request" model="ir.actions.act_window">
+        <field name="name">Descarga Masiva SAT</field>
+        <field name="res_model">sat.download.request</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Todavía no hay solicitudes de Descarga Masiva.
+            </p>
+            <p>
+                Crea una para traer automáticamente los CFDI de un periodo directamente del SAT,
+                usando tu e.firma ya cargada.
+            </p>
+        </field>
+    </record>
+
+</odoo>
