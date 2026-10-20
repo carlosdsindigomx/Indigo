@@ -3,6 +3,12 @@
     <record id="group_sat_credential_manager" model="res.groups">
         <field name="name">Bóveda CFDI / Custodio de e.firma</field>
         <field name="comment">Único grupo con permiso para cargar, ver o revocar la e.firma de la empresa. Deliberadamente separado del grupo de uso normal de la Bóveda CFDI.</field>
+        <!-- Sin esto el grupo nace VACÍO y sus menús quedan invisibles para
+             todos, incluido el administrador: en Odoo nadie pertenece a un
+             grupo custom por omisión. Se siembra al admin para que la
+             instalación quede usable; a partir de ahí se añaden a mano los
+             usuarios que deban custodiar la e.firma. -->
+        <field name="user_ids" eval="[(4, ref('base.user_admin'))]"/>
     </record>
 
 </odoo>
