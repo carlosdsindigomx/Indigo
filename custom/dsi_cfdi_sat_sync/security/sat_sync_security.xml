@@ -1,8 +1,15 @@
 <odoo>
 
     <record id="group_sat_credential_manager" model="res.groups">
-        <field name="name">Bóveda CFDI / Custodio de e.firma</field>
-        <field name="comment">Único grupo con permiso para cargar, ver o revocar la e.firma de la empresa. Deliberadamente separado del grupo de uso normal de la Bóveda CFDI.</field>
+        <field name="name">Custodio de e.firma</field>
+        <field name="privilege_id" ref="dsi_cfdi_vault.res_groups_privilege_cfdi_vault"/>
+        <!-- Odoo pinta cada privilegio como UN solo desplegable: el usuario
+             queda con uno solo de sus grupos. Si el custodio no implicara al
+             usuario, elegirlo le quitaria "Usuario", y con el el menu raiz de
+             la Boveda del que cuelga la Descarga Masiva SAT. Al implicarlo
+             queda como el nivel de arriba: Usuario < Custodio de e.firma. -->
+        <field name="implied_ids" eval="[(4, ref('dsi_cfdi_vault.group_cfdi_vault_user'))]"/>
+        <field name="comment">Único grupo con permiso para cargar, ver o revocar la e.firma de la empresa. Incluye todo lo del Usuario de la Bóveda CFDI; el Usuario, en cambio, no puede tocar la e.firma.</field>
         <!-- Sin esto el grupo nace VACÍO y sus menús quedan invisibles para
              todos, incluido el administrador: en Odoo nadie pertenece a un
              grupo custom por omisión. Se siembra al admin para que la

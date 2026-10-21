@@ -1,10 +1,14 @@
 import logging
-from datetime import timedelta
+import time
+from collections import Counter
+from datetime import datetime, timedelta
 
 from lxml import etree
 
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
+
+from .cfdi_efos_entry import EFOS_CLEARED_SITUATIONS
 
 _logger = logging.getLogger(__name__)
 
@@ -22,6 +26,20 @@ SUGGEST_MAX_CANDIDATES = 5
 SAT_CHECK_RECENT_WINDOW_DAYS = 30   # CFDI de los últimos 30 días
 SAT_CHECK_RECENT_INTERVAL_DAYS = 1  # ... se revisan a diario
 SAT_CHECK_OLD_INTERVAL_DAYS = 30    # CFDI más antiguos ... se revisan mensualmente
+
+# Respuesta de l10n_mx_edi.document._fetch_sat_status -> sat_status. Cualquier
+# otra ('error', 'not_defined') deja el estatus como estaba.
+SAT_STATUS_BY_RESULT = {
+    'valid': 'valid',
+    'cancelled': 'canceled',
+    'not_found': 'not_found',
+}
+
+# Verificación en lote desde la lista: cada CFDI es una consulta al servicio
+# público del SAT (~0.6 s, hasta 20 s si no responde). Se corta por tiempo y no
+# por cantidad para no rebasar el límite de una petición web; lo que no alcanzó
+# se verifica al volver a ejecutar la acción.
+BATCH_VERIFY_SECONDS = 60
 
 
 def _local(tag):
@@ -103,7 +121,8 @@ class CfdiDocument(models.Model):
     is_efos_risk = fields.Boolean(
         string="Riesgo 69-B", compute='_compute_efos_risk', store=True,
         help="El RFC emisor o el RFC receptor de este CFDI aparece en la lista 69-B "
-             "(Empresas que Facturan Operaciones Simuladas) del SAT.")
+             "(Empresas que Facturan Operaciones Simuladas) del SAT como presunto o "
+             "definitivo. Los que desvirtuaron o tienen sentencia favorable no cuentan.")
     active = fields.Boolean(default=True)
 
     _uuid_company_uniq = models.Constraint(
@@ -121,19 +140,24 @@ class CfdiDocument(models.Model):
         rfcs = {rfc for rfc in self.mapped('partner_rfc_issuer') + self.mapped('partner_rfc_receiver') if rfc}
         flagged = set()
         if rfcs:
-            flagged = set(self.env['dsi.cfdi.efos.entry'].sudo().search(
-                [('rfc', 'in', list(rfcs))]).mapped('rfc'))
+            flagged = set(self.env['dsi.cfdi.efos.entry'].sudo().search([
+                ('rfc', 'in', list(rfcs)),
+                ('situation', 'not in', EFOS_CLEARED_SITUATIONS),
+            ]).mapped('rfc'))
         for doc in self:
             doc.is_efos_risk = bool(
                 (doc.partner_rfc_issuer and doc.partner_rfc_issuer in flagged)
                 or (doc.partner_rfc_receiver and doc.partner_rfc_receiver in flagged)
             )
 
+    @api.model
     def _recompute_efos_risk_all(self):
-        """Llamado tras cargar/refrescar la lista 69-B: los CFDI existentes no
-        se recalculan solos con @api.depends porque el cambio ocurre en OTRO
-        modelo (dsi.cfdi.efos.entry), no en los campos de cfdi.document."""
-        self.search([])._compute_efos_risk()
+        """Llamado tras cargar/refrescar la lista 69-B y al actualizar el
+        módulo (data/cfdi_efos_recompute.xml): los CFDI existentes no se
+        recalculan solos con @api.depends porque el cambio ocurre en OTRO
+        modelo (dsi.cfdi.efos.entry), o en la regla misma, no en los campos de
+        cfdi.document. Incluye los archivados, que también pueden reactivarse."""
+        self.with_context(active_test=False).search([])._compute_efos_risk()
 
     @api.onchange('move_id')
     def _onchange_move_id(self):
@@ -374,27 +398,100 @@ class CfdiDocument(models.Model):
     # Verificación de estatus SAT bajo demanda (REQ-004)
     # -------------------------------------------------------------------
 
-    def action_verify_sat_status(self):
-        errors = []
+    def _fetch_and_store_sat_status(self, deadline=None):
+        """Consulta al SAT el estatus de cada CFDI y guarda el que responda.
+
+        Nunca lanza excepción: devuelve (verificados, errores), donde `errores`
+        es una lista de (cfdi, mensaje). Un CFDI con error conserva su estatus
+        anterior. Con `deadline` (un valor de time.monotonic()) deja de
+        consultar al rebasarlo; los que no alcanzó no quedan en ninguna de las
+        dos listas.
+        """
         sat_doc_model = self.env['l10n_mx_edi.document']
+        verified = self.env['cfdi.document']
+        errors = []
         for doc in self:
+            if deadline is not None and time.monotonic() > deadline:
+                break
             result = sat_doc_model._fetch_sat_status(
                 doc.partner_rfc_issuer, doc.partner_rfc_receiver, doc.amount_total, doc.uuid,
             )
-            value = result.get('value')
-            if value == 'valid':
-                doc.write({'sat_status': 'valid', 'sat_last_check': fields.Datetime.now()})
-            elif value == 'cancelled':
-                doc.write({'sat_status': 'canceled', 'sat_last_check': fields.Datetime.now()})
-            elif value == 'not_found':
-                doc.write({'sat_status': 'not_found', 'sat_last_check': fields.Datetime.now()})
+            status = SAT_STATUS_BY_RESULT.get(result.get('value'))
+            if status:
+                doc.write({'sat_status': status, 'sat_last_check': fields.Datetime.now()})
+                verified |= doc
             else:
-                errors.append("%s: %s" % (doc.uuid, result.get('error') or _("estatus no definido")))
+                errors.append((doc, result.get('error') or _("estatus no definido")))
+        return verified, errors
+
+    def action_verify_sat_status(self):
+        _verified, errors = self._fetch_and_store_sat_status()
         if errors:
             raise UserError(_(
                 "No se pudo verificar el estatus SAT de %(count)s CFDI. El estatus anterior no se modificó.\n\n%(errors)s",
-                count=len(errors), errors="\n".join(errors),
+                count=len(errors), errors="\n".join("%s: %s" % (doc.uuid, msg) for doc, msg in errors),
             ))
+
+    def action_verify_sat_status_batch(self):
+        """«Verificar estatus SAT» desde el menú Acciones de la lista.
+
+        A diferencia del botón del formulario, un CFDI que falla no deshace los
+        que sí respondieron: el resultado se informa en una notificación y la
+        lista se recarga. Van primero los que nunca se han verificado y luego
+        los de verificación más antigua, así que volver a ejecutarla sobre la
+        misma selección sigue donde se quedó la anterior.
+        """
+        pending = self.sorted(lambda d: d.sat_last_check or datetime.min)
+        verified, errors = pending._fetch_and_store_sat_status(
+            deadline=time.monotonic() + BATCH_VERIFY_SECONDS)
+        missing = len(self) - len(verified) - len(errors)
+
+        messages = []
+        # Cancelados que siguen vinculados a una factura: es justo lo que la
+        # verificación busca, así que se señala aparte.
+        in_books = verified.filtered(lambda d: d.sat_status == 'canceled' and d.move_id)
+        if verified:
+            labels = dict(self._fields['sat_status'].selection)
+            counts = Counter(verified.mapped('sat_status'))
+            messages.append(_(
+                "CFDI verificados: %(count)s (%(detail)s).",
+                count=len(verified),
+                detail=", ".join("%s: %s" % (labels[status], n) for status, n in sorted(counts.items())),
+            ))
+        if in_books:
+            messages.append(_(
+                "Cancelados que siguen contabilizados: %(count)s. Revísalos en Discrepancias.",
+                count=len(in_books)))
+        if errors:
+            for doc, msg in errors:
+                _logger.warning("Verificación SAT en lote falló para %s: %s", doc.uuid, msg)
+            messages.append(_(
+                "Sin poder verificar: %(count)s; conservan su estatus anterior (%(uuids)s).",
+                count=len(errors), uuids=", ".join(doc.uuid for doc, _msg in errors[:3])
+                + (", …" if len(errors) > 3 else "")))
+        if missing:
+            messages.append(_(
+                "Pendientes: %(count)s. La verificación se corta al minuto para no rebasar el "
+                "tiempo de la petición; vuelve a ejecutarla con la misma selección para continuar.",
+                count=missing))
+
+        if not verified:
+            kind = 'danger'
+        elif errors or missing or in_books:
+            kind = 'warning'
+        else:
+            kind = 'success'
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _("Verificación de estatus SAT"),
+                'message': " ".join(messages),
+                'type': kind,
+                'sticky': kind != 'success',
+                'next': {'type': 'ir.actions.client', 'tag': 'soft_reload'},
+            },
+        }
 
     # -------------------------------------------------------------------
     # Verificación de estatus SAT automática (cron, periodicidad decreciente)

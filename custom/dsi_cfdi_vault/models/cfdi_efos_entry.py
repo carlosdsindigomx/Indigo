@@ -11,9 +11,26 @@ from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
 
-DEFAULT_69B_URL = "https://omawww.sat.gob.mx/cifras_sat/Documents/Listado_Completo_69-B.csv"
-REQUEST_TIMEOUT = 30
+# El SAT publica la lista en este servidor, que por https no responde (la
+# conexión se agota) y por http sí. Se intenta primero https por si lo
+# arreglan y luego http. Los datos son públicos; lo que se pierde por http es
+# la garantía de que no se alteraron en el camino.
+DEFAULT_69B_URLS = (
+    "https://omawww.sat.gob.mx/cifras_sat/Documents/Listado_Completo_69-B.csv",
+    "http://omawww.sat.gob.mx/cifras_sat/Documents/Listado_Completo_69-B.csv",
+)
+# (conexión, lectura). El archivo pesa ~4.5 MB; si el servidor ni siquiera
+# acepta la conexión, conviene rendirse pronto y pasar a la siguiente dirección.
+REQUEST_TIMEOUT = (10, 60)
 CSV_ENCODINGS = ('utf-8-sig', 'cp1252', 'latin-1')
+
+# Situaciones que ya NO son riesgo: el contribuyente desvirtuó la presunción
+# ante el SAT o ganó en tribunales, así que sus operaciones se reconocieron
+# como reales. Siguen en el listado completo del SAT (casi el 14% de sus
+# filas), por eso no basta con que el RFC aparezca. Cualquier otra situación,
+# incluida una que no se pudo clasificar, cuenta como riesgo: ante la duda, se
+# avisa.
+EFOS_CLEARED_SITUATIONS = ('desvirtuado', 'sentencia_favorable')
 
 SITUATION_KEYWORDS = [
     ('presunto', 'presunto'),
@@ -67,16 +84,24 @@ class CfdiEfosEntry(models.Model):
 
     @api.model
     def _refresh_from_url(self, url=None):
-        url = url or _param(
-            self.env, 'dsi_cfdi_vault.efos_list_url', DEFAULT_69B_URL
-        )
-        try:
-            response = requests.get(url, timeout=REQUEST_TIMEOUT)
-            response.raise_for_status()
-        except requests.RequestException as e:
-            return {'ok': False, 'error': str(e)}
-        count = self._import_csv_bytes(response.content)
-        return {'ok': True, 'count': count}
+        """Descarga la lista y la carga. Con una URL explícita o configurada
+        en el parámetro 'dsi_cfdi_vault.efos_list_url' solo se intenta esa; si
+        no, las del SAT en orden, hasta que una responda con un CSV legible."""
+        url = url or _param(self.env, 'dsi_cfdi_vault.efos_list_url')
+        errors = []
+        for candidate in ((url,) if url else DEFAULT_69B_URLS):
+            try:
+                response = requests.get(candidate, timeout=REQUEST_TIMEOUT)
+                response.raise_for_status()
+                count = self._import_csv_bytes(response.content)
+            except (requests.RequestException, UserError) as e:
+                # Un UserError aquí es una respuesta que no es el CSV (p. ej.
+                # una página de mantenimiento). Salta antes de tocar la lista
+                # cargada, así que se puede probar la siguiente dirección.
+                errors.append(f"{candidate}: {e}")
+                continue
+            return {'ok': True, 'count': count, 'url': candidate}
+        return {'ok': False, 'error': "; ".join(errors)}
 
     @api.model
     def _import_csv_bytes(self, csv_bytes):

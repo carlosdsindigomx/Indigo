@@ -8,3 +8,5 @@ access_cfdi_efos_entry_manager,dsi.cfdi.efos.entry.manager,model_dsi_cfdi_efos_e
 access_cfdi_efos_import_wizard_user,dsi.cfdi.efos.import.wizard.user,model_dsi_cfdi_efos_import_wizard,account.group_account_manager,1,1,1,1
 access_cfdi_match_suggestion_wizard_user,cfdi.match.suggestion.wizard.user,model_cfdi_match_suggestion_wizard,group_cfdi_vault_user,1,1,1,1
 access_cfdi_match_suggestion_wizard_line_user,cfdi.match.suggestion.wizard.line.user,model_cfdi_match_suggestion_wizard_line,group_cfdi_vault_user,1,1,1,1
+access_cfdi_efos_check_wizard_user,dsi.cfdi.efos.check.wizard.user,model_dsi_cfdi_efos_check_wizard,group_cfdi_vault_user,1,1,1,1
+access_cfdi_efos_check_wizard_line_user,dsi.cfdi.efos.check.wizard.line.user,model_dsi_cfdi_efos_check_wizard_line,group_cfdi_vault_user,1,1,1,1

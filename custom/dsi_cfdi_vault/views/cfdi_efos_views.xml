@@ -88,7 +88,8 @@
             </p>
             <p>
                 Aquí aparecerían los CFDI cuyo RFC emisor o receptor está en la lista 69-B
-                (Empresas que Facturan Operaciones Simuladas) del SAT.
+                (Empresas que Facturan Operaciones Simuladas) del SAT como presunto o
+                definitivo. Los que desvirtuaron o tienen sentencia favorable no cuentan.
             </p>
         </field>
     </record>

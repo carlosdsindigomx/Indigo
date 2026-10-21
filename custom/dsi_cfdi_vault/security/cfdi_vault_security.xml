@@ -1,6 +1,19 @@
 <odoo>
+    <!-- Sin un privilegio, Odoo 19+ manda los grupos al bloque suelto
+         "Permisos adicionales" del final de la ficha de usuario, donde nadie
+         los encuentra. Con el privilegio salen como un desplegable propio
+         dentro de la seccion Contabilidad. -->
+    <record id="res_groups_privilege_cfdi_vault" model="res.groups.privilege">
+        <field name="name">Bóveda CFDI</field>
+        <field name="category_id" ref="base.module_category_accounting"/>
+        <field name="sequence">30</field>
+    </record>
+
+    <!-- El nombre va sin prefijo: Odoo antepone el del privilegio y lo
+         muestra como "Bóveda CFDI / Usuario". -->
     <record id="group_cfdi_vault_user" model="res.groups">
-        <field name="name">Bóveda CFDI / Usuario</field>
+        <field name="name">Usuario</field>
+        <field name="privilege_id" ref="res_groups_privilege_cfdi_vault"/>
         <field name="implied_ids" eval="[(4, ref('account.group_account_invoice'))]"/>
         <field name="user_ids" eval="[(4, ref('base.user_admin'))]"/>
     </record>

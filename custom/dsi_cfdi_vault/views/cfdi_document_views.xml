@@ -259,4 +259,17 @@
         </field>
     </record>
 
+    <!-- En el menú Acciones de la lista, para verificar varios a la vez en vez
+         de uno por uno. Usa la versión en lote: un CFDI que falla no deshace los
+         demás y el resultado sale en una notificación. En el formulario ya está
+         el botón, por eso solo se liga a la lista. -->
+    <record id="action_cfdi_verificar_estatus_sat" model="ir.actions.server">
+        <field name="name">Verificar estatus SAT</field>
+        <field name="model_id" ref="model_cfdi_document"/>
+        <field name="binding_model_id" ref="model_cfdi_document"/>
+        <field name="binding_view_types">list</field>
+        <field name="state">code</field>
+        <field name="code">action = records.action_verify_sat_status_batch()</field>
+    </record>
+
 </odoo>

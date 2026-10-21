@@ -41,6 +41,9 @@
     <menuitem id="menu_cfdi_document_efos_risk" name="Proveedores en lista 69-B"
               parent="menu_cfdi_vault_discrepancies" action="action_cfdi_document_efos_risk" sequence="40"/>
 
+    <menuitem id="menu_cfdi_efos_check_wizard" name="Revisar periodo contra lista 69-B"
+              parent="menu_cfdi_vault_discrepancies" action="action_cfdi_efos_check_wizard" sequence="45"/>
+
     <menuitem id="menu_cfdi_document_payment_no_move" name="Pagos (REP) sin vincular"
               parent="menu_cfdi_vault_discrepancies" action="action_cfdi_document_payment_no_move" sequence="50"/>
 
