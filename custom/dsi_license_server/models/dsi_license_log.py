@@ -12,6 +12,7 @@ class DsiLicenseLog(models.Model):
         ('activate', "Activar"),
         ('heartbeat', "Heartbeat"),
         ('deactivate', "Desactivar"),
+        ('trial', "Prueba"),
     ], required=True)
     success = fields.Boolean()
     ip_address = fields.Char()

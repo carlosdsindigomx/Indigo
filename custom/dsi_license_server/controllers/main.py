@@ -1,7 +1,8 @@
 import json
 import logging
+from datetime import timedelta
 
-from odoo import fields, http
+from odoo import SUPERUSER_ID, fields, http
 from odoo.exceptions import UserError
 from odoo.http import request
 
@@ -10,9 +11,23 @@ from ..crypto import sign_token, DsiLicenseKeyError
 _logger = logging.getLogger(__name__)
 
 GENERIC_ERROR = "No se pudo procesar la solicitud. Verifica la clave de licencia y el RFC."
+# /trial es público y hace una petición saliente por cada solicitud: se
+# limita por IP para que no se use para martillar a nadie.
+TRIAL_MAX_PER_HOUR = 10
 
 
 class DsiLicenseController(http.Controller):
+    # Todas las rutas escriben (instancias, bitácora) y llevan readonly=False:
+    # desde Odoo 19 una ruta auth='none' abre por omisión una transacción de
+    # solo lectura cuando hay réplica, y como aquí se atrapan las excepciones
+    # para contestar JSON, Odoo nunca se entera de que debía reintentar con
+    # una de lectura-escritura.
+
+    def _env(self):
+        """Entorno como OdooBot. Las rutas auth='none' no tienen usuario, y el
+        chatter (seguimiento de cambios, message_post) necesita un autor: sin
+        él fallaba al vencer una licencia y al crear una prueba."""
+        return request.env(user=SUPERUSER_ID)
 
     def _log_call(self, endpoint, license=None, instance=None, success=False,
                    request_data=None, response_data=None, error_message=None):
@@ -32,10 +47,11 @@ class DsiLicenseController(http.Controller):
         except Exception:
             _logger.exception("No se pudo escribir la bitácora de licenciamiento")
 
-    @http.route('/dsi/license/v1/activate', type='http', methods=['POST'], auth='none', csrf=False)
+    @http.route('/dsi/license/v1/activate', type='http', methods=['POST'], auth='none', csrf=False,
+                readonly=False)
     def activate(self, **kw):
         data = request.get_json_data()
-        License = request.env['dsi.license'].sudo()
+        License = self._env()['dsi.license']
         license = License.search([('key', '=', (data.get('license_key') or '').strip())], limit=1)
         try:
             if not license:
@@ -48,6 +64,7 @@ class DsiLicenseController(http.Controller):
                 raise UserError("Falta db_uuid.")
             odoo_version = data.get('odoo_version') or ''
             license._check_usable(odoo_version)
+            license._check_trial_activation(db_uuid, data.get('base_url'))
             instance = license._find_or_create_instance(
                 db_uuid=db_uuid,
                 base_url=data.get('base_url'),
@@ -55,8 +72,7 @@ class DsiLicenseController(http.Controller):
                 module_version=data.get('module_version'),
                 is_production=bool(data.get('is_production', True)),
             )
-            payload = license._build_token_payload()
-            payload['db_uuid'] = db_uuid
+            payload = license._build_token_payload(instance)
             token = sign_token(payload, env=request.env)
             response = {'token': token}
             self._log_call('activate', license, instance, success=True,
@@ -77,10 +93,11 @@ class DsiLicenseController(http.Controller):
                             error_message=str(e))
             return request.make_json_response({'error': GENERIC_ERROR}, status=500)
 
-    @http.route('/dsi/license/v1/heartbeat', type='http', methods=['POST'], auth='none', csrf=False)
+    @http.route('/dsi/license/v1/heartbeat', type='http', methods=['POST'], auth='none', csrf=False,
+                readonly=False)
     def heartbeat(self, **kw):
         data = request.get_json_data()
-        License = request.env['dsi.license'].sudo()
+        License = self._env()['dsi.license']
         license = License.search([('key', '=', (data.get('license_key') or '').strip())], limit=1)
         instance = license.instance_ids.filtered(
             lambda i: i.database_uuid == data.get('db_uuid')) if license else License.env['dsi.license.instance']
@@ -90,8 +107,7 @@ class DsiLicenseController(http.Controller):
             odoo_version = instance.odoo_version or ''
             license._check_usable(odoo_version)
             instance.date_last_heartbeat = fields.Datetime.now()
-            payload = license._build_token_payload()
-            payload['db_uuid'] = instance.database_uuid
+            payload = license._build_token_payload(instance)
             token = sign_token(payload, env=request.env)
             response = {'token': token}
             self._log_call('heartbeat', license, instance, success=True,
@@ -111,10 +127,11 @@ class DsiLicenseController(http.Controller):
                             error_message=str(e))
             return request.make_json_response({'error': GENERIC_ERROR}, status=500)
 
-    @http.route('/dsi/license/v1/deactivate', type='http', methods=['POST'], auth='none', csrf=False)
+    @http.route('/dsi/license/v1/deactivate', type='http', methods=['POST'], auth='none', csrf=False,
+                readonly=False)
     def deactivate(self, **kw):
         data = request.get_json_data()
-        License = request.env['dsi.license'].sudo()
+        License = self._env()['dsi.license']
         license = License.search([('key', '=', (data.get('license_key') or '').strip())], limit=1)
         instance = license.instance_ids.filtered(
             lambda i: i.database_uuid == data.get('db_uuid')) if license else License.env['dsi.license.instance']
@@ -128,4 +145,49 @@ class DsiLicenseController(http.Controller):
             _logger.exception("Error inesperado en /dsi/license/v1/deactivate")
             self._log_call('deactivate', license, instance, success=False, request_data=data,
                             error_message=str(e))
+            return request.make_json_response({'error': GENERIC_ERROR}, status=500)
+
+    @http.route('/dsi/license/v1/trial', type='http', methods=['POST'], auth='none', csrf=False,
+                readonly=False)
+    def trial(self, **kw):
+        """La base del cliente pide su prueba sin pasar por el portal. Antes de
+        darla se comprueba que la solicitud viene de la dirección que declara
+        (ver dsi.license._start_trial)."""
+        data = request.get_json_data()
+        # El secreto del reto no se guarda en la bitácora.
+        para_bitacora = {k: v for k, v in data.items() if k != 'challenge_secret'}
+        license = instance = None
+        try:
+            hace_una_hora = fields.Datetime.now() - timedelta(hours=1)
+            recientes = request.env['dsi.license.log'].sudo().search_count([
+                ('endpoint', '=', 'trial'),
+                ('ip_address', '=', request.httprequest.remote_addr),
+                ('create_date', '>=', hace_una_hora),
+            ])
+            if recientes >= TRIAL_MAX_PER_HOUR:
+                self._log_call('trial', success=False, request_data=para_bitacora,
+                                error_message="Demasiadas solicitudes desde esta IP")
+                return request.make_json_response(
+                    {'error': "Demasiadas solicitudes. Intenta de nuevo en una hora."}, status=429)
+            license, instance = self._env()['dsi.license']._start_trial(data)
+            payload = license._build_token_payload(instance)
+            token = sign_token(payload, env=request.env)
+            self._log_call('trial', license, instance, success=True,
+                            request_data=para_bitacora, response_data=payload)
+            return request.make_json_response({'token': token, 'license_key': license.key})
+        except DsiLicenseKeyError as e:
+            _logger.error("Configuración de licenciamiento incompleta: %s", e)
+            request.env.cr.rollback()
+            self._log_call('trial', success=False, request_data=para_bitacora, error_message=str(e))
+            return request.make_json_response({'error': GENERIC_ERROR}, status=500)
+        except UserError as e:
+            # Nada a medias: la bitácora hace commit y no debe llevarse un
+            # contacto o una licencia que no llegó a entregarse.
+            request.env.cr.rollback()
+            self._log_call('trial', success=False, request_data=para_bitacora, error_message=str(e))
+            return request.make_json_response({'error': str(e)}, status=400)
+        except Exception as e:  # pylint: disable=broad-except
+            _logger.exception("Error inesperado en /dsi/license/v1/trial")
+            request.env.cr.rollback()
+            self._log_call('trial', success=False, request_data=para_bitacora, error_message=str(e))
             return request.make_json_response({'error': GENERIC_ERROR}, status=500)
