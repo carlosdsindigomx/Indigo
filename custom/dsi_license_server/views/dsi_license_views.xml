@@ -32,6 +32,9 @@
                 <header>
                     <button name="action_activate" type="object" string="Activar" class="btn-primary"
                             invisible="state == 'active'"/>
+                    <button name="action_convert_to_subscription" type="object" string="Convertir en suscripción"
+                            class="btn-primary" invisible="license_type != 'trial'"
+                            confirm="La misma licencia pasa a suscripción por un año, con cupo de 2 instancias. El cliente la recibe en su siguiente renovación diaria, o al momento si pulsa Activar. ¿Continuar?"/>
                     <button name="action_suspend" type="object" string="Suspender"
                             invisible="state != 'active'"/>
                     <button name="action_revoke" type="object" string="Revocar" confirm="¿Revocar esta licencia? Todas sus instancias activas se liberarán."
@@ -106,6 +109,7 @@
                 <field name="rfc_authorized"/>
                 <field name="partner_id"/>
                 <filter string="Activas" name="filter_active" domain="[('state', '=', 'active')]"/>
+                <filter string="Pruebas" name="filter_trial" domain="[('license_type', '=', 'trial')]"/>
                 <filter string="Suspendidas" name="filter_suspended" domain="[('state', '=', 'suspended')]"/>
                 <filter string="Expiradas o revocadas" name="filter_ended" domain="[('state', 'in', ('expired', 'revoked'))]"/>
                 <group>
@@ -121,6 +125,22 @@
         <field name="res_model">dsi.license</field>
         <field name="view_mode">list,form</field>
         <field name="search_view_id" ref="view_dsi_license_search"/>
+    </record>
+
+    <record id="view_dsi_license_product_list" model="ir.ui.view">
+        <field name="name">dsi.license.product.list</field>
+        <field name="model">dsi.license.product</field>
+        <field name="arch" type="xml">
+            <list string="Productos licenciables" editable="bottom">
+                <field name="name"/>
+                <field name="code"/>
+                <field name="supported_versions"/>
+                <field name="allow_trial"/>
+                <field name="trial_days" invisible="not allow_trial"/>
+                <field name="purchase_url" widget="url"/>
+                <field name="active" column_invisible="True"/>
+            </list>
+        </field>
     </record>
 
     <record id="action_dsi_license_product" model="ir.actions.act_window">

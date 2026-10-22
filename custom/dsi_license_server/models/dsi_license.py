@@ -1,12 +1,21 @@
+import logging
 import secrets
 import string
 import uuid
 from datetime import datetime, timedelta
 
 from odoo import _, api, fields, models
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, ValidationError
+
+from .. import trial
+
+_logger = logging.getLogger(__name__)
 
 TOKEN_VALIDITY_DAYS = 30
+# Días que el cliente sigue funcionando tras vencer el token sin poder
+# renovarlo (servidor caído, sin internet...). Va firmado en el token. Las
+# pruebas no tienen: terminan el día que terminan.
+GRACE_DAYS = 15
 
 
 class DsiLicense(models.Model):
@@ -27,7 +36,10 @@ class DsiLicense(models.Model):
     license_type = fields.Selection([
         ('subscription', "Suscripción"),
         ('perpetual', "Perpetua"),
-    ], default='subscription', required=True, tracking=True)
+        ('trial', "Prueba"),
+    ], default='subscription', required=True, tracking=True,
+        help="Las pruebas las crea sola la base del cliente al pedirla (ver Productos > "
+             "Permitir prueba): quedan amarradas a la dirección de esa base y sin días de gracia.")
     rfc_authorized = fields.Char(string="RFC autorizado", required=True, tracking=True)
     date_start = fields.Date(default=fields.Date.context_today, required=True)
     date_end = fields.Date(string="Vigente hasta", tracking=True,
@@ -134,15 +146,149 @@ class DsiLicense(models.Model):
             'state': 'active',
         })
 
-    def _build_token_payload(self):
+    def _build_token_payload(self, instance=None):
         self.ensure_one()
         token_expires = datetime.utcnow().date() + timedelta(days=TOKEN_VALIDITY_DAYS)
-        return {
+        if self.date_end:
+            # Nunca más allá de la licencia. Antes el token duraba 30 días
+            # siempre, así que una licencia (o una prueba) de 7 días funcionaba
+            # 30 más los de gracia.
+            token_expires = min(token_expires, self.date_end)
+        es_prueba = self.license_type == 'trial'
+        payload = {
             'license_key': self.key,
             'rfc': self.rfc_authorized,
             'edition': self.edition,
+            'license_type': self.license_type,
             'features': ['vault', 'reconcile'] if self.edition == 'pro' else ['vault'],
             'license_end': self.date_end.isoformat() if self.date_end else None,
             'token_expires': token_expires.isoformat(),
+            'grace_days': 0 if es_prueba else GRACE_DAYS,
             'nonce': uuid.uuid4().hex,
         }
+        if instance:
+            # Amarrado a la base; las pruebas, además, a su dirección. Las
+            # pagadas no: en Odoo.sh cada build de staging cambia de URL.
+            payload['db_uuid'] = instance.database_uuid
+            if es_prueba:
+                payload['base_url'] = instance.base_url
+        return payload
+
+    # -------------------------------------------------------------------
+    # Prueba de autoservicio (/dsi/license/v1/trial)
+    # -------------------------------------------------------------------
+
+    @api.model
+    def _trial_test_mode(self):
+        """Solo para probar en local: acepta bases en http y en direcciones
+        privadas. Nunca debe quedar activo en producción."""
+        cp = self.env['ir.config_parameter'].sudo()
+        valor = (cp.get_str('dsi_license_server.trial_test_mode', '')
+                 if hasattr(cp, 'get_str') else cp.get_param('dsi_license_server.trial_test_mode'))
+        if valor == '1':
+            _logger.warning("dsi_license_server.trial_test_mode está activo: la prueba acepta bases "
+                            "locales y sin https. Desactívalo fuera de pruebas.")
+            return True
+        return False
+
+    @api.model
+    def _start_trial(self, data):
+        """Crea la licencia de prueba que pide una base. Devuelve (licencia,
+        instancia). Lanza UserError si no procede: una prueba por RFC, por base
+        y por dirección, y solo si la base contesta el reto desde su URL."""
+        product = self.env['dsi.license.product'].search([
+            ('code', '=', data.get('product_code')), ('allow_trial', '=', True)], limit=1)
+        if not product:
+            raise UserError(_("La prueba no está disponible para este producto."))
+        rfc = str(data.get('rfc') or '').strip().upper()
+        if not trial.RFC_RE.match(rfc):
+            raise UserError(_("El RFC %s no es válido.", rfc))
+        db_uuid = str(data.get('db_uuid') or '').strip()
+        base_url = str(data.get('base_url') or '').strip()
+        challenge_id = str(data.get('challenge_id') or '')
+        challenge_secret = str(data.get('challenge_secret') or '')
+        if not (db_uuid and challenge_id and challenge_secret):
+            raise UserError(_("La solicitud de prueba está incompleta."))
+        modo_prueba = self._trial_test_mode()
+        host = trial.validar_direccion(base_url, modo_prueba=modo_prueba)
+
+        if self.search_count([('product_id', '=', product.id), ('rfc_authorized', '=ilike', rfc)]):
+            raise UserError(_(
+                "El RFC %s ya usó su prueba o ya tiene una licencia de este producto. "
+                "Escríbenos para contratarla.", rfc))
+        if self.env['dsi.license.instance'].search_count([
+                ('license_id.product_id', '=', product.id), ('database_uuid', '=', db_uuid)]):
+            raise UserError(_("Esta base de datos ya usó su prueba o ya tiene una licencia."))
+        pruebas = self.search([('product_id', '=', product.id), ('license_type', '=', 'trial')])
+        if any(trial.host_de(i.base_url) == host for i in pruebas.instance_ids):
+            raise UserError(_("La dirección %s ya usó su prueba.", host))
+
+        trial.verificar_reto(base_url, challenge_id, challenge_secret, modo_prueba=modo_prueba)
+
+        hoy = datetime.utcnow().date()
+        odoo_version = str(data.get('odoo_version') or '')
+        license = self.create({
+            'partner_id': self._trial_partner(rfc, data.get('company_name')).id,
+            'product_id': product.id,
+            'edition': 'pro',
+            'license_type': 'trial',
+            'rfc_authorized': rfc,
+            'date_start': hoy,
+            'date_end': hoy + timedelta(days=product.trial_days),
+            'max_instances': 1,
+            'odoo_versions': odoo_version.split('+')[0].split('-')[0],
+            'state': 'active',
+            'sale_reference': _("Prueba pedida desde %s", base_url),
+        })
+        instance = license._find_or_create_instance(
+            db_uuid=db_uuid, base_url=base_url, odoo_version=odoo_version,
+            module_version=data.get('module_version'), is_production=True)
+        license.message_post(body=_(
+            "Prueba de %(dias)s días pedida desde %(url)s; la dirección se comprobó con el reto.",
+            dias=product.trial_days, url=base_url))
+        return license, instance
+
+    @api.model
+    def _trial_partner(self, rfc, company_name):
+        """El contacto de quien pide la prueba: el que ya tenga ese RFC o uno
+        nuevo con el nombre de su empresa."""
+        Partner = self.env['res.partner']
+        partner = Partner.search([('vat', '=ilike', rfc)], limit=1)
+        if partner:
+            return partner
+        valores = {
+            'name': str(company_name or '').strip()[:128] or rfc,
+            'is_company': True,
+            'country_id': self.env.ref('base.mx').id,
+        }
+        try:
+            with self.env.cr.savepoint():
+                return Partner.create({**valores, 'vat': rfc})
+        except ValidationError:
+            # Si la validación de RFC de Odoo no lo acepta, se crea sin él: el
+            # RFC queda de todos modos en la licencia.
+            return Partner.create(valores)
+
+    def _check_trial_activation(self, db_uuid, base_url):
+        """Una prueba solo se reactiva en la misma base y la misma dirección
+        que la pidió; no se puede llevar a otra con /activate."""
+        self.ensure_one()
+        if self.license_type != 'trial':
+            return
+        instancia = self.instance_ids.filtered(lambda i: i.database_uuid == db_uuid)
+        if not instancia or trial.host_de(instancia.base_url) != trial.host_de(base_url):
+            raise UserError(_("Esta licencia de prueba solo se puede usar en la base que la pidió."))
+
+    def action_convert_to_subscription(self):
+        """Al contratar: la misma licencia (misma clave) pasa a suscripción. El
+        cliente recibe el token nuevo en su siguiente renovación diaria, o al
+        momento si pulsa Activar; no tiene que capturar nada."""
+        hoy = fields.Date.context_today(self)
+        for license in self.filtered(lambda l: l.license_type == 'trial'):
+            license.write({
+                'license_type': 'subscription',
+                'date_end': max(license.date_end or hoy, hoy) + timedelta(days=365),
+                'max_instances': 2,
+                'state': 'active',
+            })
+            license.message_post(body=_("Prueba convertida en suscripción."))
