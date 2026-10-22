@@ -18,7 +18,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from odoo import fields
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, ValidationError
 from odoo.tests.common import HttpCase, TransactionCase, tagged
 
 from odoo.addons.dsi_license_server.crypto import decode_token_unsafe
@@ -130,6 +130,10 @@ class TestPruebaServidor(TransactionCase):
         with self.assertRaises(UserError):
             self._pedir()
 
+    def test_la_url_de_compra_debe_ser_web(self):
+        with self.assertRaises(ValidationError):
+            self.producto.purchase_url = 'javascript:alert(1)'
+
     def test_rfc_invalido(self):
         with self.assertRaises(UserError):
             self._pedir(rfc='NO-ES-RFC')
@@ -222,6 +226,21 @@ class TestEndpointPrueba(HttpCase):
             'base_url': 'https://otra.example.com', 'odoo_version': '20.0'})
         self.assertEqual(respuesta.status_code, 400)
         self.assertIn("solo se puede usar en la base que la pidió", respuesta.json()['error'])
+
+    def test_comprar_redirige_a_la_tienda_con_la_clave(self):
+        licencia, _instancia = self._crear_prueba()
+        licencia.product_id.purchase_url = 'https://tienda.example.com/boveda'
+        respuesta = self.url_open(f'/dsi/license/v1/comprar?clave={licencia.key}', allow_redirects=False)
+        self.assertIn(respuesta.status_code, (302, 303))
+        self.assertEqual(respuesta.headers['Location'], f'https://tienda.example.com/boveda?clave={licencia.key}')
+        clic = self.env['dsi.license.log'].search([('endpoint', '=', 'purchase')], limit=1)
+        self.assertEqual(clic.license_id, licencia)
+
+    def test_comprar_sin_tienda_definida(self):
+        _producto(self.env).purchase_url = False
+        respuesta = self.url_open('/dsi/license/v1/comprar?producto=cfdi_vault')
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn("todavía no está disponible", respuesta.text)
 
     def test_limite_de_solicitudes_por_ip(self):
         self.env['dsi.license.log'].create([

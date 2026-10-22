@@ -1,6 +1,9 @@
 import json
 import logging
 from datetime import timedelta
+from urllib.parse import urlencode
+
+from markupsafe import Markup
 
 from odoo import SUPERUSER_ID, fields, http
 from odoo.exceptions import UserError
@@ -191,3 +194,33 @@ class DsiLicenseController(http.Controller):
             request.env.cr.rollback()
             self._log_call('trial', success=False, request_data=para_bitacora, error_message=str(e))
             return request.make_json_response({'error': GENERIC_ERROR}, status=500)
+
+    @http.route('/dsi/license/v1/comprar', type='http', methods=['GET'], auth='none', csrf=False,
+                readonly=False)
+    def comprar(self, clave=None, producto=None, **kw):
+        """Destino del botón «Comprar licencia» de los clientes. Redirige a la
+        URL de compra del producto, que se define aquí: los clientes solo
+        conocen esta dirección, así que la tienda puede cambiar sin tocarlos.
+        Cada clic queda en la bitácora: es un prospecto."""
+        env = self._env()
+        license = env['dsi.license']
+        if clave:
+            license = license.search([('key', '=', clave.strip())], limit=1)
+        product = license.product_id or env['dsi.license.product'].search(
+            [('code', '=', producto or 'cfdi_vault')], limit=1)
+        self._log_call('purchase', license or None, success=bool(product.purchase_url),
+                        request_data={'clave': clave, 'producto': producto})
+        if product.purchase_url:
+            destino = product.purchase_url
+            if license:
+                destino += ('&' if '?' in destino else '?') + urlencode({'clave': license.key})
+            return request.redirect(destino, local=False)
+        return request.make_response(Markup(
+            '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">'
+            '<meta name="viewport" content="width=device-width, initial-scale=1">'
+            '<title>Comprar licencia</title></head>'
+            '<body style="font-family: sans-serif; max-width: 32rem; margin: 4rem auto; padding: 0 1rem;">'
+            '<h1>La compra en línea todavía no está disponible</h1>'
+            '<p>Escríbenos y te ayudamos a contratar tu licencia de %s.</p>'
+            '</body></html>') % (product.name or "DS Indigo"),
+            headers=[('Content-Type', 'text/html; charset=utf-8')])

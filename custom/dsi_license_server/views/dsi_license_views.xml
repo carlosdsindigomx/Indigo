@@ -137,6 +137,7 @@
                 <field name="supported_versions"/>
                 <field name="allow_trial"/>
                 <field name="trial_days" invisible="not allow_trial"/>
+                <field name="purchase_url" widget="url"/>
                 <field name="active" column_invisible="True"/>
             </list>
         </field>
