@@ -259,6 +259,16 @@
         </field>
     </record>
 
+    <!-- Entrada a la Bóveda (menú CFDI). Sin licencia vigente muestra primero el
+         aviso de licencia (comprar, activar o seguir solo consultando); con
+         licencia, la lista de CFDI de siempre. -->
+    <record id="action_cfdi_vault_entry" model="ir.actions.server">
+        <field name="name">CFDI</field>
+        <field name="model_id" ref="model_cfdi_document"/>
+        <field name="state">code</field>
+        <field name="code">action = model._vault_entry_action()</field>
+    </record>
+
     <!-- En el menú Acciones de la lista, para verificar varios a la vez en vez
          de uno por uno. Usa la versión en lote: un CFDI que falla no deshace los
          demás y el resultado sale en una notificación. En el formulario ya está

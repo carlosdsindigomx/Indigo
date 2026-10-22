@@ -16,6 +16,8 @@ from unittest.mock import patch
 
 from odoo.tests.common import TransactionCase, tagged
 
+from odoo.addons.dsi_license_client.tests.common import activar_licencia
+
 RFC_EMISOR = 'PRO010101AA1'
 RFC_RECEPTOR = 'EKU9003173C9'
 UUID_CON_FACTURA = 'AAAAAAAA-1111-2222-3333-444444444444'
@@ -61,6 +63,8 @@ class TestDescargaConcilia(TransactionCase):
         # se puede crear la factura con la que debe conciliar.
         cls.company = cls.env.company
         cls.company.partner_id.vat = RFC_RECEPTOR
+        # Descargar del SAT requiere licencia vigente.
+        activar_licencia(cls, cls.company)
         if not cls.env['account.journal'].search(
                 [('type', '=', 'purchase'), ('company_id', '=', cls.company.id)], limit=1):
             raise cls.skipTest(

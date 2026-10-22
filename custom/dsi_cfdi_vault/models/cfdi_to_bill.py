@@ -87,6 +87,9 @@ class CfdiDocument(models.Model):
         producto y cuenta por adelantado. Eran decisiones pedidas a ciegas,
         antes de ver la factura, y casi siempre con una sola respuesta posible.
         """
+        for empresa in self.company_id:
+            self.env['dsi.license.client.state']._check_feature(
+                'vault', _("convertir CFDI en facturas de proveedor"), empresa)
         convertibles, descartados = self._clasificar_para_factura()
         if not convertibles:
             detalle = "\n".join(

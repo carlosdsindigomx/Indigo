@@ -1,0 +1,86 @@
+<odoo>
+
+    <record id="view_dsi_license_client_notice_form" model="ir.ui.view">
+        <field name="name">dsi.license.client.notice.form</field>
+        <field name="model">dsi.license.client.notice</field>
+        <field name="arch" type="xml">
+            <form string="Licencia" create="0" delete="0">
+                <field name="state" invisible="1"/>
+                <field name="is_trial" invisible="1"/>
+                <field name="trial_state" invisible="1"/>
+                <field name="next_action" invisible="1"/>
+                <field name="target" invisible="1"/>
+                <field name="company_id" invisible="1"/>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="title" readonly="1"/></h1>
+                    </div>
+                    <p class="fs-5"><field name="status_message" readonly="1"/></p>
+                    <p invisible="state not in ('not_activated', 'restricted', 'grace')">
+                        Tus CFDI siguen aquí: puedes consultarlos y exportarlos. Para importar,
+                        descargar del SAT y convertir a factura necesitas una licencia vigente.
+                    </p>
+                    <p invisible="state != 'trial'">
+                        Compra tu licencia antes de que termine la prueba para no interrumpir la
+                        importación, la descarga del SAT ni la conversión a factura.
+                    </p>
+
+                    <div class="alert alert-info" role="alert" invisible="trial_state != 'requested'">
+                        Verificando esta base con el servidor de licencias de DS Indigo. Tarda menos
+                        de un minuto: pulsa <b>Actualizar</b> para ver el resultado.
+                        <button name="action_refresh" type="object" string="Actualizar" class="btn-link"/>
+                    </div>
+                    <div class="alert alert-danger" role="alert" invisible="trial_state != 'failed'">
+                        No se pudo iniciar la prueba: <field name="trial_error" readonly="1" class="oe_inline"/>
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-2 my-3" invisible="state == 'active' and not is_trial">
+                        <button name="action_buy" type="object" string="Comprar licencia"
+                                class="btn-primary" icon="fa-shopping-cart"/>
+                        <button name="action_start_trial" type="object" string="Iniciar prueba de 7 días"
+                                class="btn-secondary"
+                                invisible="state != 'not_activated' or trial_state == 'requested'"
+                                confirm="Se registrará una prueba de 7 días para el RFC de esta empresa y la dirección de esta base. Solo hay una prueba por RFC. ¿Continuar?"/>
+                    </div>
+
+                    <div invisible="state == 'active' and not is_trial">
+                        <h4 class="mt-4">¿Ya la compraste?</h4>
+                        <div class="d-flex flex-wrap align-items-center gap-2">
+                            <field name="license_key" placeholder="DSI-XXXX-XXXX-XXXX" class="w-auto"/>
+                            <button name="action_activate" type="object" string="Activar" class="btn-primary"/>
+                        </div>
+                        <p class="text-muted small mt-1">
+                            Si compraste sobre tu prueba, la clave ya está capturada: solo pulsa Activar.
+                        </p>
+                    </div>
+
+                    <div class="mt-4" invisible="not next_action or state not in ('not_activated', 'restricted')">
+                        <button name="action_continue" type="object" string="Seguir solo consultando"
+                                class="btn-link" icon="fa-arrow-right"/>
+                    </div>
+                </sheet>
+                <footer>
+                    <button string="Cerrar" special="cancel" class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- Para los menús "Licencia" de los productos (ver dsi_cfdi_vault). -->
+    <record id="action_license_notice" model="ir.actions.server">
+        <field name="name">Licencia</field>
+        <field name="model_id" ref="model_dsi_license_client_notice"/>
+        <field name="state">code</field>
+        <field name="code">action = env['dsi.license.client.state']._get_or_create()._notice_action()</field>
+    </record>
+
+    <!-- La que abre la ventana de bloqueo ("Comprar o activar licencia"). -->
+    <record id="action_license_notice_dialog" model="ir.actions.act_window">
+        <field name="name">Licencia</field>
+        <field name="res_model">dsi.license.client.notice</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="context">{'default_target': 'new'}</field>
+    </record>
+
+</odoo>
