@@ -5,7 +5,7 @@
               groups="group_cfdi_vault_user"/>
 
     <menuitem id="menu_cfdi_document" name="CFDI" parent="menu_cfdi_vault_root"
-              action="action_cfdi_document" sequence="10"/>
+              action="action_cfdi_vault_entry" sequence="10"/>
 
     <menuitem id="menu_cfdi_import_wizard" name="Importar CFDI" parent="menu_cfdi_vault_root"
               action="action_cfdi_import_wizard" sequence="20"/>
@@ -57,5 +57,10 @@
     <menuitem id="menu_cfdi_efos_import_wizard" name="Cargar lista 69-B" parent="menu_cfdi_vault_root"
               action="action_cfdi_efos_import_wizard" sequence="41"
               groups="account.group_account_manager"/>
+
+    <!-- Para cualquier usuario de la Bóveda: ver cuánto le queda a la prueba,
+         comprar y activar la licencia sin pasar por Ajustes. -->
+    <menuitem id="menu_cfdi_vault_license" name="Licencia" parent="menu_cfdi_vault_root"
+              action="dsi_license_client.action_license_notice" sequence="90"/>
 
 </odoo>

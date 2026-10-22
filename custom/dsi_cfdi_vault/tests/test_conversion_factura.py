@@ -20,6 +20,8 @@ from datetime import date
 from odoo.exceptions import UserError
 from odoo.tests.common import TransactionCase, tagged
 
+from odoo.addons.dsi_license_client.tests.common import activar_licencia
+
 RFC_EMISOR = 'PRO010101AA1'
 RFC_RECEPTOR = 'EKU9003173C9'
 
@@ -74,6 +76,8 @@ class TestConversionFactura(TransactionCase):
         super().setUpClass()
         cls.company = cls.env.company
         cls.company.partner_id.vat = RFC_RECEPTOR
+        # Convertir a factura requiere licencia vigente.
+        activar_licencia(cls, cls.company)
         cls.journal = cls.env['account.journal'].search(
             [('type', '=', 'purchase'), ('company_id', '=', cls.company.id)], limit=1)
         if not cls.journal:

@@ -170,6 +170,10 @@ class SatSyncSchedule(models.Model):
         """Crea las solicitudes del siguiente periodo y las manda al SAT.
         Devuelve el recordset creado (vacío si ya estaba al día)."""
         self.ensure_one()
+        # Antes de crear nada: sin licencia, las solicitudes no podrían
+        # mandarse al SAT y aun así el periodo quedaría marcado como cubierto.
+        self.env['dsi.license.client.state']._check_feature(
+            'vault', _("descargar CFDI del SAT"), self.company_id)
         Request = self.env['sat.download.request']
         periodo = self._next_period()
         if not periodo:
@@ -209,7 +213,14 @@ class SatSyncSchedule(models.Model):
     def _cron_generar_solicitudes(self):
         """Recorre las programaciones activas y pide el siguiente periodo.
         Nunca lanza: una programación rota no debe frenar a las demás."""
+        Licencia = self.env['dsi.license.client.state']
         for programacion in self.search([]):
+            licencia = Licencia._get_or_create(programacion.company_id)
+            if not licencia.is_feature_enabled('vault'):
+                # No es una falla técnica: no cuenta para el aviso de fallas
+                # seguidas, solo se deja dicho por qué no avanza.
+                programacion.write({'last_error': licencia.status_message})
+                continue
             try:
                 creadas = programacion._generar_periodo()
                 if creadas:
@@ -236,6 +247,9 @@ class SatSyncSchedule(models.Model):
         pendientes = self.env['sat.download.request'].search([
             ('state', 'in', ('draft', 'authenticated', 'requested', 'verifying', 'downloading')),
         ])
-        for solicitud in pendientes:
+        Licencia = self.env['dsi.license.client.state']
+        con_licencia = pendientes.company_id.filtered(
+            lambda empresa: Licencia._get_or_create(empresa).is_feature_enabled('vault'))
+        for solicitud in pendientes.filtered(lambda s: s.company_id in con_licencia):
             solicitud._avanzar_sin_excepciones()
             self.env.cr.commit()

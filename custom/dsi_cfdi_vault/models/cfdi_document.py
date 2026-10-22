@@ -151,6 +151,16 @@ class CfdiDocument(models.Model):
             )
 
     @api.model
+    def _vault_entry_action(self):
+        """Lo que abre el menú CFDI. Sin licencia vigente (prueba terminada,
+        licencia vencida o nunca activada) primero el aviso de licencia, con
+        «Seguir solo consultando» hacia la lista; si no, la lista directa."""
+        licencia = self.env['dsi.license.client.state']._get_or_create()
+        if licencia.state in ('not_activated', 'restricted'):
+            return licencia._notice_action(next_action='dsi_cfdi_vault.action_cfdi_document', target='main')
+        return self.env['ir.actions.act_window']._for_xml_id('dsi_cfdi_vault.action_cfdi_document')
+
+    @api.model
     def _recompute_efos_risk_all(self):
         """Llamado tras cargar/refrescar la lista 69-B y al actualizar el
         módulo (data/cfdi_efos_recompute.xml): los CFDI existentes no se

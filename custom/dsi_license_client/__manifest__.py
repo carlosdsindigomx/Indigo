@@ -11,6 +11,7 @@
         'data/dsi_license_client_state_data.xml',
         'data/ir_cron.xml',
         'views/dsi_license_client_views.xml',
+        'views/dsi_license_client_notice_views.xml',
         'views/dsi_license_client_menus.xml',
     ],
     'installable': True,

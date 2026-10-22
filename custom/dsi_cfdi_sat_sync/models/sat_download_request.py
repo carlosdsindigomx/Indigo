@@ -8,7 +8,7 @@ from io import BytesIO
 from lxml import etree
 
 from odoo import _, api, fields, models
-from odoo.exceptions import UserError
+from odoo.exceptions import RedirectWarning, UserError
 
 from . import sat_soap_client as soap
 from .sat_soap_client import NS
@@ -87,6 +87,12 @@ class SatDownloadRequest(models.Model):
             'sat_request_id': False, 'package_ids_json': False,
         })
 
+    def _check_license(self):
+        """Descargar del SAT requiere licencia vigente. Va al inicio de cada
+        paso que habla con el SAT, antes de tocar el estado de la solicitud."""
+        self.env['dsi.license.client.state']._check_feature(
+            'vault', _("descargar CFDI del SAT"), self.company_id)
+
     def _avanzar_sin_excepciones(self):
         """Empuja la solicitud al siguiente paso que le toque, tragándose los
         errores. Lo usan los crons: un fallo en una solicitud no debe frenar
@@ -106,7 +112,7 @@ class SatDownloadRequest(models.Model):
                     self.action_descargar_y_procesar()
             elif self.state == 'downloading':
                 self.action_descargar_y_procesar()
-        except UserError as e:
+        except (UserError, RedirectWarning) as e:
             # Errores de negocio esperables (el SAT aún no la registra, rechazo
             # con motivo, etc.). Ya quedaron escritos en error_message.
             _logger.info("Solicitud %s no avanzó: %s", self.id, e)
@@ -135,6 +141,7 @@ class SatDownloadRequest(models.Model):
 
     def action_autenticar(self):
         self.ensure_one()
+        self._check_license()
         self._autenticar()
         if self.state == 'draft':
             self.state = 'authenticated'
@@ -199,6 +206,7 @@ class SatDownloadRequest(models.Model):
         Emitidos vs. Recibidos, cada una con su propio elemento raíz y su
         propio tipo de "solicitud" anidada — no es un único mensaje genérico."""
         self.ensure_one()
+        self._check_license()
         if self.state != 'authenticated':
             raise UserError(_("Primero hay que autenticar esta solicitud."))
         if self.request_type == 'cfdi' and self.estado_comprobante == 'todos':
@@ -297,6 +305,7 @@ class SatDownloadRequest(models.Model):
 
     def action_verificar(self):
         self.ensure_one()
+        self._check_license()
         if self.state not in ('requested', 'verifying'):
             raise UserError(_("Esta solicitud todavía no se ha enviado al SAT."))
         credential = self.credential_id
@@ -424,6 +433,7 @@ class SatDownloadRequest(models.Model):
 
     def action_descargar_y_procesar(self):
         self.ensure_one()
+        self._check_license()
         if self.state != 'downloading':
             raise UserError(_("Esta solicitud todavía no tiene paquetes listos para descargar."))
         import json

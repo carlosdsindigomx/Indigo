@@ -8,4 +8,17 @@
         <field name="interval_type">days</field>
         <field name="active">True</field>
     </record>
+
+    <!-- Manda las solicitudes de prueba. El botón la dispara al momento
+         (_trigger); la corrida por hora es solo un respaldo. Ver por qué no
+         se manda desde el clic en action_request_trial. -->
+    <record id="ir_cron_trial_request" model="ir.cron">
+        <field name="name">DS Indigo: Solicitar prueba de licencia</field>
+        <field name="model_id" ref="model_dsi_license_client_state"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_request_trial()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">hours</field>
+        <field name="active">True</field>
+    </record>
 </odoo>

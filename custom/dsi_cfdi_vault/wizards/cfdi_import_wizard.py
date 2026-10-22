@@ -3,7 +3,6 @@ import zipfile
 
 from ..models.cfdi_conceptos import _bytes_de_adjunto
 from odoo import _, api, fields, models
-from odoo.exceptions import UserError
 
 
 class CfdiImportWizard(models.TransientModel):
@@ -52,15 +51,8 @@ class CfdiImportWizard(models.TransientModel):
 
     def action_import(self):
         self.ensure_one()
-        license_state = self.env['dsi.license.client.state'].sudo()._get_or_create()
-        if not license_state.is_feature_enabled('vault'):
-            raise UserError(_(
-                "La licencia de Bóveda CFDI no está vigente (estado: %s). "
-                "No se pueden importar nuevos CFDI, pero los ya importados siguen "
-                "disponibles para consulta y exportación. Activa o renueva la licencia "
-                "desde Ajustes > Licenciamiento DS Indigo.",
-                dict(license_state._fields['state'].selection).get(license_state.state),
-            ))
+        self.env['dsi.license.client.state']._check_feature(
+            'vault', _("importar CFDI"), self.company_id)
         self.result_ids.unlink()
         CfdiDocument = self.env['cfdi.document']
         company = self.company_id
