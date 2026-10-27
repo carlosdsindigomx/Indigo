@@ -7,6 +7,11 @@ from odoo.exceptions import UserError, ValidationError
 _logger = logging.getLogger(__name__)
 
 CFDI_VAULT_CODE = 'cfdi_vault'
+# Códigos con que puede estar dada de alta la Bóveda en este servidor. En
+# producción se dio de alta a mano como 'I-BCDFI', antes de que el código del
+# producto importara. Los clientes la piden y la reciben siempre como
+# 'cfdi_vault' (ver client_code): es el único código que conocen.
+CFDI_VAULT_CODES = (CFDI_VAULT_CODE, 'I-BCDFI')
 # Funciones de la Bóveda, fijas en código. Los clientes ya instalados solo
 # conocen estas y abren la Bóveda con 'vault': si cambian, se rompe el
 # contrato con ellos (lo vigila la prueba del payload exacto).
@@ -49,6 +54,13 @@ def split_csv(value):
     return [v.strip() for v in str(value or '').split(',') if v.strip()]
 
 
+def client_code(code):
+    """El código de producto como lo conocen los clientes: cualquier código
+    de la Bóveda es 'cfdi_vault'; los demás, tal cual."""
+    code = str(code or '').strip()
+    return CFDI_VAULT_CODE if code in CFDI_VAULT_CODES else code
+
+
 class DsiLicenseProduct(models.Model):
     _name = 'dsi.license.product'
     _description = "Producto licenciable DS Indigo"
@@ -57,7 +69,11 @@ class DsiLicenseProduct(models.Model):
     code = fields.Char(
         required=True,
         help="Identificador técnico estable, ej. 'cfdi_vault'. Los clientes lo mandan en cada "
-             "llamada y viaja en el token: no se puede cambiar si el producto ya tiene licencias.")
+             "llamada y viaja en el token: no se puede cambiar si el producto ya tiene licencias. "
+             "La Bóveda CFDI puede llamarse cfdi_vault o I-BCDFI; a los clientes siempre les "
+             "llega como cfdi_vault.")
+    is_cfdi_vault = fields.Boolean(
+        string="Es la Bóveda CFDI", compute='_compute_is_cfdi_vault', search='_search_is_cfdi_vault')
     supported_versions = fields.Char(
         default="19.0", required=True,
         help="Versiones de Odoo soportadas, separadas por coma. Ej: 17.0,18.0,19.0. Se revisan "
@@ -93,6 +109,34 @@ class DsiLicenseProduct(models.Model):
 
     _code_uniq = models.Constraint('unique(code)', "Ya existe un producto con este código.")
 
+    @api.depends('code')
+    def _compute_is_cfdi_vault(self):
+        for product in self:
+            product.is_cfdi_vault = product.code in CFDI_VAULT_CODES
+
+    def _search_is_cfdi_vault(self, operator, value):
+        if operator != 'in':
+            return NotImplemented
+        return [('code', 'in', list(CFDI_VAULT_CODES))]
+
+    def _client_code(self):
+        """El código con que los clientes piden este producto y que viaja en
+        su token."""
+        self.ensure_one()
+        # Con la misma regla que is_cfdi_vault (código exacto): client_code()
+        # quita espacios, y un ' I-BCDFI' que no es la Bóveda saldría como tal.
+        return CFDI_VAULT_CODE if self.is_cfdi_vault else self.code
+
+    @api.model
+    def _search_client_code(self, code, domain=None):
+        """El producto que pide un cliente con `code`. 'cfdi_vault' encuentra
+        la Bóveda aunque esté dada de alta con otro de sus códigos."""
+        code = client_code(code)
+        if not code:
+            return self.browse()
+        codes = list(CFDI_VAULT_CODES) if code == CFDI_VAULT_CODE else [code]
+        return self.search([('code', 'in', codes)] + list(domain or []), limit=1)
+
     @api.depends('code', 'features_basic', 'features_pro')
     def _compute_features_summary(self):
         for product in self:
@@ -113,10 +157,21 @@ class DsiLicenseProduct(models.Model):
             if product.purchase_url and not product.purchase_url.startswith(('https://', 'http://')):
                 raise ValidationError(_("La URL de compra debe empezar con https://"))
 
+    @api.constrains('code')
+    def _check_single_cfdi_vault(self):
+        # Con dos productos de la Bóveda (cfdi_vault e I-BCDFI) no se sabría
+        # cuál dar en la prueba ni en «Comprar».
+        Product = self.with_context(active_test=False)
+        if any(product.is_cfdi_vault for product in self) and \
+                Product.search_count([('code', 'in', list(CFDI_VAULT_CODES))]) > 1:
+            raise ValidationError(_(
+                "Ya existe el producto de la Bóveda CFDI: solo puede haber uno (con código "
+                "%s).", " o ".join(CFDI_VAULT_CODES)))
+
     @api.constrains('code', 'features_basic', 'features_pro')
     def _check_features(self):
         for product in self:
-            if product.code == CFDI_VAULT_CODE:
+            if product.is_cfdi_vault:
                 if product.features_basic or product.features_pro:
                     raise ValidationError(_(
                         "Las funciones de la Bóveda CFDI están fijas en código (Basic: vault · "
@@ -161,7 +216,7 @@ class DsiLicenseProduct(models.Model):
         su configuración y nunca las de la Bóveda (aunque alguien las haya
         metido sin pasar por la validación)."""
         self.ensure_one()
-        if self.code == CFDI_VAULT_CODE:
+        if self.is_cfdi_vault:
             return list(CFDI_VAULT_FEATURES['pro' if edition == 'pro' else 'basic'])
         csv = self.features_pro if edition == 'pro' else self.features_basic
         return [f for f in split_csv(csv) if f not in RESERVED_FEATURES]

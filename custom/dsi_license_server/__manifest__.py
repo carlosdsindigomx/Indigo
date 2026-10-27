@@ -1,7 +1,7 @@
 {
     'name': "DS Indigo · Servidor de Licencias",
     'summary': "Emite, valida, renueva y revoca licencias de los productos DS Indigo, ancladas al RFC del cliente",
-    'version': '19.0.0.2.0',
+    'version': '19.0.0.2.1',
     'category': 'Extra Tools',
     'author': "DS Indigo",
     'license': 'OPL-1',

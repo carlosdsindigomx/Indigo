@@ -119,7 +119,7 @@
                 <filter string="Suspendidas" name="filter_suspended" domain="[('state', '=', 'suspended')]"/>
                 <filter string="Expiradas o revocadas" name="filter_ended" domain="[('state', 'in', ('expired', 'revoked'))]"/>
                 <separator/>
-                <filter string="Bóveda CFDI" name="filter_cfdi_vault" domain="[('product_id.code', '=', 'cfdi_vault')]"/>
+                <filter string="Bóveda CFDI" name="filter_cfdi_vault" domain="[('product_id.is_cfdi_vault', '=', True)]"/>
                 <filter string="Manufactura" name="filter_mrp_manufactura" domain="[('product_id.code', '=', 'mrp_manufactura')]"/>
                 <group>
                     <filter string="Producto" name="group_product" context="{'group_by': 'product_id'}"/>
@@ -179,15 +179,16 @@
                         </group>
                     </group>
                     <group string="Funciones que abre el token">
+                        <field name="is_cfdi_vault" invisible="1"/>
                         <div class="alert alert-info mb-0" role="alert" colspan="2"
-                             invisible="code != 'cfdi_vault'">
+                             invisible="not is_cfdi_vault">
                             Las funciones de la Bóveda CFDI están fijas en código:
                             <strong>Basic</strong>: vault · <strong>Pro</strong>: vault, reconcile.
                             Los clientes ya instalados solo conocen esas.
                         </div>
-                        <field name="features_basic" invisible="code == 'cfdi_vault'"
+                        <field name="features_basic" invisible="is_cfdi_vault"
                                placeholder="Ej. mrp_manufactura"/>
-                        <field name="features_pro" invisible="code == 'cfdi_vault'"
+                        <field name="features_pro" invisible="is_cfdi_vault"
                                placeholder="Ej. mrp_manufactura"/>
                     </group>
                     <group string="Compra">
