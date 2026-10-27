@@ -76,6 +76,28 @@ class TestBloqueoLicencia(TransactionCase):
         usuario.write({campo: [(4, self.env.ref('dsi_cfdi_vault.group_cfdi_vault_user').id)]})
         self.assertIn(usuario.partner_id, self.licencia._reminder_partners())
 
+    def test_una_clave_de_manufactura_no_abre_la_boveda(self):
+        # Aunque el token traiga 'vault' (como lo habría emitido el servidor
+        # antes de distinguir productos): es de otro producto.
+        self.licencia.token = token_de_prueba(
+            self.env, product_code='mrp_manufactura', features=['vault', 'mrp_manufactura'])
+        self.assertEqual(self.licencia.state, 'restricted')
+        wizard = self.env['cfdi.import.wizard'].create({'company_id': self.company.id})
+        with self.assertRaises(RedirectWarning) as error:
+            wizard.action_import()
+        self.assertIn("otro producto", str(error.exception))
+        self.assertEqual(self.env['cfdi.document']._vault_entry_action()['res_model'],
+                         'dsi.license.client.notice')
+
+    def test_el_aviso_de_fin_de_prueba_de_otro_producto_no_llega_a_la_boveda(self):
+        usuario = self.env['res.users'].create({'name': "Contadora", 'login': 'contadora-otro@example.com'})
+        campo = 'group_ids' if 'group_ids' in usuario._fields else 'groups_id'
+        usuario.write({campo: [(4, self.env.ref('dsi_cfdi_vault.group_cfdi_vault_user').id)]})
+        otro = self.env['dsi.license.client.state']._get_product_license(
+            'mrp_manufactura', self.company, create=True)
+        self.assertNotIn(usuario.partner_id, otro._reminder_partners())
+        self.assertIn(usuario.partner_id, self.licencia._reminder_partners())
+
     def test_consultar_y_exportar_siempre(self):
         self.assertEqual(
             self.env['cfdi.document'].search_read([('id', '=', self.doc.id)], ['uuid'])[0]['uuid'],

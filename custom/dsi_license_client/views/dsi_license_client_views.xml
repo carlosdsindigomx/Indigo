@@ -1,15 +1,49 @@
 <odoo>
 
+    <record id="view_dsi_license_client_state_list" model="ir.ui.view">
+        <field name="name">dsi.license.client.state.list</field>
+        <field name="model">dsi.license.client.state</field>
+        <field name="arch" type="xml">
+            <list string="Licenciamiento DS Indigo" create="0" delete="0">
+                <field name="product_name"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+                <field name="license_scope"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'active'"
+                       decoration-info="state == 'trial'"
+                       decoration-warning="state == 'grace'"
+                       decoration-danger="state == 'restricted'"/>
+                <field name="license_end"/>
+                <field name="token_expires"/>
+                <field name="last_check" optional="hide"/>
+                <field name="last_error" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_dsi_license_client_state_search" model="ir.ui.view">
+        <field name="name">dsi.license.client.state.search</field>
+        <field name="model">dsi.license.client.state</field>
+        <field name="arch" type="xml">
+            <search string="Licenciamiento DS Indigo">
+                <field name="product_code"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+                <filter name="installed" string="Productos instalados"
+                        domain="[('product_installed', '=', True)]"/>
+            </search>
+        </field>
+    </record>
+
     <record id="view_dsi_license_client_state_form" model="ir.ui.view">
         <field name="name">dsi.license.client.state.form</field>
         <field name="model">dsi.license.client.state</field>
         <field name="arch" type="xml">
-            <form string="Licenciamiento DS Indigo">
+            <form string="Licenciamiento DS Indigo" create="0" delete="0">
                 <header>
                     <button name="action_request_trial" type="object" string="Iniciar prueba de 7 días"
                             class="btn-primary"
                             invisible="state != 'not_activated' or trial_state == 'requested'"
-                            confirm="Se registrará una prueba de 7 días para el RFC de esta empresa y la dirección de esta base. Solo hay una prueba por RFC. ¿Continuar?"/>
+                            confirm="Se registrará una prueba de 7 días para el RFC de tu empresa y la dirección de esta base. Solo hay una prueba por RFC. ¿Continuar?"/>
                     <button name="action_refresh" type="object" string="Actualizar"
                             class="btn-primary" invisible="trial_state != 'requested'"/>
                     <button name="action_buy" type="object" string="Comprar licencia" icon="fa-shopping-cart"
@@ -30,6 +64,9 @@
                             invisible="state != 'grace'"/>
                     <widget name="web_ribbon" title="En prueba" bg_color="text-bg-info"
                             invisible="state != 'trial'"/>
+                    <div class="oe_title">
+                        <h1><field name="product_name" readonly="1"/></h1>
+                    </div>
                     <div class="alert alert-info" role="alert" invisible="trial_state != 'requested'">
                         Verificando esta base con el servidor de licencias de DS Indigo. Tarda menos
                         de un minuto: pulsa <b>Actualizar</b> para ver el resultado.
@@ -39,18 +76,23 @@
                     </div>
                     <div class="alert alert-warning" role="alert" invisible="state not in ('grace', 'restricted')">
                         <field name="status_message" readonly="1" class="oe_inline"/>
-                        Mientras tanto no se puede importar, descargar del SAT ni convertir a factura;
-                        lo ya guardado se puede consultar y exportar.
+                        <field name="restriction_text" readonly="1" class="oe_inline"/>
                     </div>
                     <group>
                         <group string="Activación">
-                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="product_code" readonly="1"/>
+                            <field name="license_scope" readonly="1"/>
+                            <field name="company_id" groups="base.group_multi_company" readonly="1"
+                                   invisible="license_scope == 'database'"/>
+                            <field name="company_id" string="Empresa titular (RFC)" readonly="1"
+                                   invisible="license_scope != 'database'"/>
                             <field name="activation_url" invisible="1"/>
                             <field name="trial_state" invisible="1"/>
                             <field name="license_key" placeholder="DSI-XXXX-XXXX-XXXX"/>
                         </group>
                         <group string="Estado">
                             <field name="status_message"/>
+                            <field name="license_mode"/>
                             <field name="edition"/>
                             <field name="features"/>
                             <field name="license_end"/>
@@ -64,11 +106,16 @@
         </field>
     </record>
 
+    <!-- res_id explícito en False: al actualizar desde XML, un campo omitido
+         conserva su valor anterior y la acción seguiría abriendo siempre el
+         registro de la Bóveda en lugar de la lista. -->
     <record id="action_dsi_license_client_state" model="ir.actions.act_window">
         <field name="name">Licenciamiento DS Indigo</field>
         <field name="res_model">dsi.license.client.state</field>
-        <field name="view_mode">form</field>
-        <field name="res_id" eval="ref('dsi_license_client_state_default')"/>
+        <field name="view_mode">list,form</field>
+        <field name="res_id" eval="False"/>
+        <field name="search_view_id" ref="view_dsi_license_client_state_search"/>
+        <field name="context">{'search_default_installed': 1}</field>
     </record>
 
 </odoo>
