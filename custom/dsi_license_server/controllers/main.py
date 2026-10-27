@@ -246,11 +246,11 @@ class DsiLicenseController(http.Controller):
             # de otro producto se descarta (no viaja a la tienda ni se liga a
             # la licencia en la bitácora); si el producto no existe, la página
             # genérica, no la de la Bóveda.
-            product = Product.search([('code', '=', codigo)], limit=1)
+            product = Product._search_client_code(codigo)
             if license.product_id != product:
                 license = env['dsi.license']
         else:
-            product = license.product_id or Product.search([('code', '=', CFDI_VAULT_CODE)], limit=1)
+            product = license.product_id or Product._search_client_code(CFDI_VAULT_CODE)
         self._log_call('purchase', license or None, success=bool(product.purchase_url),
                         request_data={'clave': clave, 'producto': producto})
         if product.purchase_url:

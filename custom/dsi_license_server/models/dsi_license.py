@@ -8,7 +8,7 @@ from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
 
 from .. import trial
-from .dsi_license_product import CFDI_VAULT_CODE, normalize_version, split_csv
+from .dsi_license_product import CFDI_VAULT_CODE, client_code, normalize_version, split_csv
 
 _logger = logging.getLogger(__name__)
 
@@ -156,10 +156,10 @@ class DsiLicense(models.Model):
         product_code es la Bóveda: los clientes instalados antes de que hubiera
         más productos no lo mandan."""
         self.ensure_one()
-        pedido = str(product_code or '').strip() or CFDI_VAULT_CODE
-        if self.product_id.code != pedido:
-            producto = self.env['dsi.license.product'].with_context(active_test=False).search(
-                [('code', '=', pedido)], limit=1)
+        pedido = client_code(product_code) or CFDI_VAULT_CODE
+        if self.product_id._client_code() != pedido:
+            producto = self.env['dsi.license.product'].with_context(
+                active_test=False)._search_client_code(pedido)
             raise UserError(_(
                 "Esta clave es de «%(clave)s»; no sirve para «%(pedido)s».",
                 clave=self.product_id.name, pedido=producto.name or pedido))
@@ -236,7 +236,9 @@ class DsiLicense(models.Model):
             # La Bóveda sigue con sus funciones fijas en código; los demás
             # productos, con las suyas (nunca 'vault' ni 'reconcile').
             'features': self.product_id._features_for(self.edition),
-            'product_code': self.product_id.code,
+            # Como lo conoce el cliente: la Bóveda siempre es 'cfdi_vault',
+            # aunque aquí esté dada de alta como 'I-BCDFI'.
+            'product_code': self.product_id._client_code(),
             'license_end': self.date_end.isoformat() if self.date_end else None,
             'token_expires': token_expires.isoformat(),
             'grace_days': 0 if es_prueba else GRACE_DAYS,
@@ -272,14 +274,14 @@ class DsiLicense(models.Model):
         """Crea la licencia de prueba que pide una base. Devuelve (licencia,
         instancia). Lanza UserError si no procede: una prueba por RFC, por base
         y por dirección, y solo si la base contesta el reto desde su URL."""
-        product = self.env['dsi.license.product'].search([
-            ('code', '=', data.get('product_code')), ('allow_trial', '=', True)], limit=1)
+        product = self.env['dsi.license.product']._search_client_code(
+            data.get('product_code'), [('allow_trial', '=', True)])
         if not product:
             raise UserError(_("La prueba no está disponible para este producto."))
         odoo_version = str(data.get('odoo_version') or '')
         # La Bóveda no se valida: en producción tiene '19.0' y la piden
         # bases 18 y 20. Antes del reto, que es una llamada saliente.
-        if product.code != CFDI_VAULT_CODE and not product._supports_version(odoo_version):
+        if not product.is_cfdi_vault and not product._supports_version(odoo_version):
             raise UserError(_(
                 "La prueba de %(producto)s no está disponible para Odoo %(version)s.",
                 producto=product.name, version=normalize_version(odoo_version) or odoo_version))

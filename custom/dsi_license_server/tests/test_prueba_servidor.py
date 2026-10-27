@@ -47,7 +47,9 @@ def _respuesta_del_cliente(texto, status=200):
 
 
 def _producto(env):
-    producto = env['dsi.license.product'].search([('code', '=', 'cfdi_vault')], limit=1)
+    # Como la busca el servidor: en producción la Bóveda es 'I-BCDFI' y solo
+    # puede haber un producto de la Bóveda.
+    producto = env['dsi.license.product'].with_context(active_test=False)._search_client_code('cfdi_vault')
     if not producto:
         producto = env['dsi.license.product'].create({'name': "Bóveda CFDI", 'code': 'cfdi_vault'})
     producto.write({'allow_trial': True, 'trial_days': 7})
