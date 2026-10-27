@@ -3,8 +3,8 @@
 La llave privada de producción vive solo en el servidor de licencias, así que
 aquí se genera un par temporal y, mientras corre la prueba, el cliente
 verifica contra esa llave pública en lugar de la de producción. Lo usan
-también las pruebas de dsi_cfdi_vault y dsi_cfdi_sat_sync que necesitan una
-licencia vigente para importar, descargar del SAT o convertir a factura.
+también las pruebas de dsi_cfdi_vault, dsi_cfdi_sat_sync y de los módulos de
+cada producto que necesitan una licencia vigente.
 """
 import base64
 import json
@@ -22,6 +22,9 @@ _LLAVE_PRIVADA = Ed25519PrivateKey.generate()
 LLAVE_PUBLICA_B64 = base64.b64encode(_LLAVE_PRIVADA.public_key().public_bytes(
     serialization.Encoding.Raw, serialization.PublicFormat.Raw)).decode()
 CLAVE_DE_PRUEBA = 'DSI-TEST-TEST-TEST'
+# Producto por base que solo existe en las pruebas (ver catalogo_de_prueba):
+# así las pruebas del cliente no dependen de ningún módulo de producto.
+PRODUCTO_BASE = 'dsi_prueba_base'
 
 
 def _b64u(data):
@@ -34,9 +37,13 @@ def firmar(payload):
     return f"{payload_b64}.{_b64u(_LLAVE_PRIVADA.sign(payload_b64.encode()))}"
 
 
-def token_de_prueba(env, dias=30, **extra):
+def token_de_prueba(env, dias=30, product_code=None, **extra):
     """Un token como los que emite el servidor, vigente `dias` días desde hoy
-    (negativo para uno ya vencido) y amarrado a esta base."""
+    (negativo para uno ya vencido) y amarrado a esta base.
+
+    Sin product_code es un token de la Bóveda de los de antes (sin
+    product_code y con ['vault', 'reconcile']). Con product_code lo lleva y,
+    salvo que vengan en `extra`, las funciones son la del catálogo."""
     payload = {
         'license_key': CLAVE_DE_PRUEBA,
         'rfc': 'EKU9003173C9',
@@ -47,6 +54,11 @@ def token_de_prueba(env, dias=30, **extra):
         'db_uuid': env['dsi.license.client.state']._get_db_uuid(),
         'nonce': 'prueba',
     }
+    if product_code:
+        payload['product_code'] = product_code
+        if product_code != 'cfdi_vault' and 'features' not in extra:
+            funcion = env['dsi.license.client.state']._product_info(product_code)['feature']
+            payload['features'] = [funcion] if funcion else []
     payload.update(extra)
     return firmar(payload)
 
@@ -56,9 +68,39 @@ def usar_llave_de_prueba(cls):
     cls.startClassPatcher(patch.object(crypto, 'DSI_LICENSE_PUBLIC_KEY_B64', LLAVE_PUBLICA_B64))
 
 
-def activar_licencia(cls, company=None, **extra):
-    """En setUpClass: deja una licencia vigente para la empresa."""
+def activar_licencia(cls, company=None, product_code='cfdi_vault', **extra):
+    """En setUpClass: deja una licencia vigente del producto (por omisión la
+    Bóveda de la empresa) y devuelve su registro."""
     usar_llave_de_prueba(cls)
-    estado = cls.env['dsi.license.client.state']._get_or_create(company)
-    estado.write({'license_key': CLAVE_DE_PRUEBA, 'token': token_de_prueba(cls.env, **extra)})
+    estado = cls.env['dsi.license.client.state']._get_product_license(product_code, company, create=True)
+    producto_token = None if product_code == 'cfdi_vault' else product_code
+    estado.write({
+        'license_key': CLAVE_DE_PRUEBA,
+        'token': token_de_prueba(cls.env, product_code=producto_token, **extra),
+    })
     return estado
+
+
+def catalogo_de_prueba(cls, **cambios):
+    """En setUpClass: agrega al catálogo el producto PRODUCTO_BASE, por base,
+    con gracia de solo consulta y sin «Seguir solo consultando», como los
+    productos de Manufactura. Envuelve el método de la clase del registro,
+    así que los productos de otros módulos instalados siguen en el catálogo."""
+    State = cls.registry['dsi.license.client.state']
+    original = State._product_catalog
+
+    def _product_catalog(self):
+        catalogo = original(self)
+        catalogo[PRODUCTO_BASE] = dict({
+            'name': "Producto de prueba",
+            'module': 'dsi_license_client',
+            'scope': 'database',
+            'feature': 'prueba_base',
+            'read_only_grace': True,
+            'allow_continue': False,
+            'trial_days': 7,
+            'license_menu': "Producto de prueba > Licencia",
+        }, **cambios)
+        return catalogo
+
+    cls.startClassPatcher(patch.object(State, '_product_catalog', _product_catalog))

@@ -10,9 +10,10 @@ from unittest.mock import MagicMock, patch
 
 from odoo import fields
 from odoo.exceptions import RedirectWarning
-from odoo.tests.common import TransactionCase, tagged
+from odoo.tests.common import TransactionCase, new_test_user, tagged
 
-from .common import CLAVE_DE_PRUEBA, token_de_prueba, usar_llave_de_prueba
+from .common import (CLAVE_DE_PRUEBA, PRODUCTO_BASE, catalogo_de_prueba, token_de_prueba,
+                     usar_llave_de_prueba)
 
 ENVIO = 'odoo.addons.dsi_license_client.models.dsi_license_client_state.requests.post'
 
@@ -24,6 +25,7 @@ class TestAvisoLicencia(TransactionCase):
     def setUpClass(cls):
         super().setUpClass()
         usar_llave_de_prueba(cls)
+        catalogo_de_prueba(cls)
         cls.licencia = cls.env['dsi.license.client.state']._get_or_create()
         cls.licencia.write({'token': False, 'license_key': False})
         cls.licencia.company_id.partner_id.vat = 'EKU9003173C9'
@@ -126,4 +128,28 @@ class TestAvisoLicencia(TransactionCase):
         self.licencia._send_trial_reminders()
         self.licencia.token = token_de_prueba(self.env, dias=1)
         self.licencia._send_trial_reminders()
+        self.assertFalse(self._avisos_enviados())
+
+    def test_aviso_de_fin_de_prueba_de_un_producto_por_base(self):
+        # La licencia es de toda la base: avisa a los administradores de
+        # cualquier empresa, con el nombre del producto.
+        otra = self.env['res.company'].create({'name': "Otra empresa (avisos)"})
+        admin_otra = new_test_user(
+            self.env, login='admin-otra-licencia@example.com', groups='base.group_user,base.group_system',
+            company_id=otra.id, company_ids=[(6, 0, otra.ids)])
+        por_base = self.env['dsi.license.client.state']._get_product_license(PRODUCTO_BASE, create=True)
+        por_base.write({
+            'license_key': CLAVE_DE_PRUEBA,
+            'token': token_de_prueba(self.env, dias=3, product_code=PRODUCTO_BASE, license_type='trial',
+                                     grace_days=0, base_url=self.base_url),
+        })
+        self.assertIn(admin_otra.partner_id, por_base._reminder_partners())
+        # El de la Bóveda sigue siendo solo de su empresa.
+        self.assertNotIn(admin_otra.partner_id, self.licencia._reminder_partners())
+        por_base._send_trial_reminders()
+        aviso = self.env['mail.message'].search([('subject', 'like', 'Tu prueba de Producto de prueba termina')])
+        self.assertEqual(len(aviso), 1)
+        self.assertIn(admin_otra.partner_id, aviso.partner_ids)
+        self.assertIn("esta base", aviso.body)
+        self.assertIn("Producto de prueba &gt; Licencia", aviso.body)
         self.assertFalse(self._avisos_enviados())

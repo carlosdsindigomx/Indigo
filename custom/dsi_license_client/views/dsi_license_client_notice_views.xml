@@ -11,19 +11,24 @@
                 <field name="next_action" invisible="1"/>
                 <field name="target" invisible="1"/>
                 <field name="company_id" invisible="1"/>
+                <field name="product_code" invisible="1"/>
+                <field name="allow_continue" invisible="1"/>
+                <field name="license_mode" invisible="1"/>
+                <field name="can_enter" invisible="1"/>
                 <sheet>
                     <div class="oe_title">
                         <h1><field name="title" readonly="1"/></h1>
                     </div>
                     <p class="fs-5"><field name="status_message" readonly="1"/></p>
-                    <p invisible="state not in ('not_activated', 'restricted', 'grace')">
-                        Tus CFDI siguen aquí: puedes consultarlos y exportarlos. Para importar,
-                        descargar del SAT y convertir a factura necesitas una licencia vigente.
+                    <p invisible="not notice_text">
+                        <field name="notice_text" readonly="1"/>
                     </p>
-                    <p invisible="state != 'trial'">
-                        Compra tu licencia antes de que termine la prueba para no interrumpir la
-                        importación, la descarga del SAT ni la conversión a factura.
+                    <p invisible="not trial_text">
+                        <field name="trial_text" readonly="1"/>
                     </p>
+                    <div class="alert alert-warning" role="alert" invisible="not read_text">
+                        <field name="read_text" readonly="1"/>
+                    </div>
 
                     <div class="alert alert-info" role="alert" invisible="trial_state != 'requested'">
                         Verificando esta base con el servidor de licencias de DS Indigo. Tarda menos
@@ -34,13 +39,18 @@
                         No se pudo iniciar la prueba: <field name="trial_error" readonly="1" class="oe_inline"/>
                     </div>
 
+                    <div class="my-3" invisible="not can_enter">
+                        <button name="action_continue" type="object" string="Entrar"
+                                class="btn-primary" icon="fa-arrow-right"/>
+                    </div>
+
                     <div class="d-flex flex-wrap gap-2 my-3" invisible="state == 'active' and not is_trial">
                         <button name="action_buy" type="object" string="Comprar licencia"
                                 class="btn-primary" icon="fa-shopping-cart"/>
                         <button name="action_start_trial" type="object" string="Iniciar prueba de 7 días"
                                 class="btn-secondary"
                                 invisible="state != 'not_activated' or trial_state == 'requested'"
-                                confirm="Se registrará una prueba de 7 días para el RFC de esta empresa y la dirección de esta base. Solo hay una prueba por RFC. ¿Continuar?"/>
+                                confirm="Se registrará una prueba de 7 días para el RFC de tu empresa y la dirección de esta base. Solo hay una prueba por RFC. ¿Continuar?"/>
                     </div>
 
                     <div invisible="state == 'active' and not is_trial">
@@ -54,7 +64,8 @@
                         </p>
                     </div>
 
-                    <div class="mt-4" invisible="not next_action or state not in ('not_activated', 'restricted')">
+                    <div class="mt-4"
+                         invisible="not allow_continue or not next_action or state not in ('not_activated', 'restricted')">
                         <button name="action_continue" type="object" string="Seguir solo consultando"
                                 class="btn-link" icon="fa-arrow-right"/>
                     </div>
@@ -66,7 +77,8 @@
         </field>
     </record>
 
-    <!-- Para los menús "Licencia" de los productos (ver dsi_cfdi_vault). -->
+    <!-- Para los menús "Licencia" de la Bóveda (ver dsi_cfdi_vault). Los
+         demás productos tienen la suya. -->
     <record id="action_license_notice" model="ir.actions.server">
         <field name="name">Licencia</field>
         <field name="model_id" ref="model_dsi_license_client_notice"/>
@@ -74,7 +86,9 @@
         <field name="code">action = env['dsi.license.client.state']._get_or_create()._notice_action()</field>
     </record>
 
-    <!-- La que abre la ventana de bloqueo ("Comprar o activar licencia"). -->
+    <!-- La que abre la ventana de bloqueo ("Comprar o activar licencia"). El
+         producto y la empresa llegan en el contexto de la ventana
+         (dsi_license_product, dsi_license_company). -->
     <record id="action_license_notice_dialog" model="ir.actions.act_window">
         <field name="name">Licencia</field>
         <field name="res_model">dsi.license.client.notice</field>

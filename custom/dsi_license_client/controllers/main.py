@@ -12,7 +12,7 @@ class DsiLicenseClientController(http.Controller):
         que la escribió a mano."""
         secret = request.env['dsi.license.client.state'].sudo()._trial_challenge_secret(id)
         if not secret:
-            return request.not_found()
+            raise request.not_found()
         return request.make_response(secret, headers=[
             ('Content-Type', 'text/plain; charset=utf-8'),
             ('Cache-Control', 'no-store'),
