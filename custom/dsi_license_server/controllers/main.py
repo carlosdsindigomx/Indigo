@@ -10,6 +10,7 @@ from odoo.exceptions import UserError
 from odoo.http import request
 
 from ..crypto import sign_token, DsiLicenseKeyError
+from ..models.dsi_license_product import CFDI_VAULT_CODE
 
 _logger = logging.getLogger(__name__)
 
@@ -62,6 +63,11 @@ class DsiLicenseController(http.Controller):
             rfc_in = (data.get('rfc') or '').strip().upper()
             if rfc_in != (license.rfc_authorized or '').strip().upper():
                 raise UserError(GENERIC_ERROR)
+            # Antes de todo lo que puede escribir (_check_usable marca
+            # 'expired', _find_or_create_instance crea o reactiva): una clave
+            # de otro producto no deja rastro en la licencia. Sin
+            # product_code es la Bóveda (clientes de antes de este cambio).
+            license._check_product(data.get('product_code'))
             db_uuid = data.get('db_uuid')
             if not db_uuid:
                 raise UserError("Falta db_uuid.")
@@ -107,9 +113,36 @@ class DsiLicenseController(http.Controller):
         try:
             if not license or not instance:
                 raise UserError(GENERIC_ERROR)
-            odoo_version = instance.odoo_version or ''
-            license._check_usable(odoo_version)
-            instance.date_last_heartbeat = fields.Datetime.now()
+            license._check_product(data.get('product_code'))
+            # Los clientes nuevos mandan su versión (una base migrada de 19 a
+            # 20 se valida con la nueva); los de antes no: se usa la guardada.
+            odoo_version = str(data.get('odoo_version') or '').strip()
+            module_version = str(data.get('module_version') or '').strip()
+            license._check_usable(odoo_version or instance.odoo_version or '')
+            valores = {'date_last_heartbeat': fields.Datetime.now()}
+            if instance.state != 'active':
+                # Liberada por el operador: ya no ocupa cupo y otra base pudo
+                # tomar su lugar, así que no se le renueva. Liberada por la
+                # propia base («Desactivar»): esa base borró su token y ya no
+                # manda heartbeat; si llega uno, es de otra empresa de la misma
+                # base (misma clave y RFC) que la sigue usando, y vuelve a
+                # ocupar el lugar si cabe.
+                if instance.released_by != 'client':
+                    raise UserError(
+                        "Esta base fue liberada de la licencia. Vuelve a activarla desde la "
+                        "ventana de licencia.")
+                try:
+                    license._check_cupo()
+                except UserError:
+                    raise UserError(
+                        "Esta base fue liberada de la licencia y su lugar ya lo ocupa otra base. "
+                        "Vuelve a activarla desde la ventana de licencia cuando haya cupo.") from None
+                valores.update({'state': 'active', 'released_by': False})
+            if odoo_version:
+                valores['odoo_version'] = odoo_version
+            if module_version:
+                valores['module_version'] = module_version
+            instance.write(valores)
             payload = license._build_token_payload(instance)
             token = sign_token(payload, env=request.env)
             response = {'token': token}
@@ -141,7 +174,7 @@ class DsiLicenseController(http.Controller):
         try:
             if not license or not instance:
                 raise UserError(GENERIC_ERROR)
-            instance.action_release()
+            instance._release('client')
             self._log_call('deactivate', license, instance, success=True, request_data=data)
             return request.make_json_response({'ok': True})
         except Exception as e:  # pylint: disable=broad-except
@@ -203,11 +236,21 @@ class DsiLicenseController(http.Controller):
         conocen esta dirección, así que la tienda puede cambiar sin tocarlos.
         Cada clic queda en la bitácora: es un prospecto."""
         env = self._env()
+        Product = env['dsi.license.product']
         license = env['dsi.license']
         if clave:
             license = license.search([('key', '=', clave.strip())], limit=1)
-        product = license.product_id or env['dsi.license.product'].search(
-            [('code', '=', producto or 'cfdi_vault')], limit=1)
+        codigo = (producto or '').strip()
+        if codigo:
+            # Manda el producto pedido: es el botón de ese producto. Una clave
+            # de otro producto se descarta (no viaja a la tienda ni se liga a
+            # la licencia en la bitácora); si el producto no existe, la página
+            # genérica, no la de la Bóveda.
+            product = Product.search([('code', '=', codigo)], limit=1)
+            if license.product_id != product:
+                license = env['dsi.license']
+        else:
+            product = license.product_id or Product.search([('code', '=', CFDI_VAULT_CODE)], limit=1)
         self._log_call('purchase', license or None, success=bool(product.purchase_url),
                         request_data={'clave': clave, 'producto': producto})
         if product.purchase_url:

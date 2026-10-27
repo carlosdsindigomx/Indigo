@@ -37,7 +37,7 @@
                             confirm="La misma licencia pasa a suscripción por un año, con cupo de 2 instancias. El cliente la recibe en su siguiente renovación diaria, o al momento si pulsa Activar. ¿Continuar?"/>
                     <button name="action_suspend" type="object" string="Suspender"
                             invisible="state != 'active'"/>
-                    <button name="action_revoke" type="object" string="Revocar" confirm="¿Revocar esta licencia? Todas sus instancias activas se liberarán."
+                    <button name="action_revoke" type="object" string="Revocar" confirm="¿Revocar esta licencia? Sus bases dejarán de renovarla. Con «Activar» vuelven a renovar sin hacer nada en ellas."
                             invisible="state == 'revoked'"/>
                     <button name="action_reset_to_draft" type="object" string="Regresar a borrador"
                             invisible="state != 'suspended'"/>
@@ -52,6 +52,7 @@
                             <field name="partner_id"/>
                             <field name="product_id"/>
                             <field name="edition"/>
+                            <field name="token_features"/>
                             <field name="rfc_authorized"/>
                         </group>
                         <group>
@@ -77,8 +78,12 @@
                                     <field name="state" widget="badge"
                                            decoration-success="state == 'active'"
                                            decoration-muted="state == 'inactive'"/>
+                                    <field name="released_by" optional="show"/>
                                     <button name="action_release" type="object" string="Liberar" icon="fa-times"
-                                            invisible="state == 'inactive'"/>
+                                            invisible="state == 'inactive'"
+                                            confirm="¿Liberar esta base? Deja de renovar su licencia y su lugar queda libre para otra. Se deshace con «Reactivar» mientras haya cupo."/>
+                                    <button name="action_reactivate" type="object" string="Reactivar" icon="fa-undo"
+                                            invisible="state == 'active'"/>
                                 </list>
                             </field>
                         </page>
@@ -108,10 +113,14 @@
                 <field name="key"/>
                 <field name="rfc_authorized"/>
                 <field name="partner_id"/>
+                <field name="product_id"/>
                 <filter string="Activas" name="filter_active" domain="[('state', '=', 'active')]"/>
                 <filter string="Pruebas" name="filter_trial" domain="[('license_type', '=', 'trial')]"/>
                 <filter string="Suspendidas" name="filter_suspended" domain="[('state', '=', 'suspended')]"/>
                 <filter string="Expiradas o revocadas" name="filter_ended" domain="[('state', 'in', ('expired', 'revoked'))]"/>
+                <separator/>
+                <filter string="Bóveda CFDI" name="filter_cfdi_vault" domain="[('product_id.code', '=', 'cfdi_vault')]"/>
+                <filter string="Manufactura" name="filter_mrp_manufactura" domain="[('product_id.code', '=', 'mrp_manufactura')]"/>
                 <group>
                     <filter string="Producto" name="group_product" context="{'group_by': 'product_id'}"/>
                     <filter string="Estado" name="group_state" context="{'group_by': 'state'}"/>
@@ -131,15 +140,73 @@
         <field name="name">dsi.license.product.list</field>
         <field name="model">dsi.license.product</field>
         <field name="arch" type="xml">
-            <list string="Productos licenciables" editable="bottom">
+            <list string="Productos licenciables">
                 <field name="name"/>
                 <field name="code"/>
                 <field name="supported_versions"/>
+                <field name="features_summary"/>
                 <field name="allow_trial"/>
                 <field name="trial_days" invisible="not allow_trial"/>
+                <field name="license_count"/>
                 <field name="purchase_url" widget="url"/>
                 <field name="active" column_invisible="True"/>
             </list>
+        </field>
+    </record>
+
+    <record id="view_dsi_license_product_form" model="ir.ui.view">
+        <field name="name">dsi.license.product.form</field>
+        <field name="model">dsi.license.product</field>
+        <field name="arch" type="xml">
+            <form string="Producto licenciable">
+                <sheet>
+                    <widget name="web_ribbon" title="Archivado" bg_color="text-bg-danger" invisible="active"/>
+                    <field name="active" invisible="1"/>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="Ej. Manufactura"/></h1>
+                    </div>
+                    <group>
+                        <group string="Identificación">
+                            <field name="code" readonly="license_count"/>
+                            <field name="supported_versions"/>
+                            <field name="license_count"/>
+                        </group>
+                        <group string="Prueba de autoservicio">
+                            <field name="allow_trial"/>
+                            <field name="trial_days" invisible="not allow_trial"/>
+                            <field name="trial_edition" invisible="not allow_trial"/>
+                        </group>
+                    </group>
+                    <group string="Funciones que abre el token">
+                        <div class="alert alert-info mb-0" role="alert" colspan="2"
+                             invisible="code != 'cfdi_vault'">
+                            Las funciones de la Bóveda CFDI están fijas en código:
+                            <strong>Basic</strong>: vault · <strong>Pro</strong>: vault, reconcile.
+                            Los clientes ya instalados solo conocen esas.
+                        </div>
+                        <field name="features_basic" invisible="code == 'cfdi_vault'"
+                               placeholder="Ej. mrp_manufactura"/>
+                        <field name="features_pro" invisible="code == 'cfdi_vault'"
+                               placeholder="Ej. mrp_manufactura"/>
+                    </group>
+                    <group string="Compra">
+                        <field name="purchase_url" widget="url"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_dsi_license_product_search" model="ir.ui.view">
+        <field name="name">dsi.license.product.search</field>
+        <field name="model">dsi.license.product</field>
+        <field name="arch" type="xml">
+            <search string="Buscar productos">
+                <field name="name"/>
+                <field name="code"/>
+                <filter string="Archivados" name="filter_archived" domain="[('active', '=', False)]"/>
+            </search>
         </field>
     </record>
 
