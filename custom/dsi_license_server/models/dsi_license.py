@@ -8,6 +8,7 @@ from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
 
 from .. import trial
+from .dsi_license_product import CFDI_VAULT_CODE, normalize_version, split_csv
 
 _logger = logging.getLogger(__name__)
 
@@ -16,6 +17,7 @@ TOKEN_VALIDITY_DAYS = 30
 # renovarlo (servidor caído, sin internet...). Va firmado en el token. Las
 # pruebas no tienen: terminan el día que terminan.
 GRACE_DAYS = 15
+DEFAULT_ODOO_VERSIONS = '19.0'
 
 
 class DsiLicense(models.Model):
@@ -46,7 +48,7 @@ class DsiLicense(models.Model):
                             help="Vacío = licencia perpetua sin fecha de expiración.")
     max_instances = fields.Integer(default=2, required=True,
                                     help="Cupo de activaciones simultáneas (ej. producción + pruebas).")
-    odoo_versions = fields.Char(default="19.0", required=True,
+    odoo_versions = fields.Char(default=DEFAULT_ODOO_VERSIONS, required=True,
                                  help="Versiones de Odoo permitidas para esta licencia, separadas por coma.")
     state = fields.Selection([
         ('draft', "Borrador"),
@@ -59,6 +61,9 @@ class DsiLicense(models.Model):
     instance_count = fields.Integer(compute='_compute_instance_count')
     active_instance_count = fields.Integer(compute='_compute_instance_count')
     log_ids = fields.One2many('dsi.license.log', 'license_id', string="Bitácora")
+    token_features = fields.Char(
+        string="Funciones del token", compute='_compute_token_features',
+        help="Lo que abre el token de esta licencia en el cliente. Sale del producto y la edición.")
     sale_reference = fields.Char(string="Referencia comercial",
                                   help="Folio de la orden de venta o suscripción de origen (texto libre).")
 
@@ -78,6 +83,29 @@ class DsiLicense(models.Model):
             if not self.search_count([('key', '=', key)]):
                 return key
 
+    @api.depends('product_id.code', 'product_id.features_basic', 'product_id.features_pro', 'edition')
+    def _compute_token_features(self):
+        for license in self:
+            license.token_features = ', '.join(
+                license.product_id._features_for(license.edition)) if license.product_id else False
+
+    @api.onchange('product_id')
+    def _onchange_product_id_versions(self):
+        # El default '19.0' dejaría sin Odoo 20 (o 18) a una licencia vendida a
+        # mano de un producto que sí lo soporta. Solo al crearla: en una que ya
+        # existe, odoo_versions decide si sus bases renuevan (y en la Bóveda
+        # supported_versions no es lo que se vende). Tampoco pisa lo que
+        # escribió el operador: solo el default o lo que puso otro producto.
+        # Las pruebas toman la versión de la base que la pide.
+        if not self.product_id or self.license_type == 'trial' or self._origin.id:
+            return
+        actuales = (self.odoo_versions or '').strip()
+        propuestas = {DEFAULT_ODOO_VERSIONS} | set(
+            self.env['dsi.license.product'].with_context(active_test=False).search([])
+            .mapped('supported_versions'))
+        if not actuales or actuales in propuestas:
+            self.odoo_versions = self.product_id.supported_versions
+
     @api.depends('instance_ids.state')
     def _compute_instance_count(self):
         for license in self:
@@ -91,15 +119,50 @@ class DsiLicense(models.Model):
         self.write({'state': 'suspended'})
 
     def action_revoke(self):
+        # Las instancias se quedan como están: el estado 'revoked' ya corta
+        # /activate y /heartbeat (_check_usable). Si se liberaran, «Activar»
+        # no devolvería el servicio, porque el heartbeat no renueva
+        # instancias liberadas.
         self.write({'state': 'revoked'})
-        self.instance_ids.filtered(lambda i: i.state == 'active').write({'state': 'inactive'})
 
     def action_reset_to_draft(self):
         self.write({'state': 'draft'})
 
+    def write(self, vals):
+        res = super().write(vals)
+        if 'date_end' in vals and 'state' not in vals:
+            # Renovar extendiendo la fecha: una licencia que ya se marcó
+            # 'expired' (primer heartbeat después de vencer) vuelve sola a
+            # 'active'. Antes se quedaba vencida, y el cliente sin renovar,
+            # hasta que alguien pulsara «Activar». Mismo «hoy» (UTC) que
+            # _check_usable. Sin fecha = perpetua, también vigente.
+            hoy = datetime.utcnow().date()
+            vigentes = self.filtered(
+                lambda l: l.state == 'expired' and (not l.date_end or l.date_end >= hoy))
+            if vigentes:
+                super(DsiLicense, vigentes).write({'state': 'active'})
+                for license in vigentes:
+                    license.message_post(body=_(
+                        "Licencia reactivada al extender su vigencia (hasta %s).",
+                        license.date_end or _("sin fecha de fin")))
+        return res
+
     # -------------------------------------------------------------------
     # Lógica usada por los endpoints (controllers/main.py)
     # -------------------------------------------------------------------
+
+    def _check_product(self, product_code):
+        """Lanza UserError si la clave no es del producto que la pide. Sin
+        product_code es la Bóveda: los clientes instalados antes de que hubiera
+        más productos no lo mandan."""
+        self.ensure_one()
+        pedido = str(product_code or '').strip() or CFDI_VAULT_CODE
+        if self.product_id.code != pedido:
+            producto = self.env['dsi.license.product'].with_context(active_test=False).search(
+                [('code', '=', pedido)], limit=1)
+            raise UserError(_(
+                "Esta clave es de «%(clave)s»; no sirve para «%(pedido)s».",
+                clave=self.product_id.name, pedido=producto.name or pedido))
 
     def _check_usable(self, odoo_version):
         """Lanza UserError con un mensaje claro si la licencia no se puede usar ahora mismo."""
@@ -111,24 +174,15 @@ class DsiLicense(models.Model):
         if self.date_end and datetime.utcnow().date() > self.date_end:
             self.state = 'expired'
             raise UserError(_("La licencia expiró el %s.", self.date_end))
-        allowed_versions = [v.strip() for v in (self.odoo_versions or '').split(',') if v.strip()]
-        # Normaliza sufijos de build como "19.0+e" (enterprise) o "19.0-20260101" antes de comparar.
-        normalized_version = (odoo_version or '').split('+')[0].split('-')[0]
-        if allowed_versions and normalized_version not in allowed_versions:
+        # Normaliza sufijos de build como "19.0+e" (enterprise) o "19.0-20260101"
+        # antes de comparar, de los dos lados.
+        allowed_versions = [normalize_version(v) for v in split_csv(self.odoo_versions)]
+        if allowed_versions and normalize_version(odoo_version) not in allowed_versions:
             raise UserError(_("Esta licencia no cubre la versión de Odoo %s.", odoo_version))
 
-    def _find_or_create_instance(self, db_uuid, base_url, odoo_version, module_version, is_production):
+    def _check_cupo(self):
+        """Lanza UserError si ya no cabe otra instancia activa."""
         self.ensure_one()
-        instance = self.instance_ids.filtered(lambda i: i.database_uuid == db_uuid)
-        if instance:
-            instance.write({
-                'base_url': base_url or instance.base_url,
-                'odoo_version': odoo_version,
-                'module_version': module_version,
-                'is_production': is_production,
-                'state': 'active',
-            })
-            return instance
         active_count = len(self.instance_ids.filtered(lambda i: i.state == 'active'))
         if active_count >= self.max_instances:
             raise UserError(_(
@@ -136,6 +190,25 @@ class DsiLicense(models.Model):
                 "Libera una instancia desde el portal antes de activar una nueva.",
                 count=active_count, max=self.max_instances,
             ))
+
+    def _find_or_create_instance(self, db_uuid, base_url, odoo_version, module_version, is_production):
+        self.ensure_one()
+        instance = self.instance_ids.filtered(lambda i: i.database_uuid == db_uuid)
+        if instance:
+            if instance.state != 'active':
+                # Reactivar una base liberada también ocupa cupo: antes se
+                # podía activar A y B, liberar A, activar C y reactivar A.
+                self._check_cupo()
+            instance.write({
+                'base_url': base_url or instance.base_url,
+                'odoo_version': odoo_version,
+                'module_version': module_version,
+                'is_production': is_production,
+                'state': 'active',
+                'released_by': False,
+            })
+            return instance
+        self._check_cupo()
         return self.env['dsi.license.instance'].create({
             'license_id': self.id,
             'database_uuid': db_uuid,
@@ -160,7 +233,10 @@ class DsiLicense(models.Model):
             'rfc': self.rfc_authorized,
             'edition': self.edition,
             'license_type': self.license_type,
-            'features': ['vault', 'reconcile'] if self.edition == 'pro' else ['vault'],
+            # La Bóveda sigue con sus funciones fijas en código; los demás
+            # productos, con las suyas (nunca 'vault' ni 'reconcile').
+            'features': self.product_id._features_for(self.edition),
+            'product_code': self.product_id.code,
             'license_end': self.date_end.isoformat() if self.date_end else None,
             'token_expires': token_expires.isoformat(),
             'grace_days': 0 if es_prueba else GRACE_DAYS,
@@ -200,6 +276,13 @@ class DsiLicense(models.Model):
             ('code', '=', data.get('product_code')), ('allow_trial', '=', True)], limit=1)
         if not product:
             raise UserError(_("La prueba no está disponible para este producto."))
+        odoo_version = str(data.get('odoo_version') or '')
+        # La Bóveda no se valida: en producción tiene '19.0' y la piden
+        # bases 18 y 20. Antes del reto, que es una llamada saliente.
+        if product.code != CFDI_VAULT_CODE and not product._supports_version(odoo_version):
+            raise UserError(_(
+                "La prueba de %(producto)s no está disponible para Odoo %(version)s.",
+                producto=product.name, version=normalize_version(odoo_version) or odoo_version))
         rfc = str(data.get('rfc') or '').strip().upper()
         if not trial.RFC_RE.match(rfc):
             raise UserError(_("El RFC %s no es válido.", rfc))
@@ -226,17 +309,16 @@ class DsiLicense(models.Model):
         trial.verificar_reto(base_url, challenge_id, challenge_secret, modo_prueba=modo_prueba)
 
         hoy = datetime.utcnow().date()
-        odoo_version = str(data.get('odoo_version') or '')
         license = self.create({
             'partner_id': self._trial_partner(rfc, data.get('company_name')).id,
             'product_id': product.id,
-            'edition': 'pro',
+            'edition': product.trial_edition or 'pro',
             'license_type': 'trial',
             'rfc_authorized': rfc,
             'date_start': hoy,
             'date_end': hoy + timedelta(days=product.trial_days),
             'max_instances': 1,
-            'odoo_versions': odoo_version.split('+')[0].split('-')[0],
+            'odoo_versions': normalize_version(odoo_version),
             'state': 'active',
             'sale_reference': _("Prueba pedida desde %s", base_url),
         })
