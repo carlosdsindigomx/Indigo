@@ -56,7 +56,6 @@ class CfdiImportWizard(models.TransientModel):
         self.result_ids.unlink()
         CfdiDocument = self.env['cfdi.document']
         company = self.company_id
-        company_rfc = (company.partner_id.vat or '').upper()
 
         files = self._collect_xml_files()
         new_docs = CfdiDocument
@@ -87,7 +86,7 @@ class CfdiImportWizard(models.TransientModel):
                 'res_id': 0,
             })
 
-            direction = 'issued' if vals.get('partner_rfc_issuer', '').upper() == company_rfc else 'received'
+            direction = CfdiDocument._direccion_para(company, vals.get('partner_rfc_issuer'))
 
             doc_vals = {
                 'company_id': company.id,
@@ -104,6 +103,9 @@ class CfdiImportWizard(models.TransientModel):
 
         if new_docs:
             new_docs.action_match_automatically()
+            # Después de guardar todo: un REP y la factura que paga pueden
+            # venir en el mismo ZIP, en cualquier orden.
+            new_docs._ligar_reps('rep')
 
         self.state = 'done'
         return {

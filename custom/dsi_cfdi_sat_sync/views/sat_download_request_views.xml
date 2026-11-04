@@ -11,6 +11,8 @@
                 <field name="date_from"/>
                 <field name="date_to"/>
                 <field name="imported_count"/>
+                <field name="metadata_count" optional="show"/>
+                <field name="is_refresh" optional="hide"/>
                 <field name="state" widget="badge"
                        decoration-success="state == 'processed'"
                        decoration-danger="state in ('rejected', 'expired')"
@@ -35,6 +37,9 @@
                             invisible="state != 'downloading'"/>
                     <button name="action_reintentar" type="object" string="Corregir y reintentar"
                             invisible="state != 'rejected'"/>
+                    <!-- Lee otra vez los TXT adjuntos; no vuelve a hablar con el SAT. -->
+                    <button name="action_reprocesar_metadatos" type="object" string="Volver a leer los metadatos"
+                            invisible="request_type != 'metadata' or not metadata_attachment_ids"/>
                     <field name="state" widget="statusbar"
                            statusbar_visible="draft,authenticated,requested,verifying,downloading,processed"/>
                 </header>
@@ -52,8 +57,18 @@
                         </group>
                         <group string="Resultado">
                             <field name="sat_request_id"/>
-                            <field name="imported_count"/>
+                            <field name="imported_count" invisible="request_type == 'metadata'"/>
+                            <field name="metadata_count" invisible="request_type != 'metadata'"/>
+                            <field name="metadata_error_count" invisible="not metadata_error_count"/>
+                            <field name="metadata_pending" invisible="not metadata_pending"/>
+                            <field name="is_refresh" invisible="not is_refresh"/>
                         </group>
+                    </group>
+                    <group string="Archivos de metadatos" invisible="not metadata_attachment_ids">
+                        <field name="metadata_attachment_ids" widget="many2many_binary" nolabel="1" colspan="2"/>
+                    </group>
+                    <group string="Líneas que no se pudieron leer" invisible="not metadata_errors">
+                        <field name="metadata_errors" nolabel="1" colspan="2"/>
                     </group>
                     <group string="Último error" invisible="not error_message">
                         <field name="error_message" nolabel="1"/>

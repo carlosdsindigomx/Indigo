@@ -5,7 +5,17 @@ from datetime import timedelta
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
+from odoo.addons.dsi_cfdi_vault.models.cfdi_inconsistency import _puede_hacer_commit
+
 _logger = logging.getLogger(__name__)
+
+# Refresco semanal de metadatos: cuántos días hacia atrás por omisión y
+# cuántas veces se recorre un día el inicio de la ventana para no repetir una
+# solicitud ya hecha con los mismos parámetros. El SAT no deja repetir una
+# solicitud vigente con los mismos parámetros (CodEstatus 5005) y limita las
+# que se repiten (5002).
+DIAS_DE_REFRESCO = 90
+INTENTOS_SIN_REPETIR = 8
 
 
 class SatSyncSchedule(models.Model):
@@ -48,6 +58,14 @@ class SatSyncSchedule(models.Model):
         help="El índice ligero. Sirve para detectar cancelaciones, porque incluye "
              "vigentes y cancelados en la misma solicitud — cosa que el XML completo "
              "no permite.")
+
+    metadata_refresh_days = fields.Integer(
+        string="Refrescar metadatos (días)", default=DIAS_DE_REFRESCO,
+        help="Una vez por semana se vuelven a pedir los metadatos de emitidos y recibidos de "
+             "estos últimos días, para ver las cancelaciones de lo que ya se descargó: cada periodo "
+             "se pide una sola vez y un CFDI se puede cancelar después. No mueve «Cubierto hasta». "
+             "0 lo apaga. Requiere «Descargar metadatos».")
+    metadata_refreshed_on = fields.Datetime(string="Último refresco de metadatos", readonly=True)
 
     date_covered_to = fields.Date(
         string="Cubierto hasta", readonly=True,
@@ -206,8 +224,111 @@ class SatSyncSchedule(models.Model):
         return creadas
 
     # -------------------------------------------------------------------
+    # Refresco semanal de metadatos
+    # -------------------------------------------------------------------
+
+    def action_refrescar_metadatos(self):
+        """«Refrescar metadatos ahora», sin esperar a la tarea semanal."""
+        self.ensure_one()
+        creadas = self._refrescar_metadatos()
+        if not creadas:
+            raise UserError(_(
+                "No se pidió nada: activa «Descargar metadatos» y pon los días a refrescar, o ya se "
+                "pidieron hoy todas las ventanas posibles."))
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _("Solicitudes generadas"),
+            'res_model': 'sat.download.request',
+            'view_mode': 'list,form',
+            'domain': [('id', 'in', creadas.ids)],
+        }
+
+    def _refrescar_metadatos(self):
+        """Pide los metadatos (vigentes y cancelados) de emitidos y recibidos
+        de los últimos `metadata_refresh_days` días, hasta ayer. Cada periodo
+        se pide una sola vez al descargar, y un CFDI se puede cancelar después:
+        sin esto, esa cancelación nunca llegaba por metadatos.
+
+        Son emitidos y recibidos aunque la programación solo descargue unos:
+        el estatus le sirve a las facturas de los dos lados. No toca «Cubierto
+        hasta»: el avance de la descarga es otra cosa. Nunca repite una
+        solicitud con los mismos parámetros (_inicio_sin_repetir).
+
+        Devuelve las solicitudes creadas, ya mandadas al SAT.
+        """
+        self.ensure_one()
+        self.env['dsi.license.client.state']._check_feature(
+            'vault', _("descargar CFDI del SAT"), self.company_id)
+        Request = self.env['sat.download.request']
+        if not self.download_metadata or self.metadata_refresh_days <= 0:
+            return Request
+        hoy = fields.Date.context_today(self)
+        hasta = hoy - timedelta(days=1)
+        desde = hoy - timedelta(days=self.metadata_refresh_days)
+        creadas = Request
+        for direccion in ('received', 'issued'):
+            inicio = self._inicio_sin_repetir(direccion, desde, hasta)
+            if not inicio:
+                _logger.info(
+                    "%s: el refresco de metadatos (%s) ya se pidió hoy con todas las ventanas posibles.",
+                    self.display_name, direccion)
+                continue
+            creadas |= Request.create({
+                'company_id': self.company_id.id,
+                'credential_id': self.credential_id.id,
+                'schedule_id': self.id,
+                'direction': direccion,
+                'request_type': 'metadata',
+                'estado_comprobante': 'todos',
+                'date_from': inicio,
+                'date_to': hasta,
+                'is_refresh': True,
+            })
+        for solicitud in creadas:
+            solicitud._avanzar_sin_excepciones()
+        self.write({'metadata_refreshed_on': fields.Datetime.now()})
+        return creadas
+
+    def _inicio_sin_repetir(self, direccion, desde, hasta):
+        """El inicio de la ventana para que la solicitud no repita una ya hecha
+        en esta empresa con los mismos parámetros (dirección, tipo, estatus y
+        fechas), en cualquier estado: se recorre un día hacia atrás cada vez.
+        La tarea semanal ya mueve la ventana siete días; esto cubre el botón
+        apretado varias veces. False si ninguna sirve."""
+        Request = self.env['sat.download.request']
+        for atras in range(INTENTOS_SIN_REPETIR):
+            inicio = desde - timedelta(days=atras)
+            if not Request.search_count([
+                ('company_id', '=', self.company_id.id),
+                ('direction', '=', direccion),
+                ('request_type', '=', 'metadata'),
+                ('estado_comprobante', '=', 'todos'),
+                ('date_from', '=', inicio),
+                ('date_to', '=', hasta),
+            ], limit=1):
+                return inicio
+        return False
+
+    # -------------------------------------------------------------------
     # Crons
     # -------------------------------------------------------------------
+
+    @api.model
+    def _cron_refrescar_metadatos(self):
+        """Refresco semanal de metadatos de las programaciones activas con
+        licencia. Una sin licencia no se toca (la tarea diaria ya deja dicho
+        por qué no avanza). Nunca lanza: una programación rota no frena a las
+        demás."""
+        Licencia = self.env['dsi.license.client.state']
+        for programacion in self.search([('download_metadata', '=', True), ('metadata_refresh_days', '>', 0)]):
+            if not Licencia._get_or_create(programacion.company_id).is_feature_enabled('vault'):
+                continue
+            try:
+                programacion._refrescar_metadatos()
+            except Exception:  # pylint: disable=broad-except
+                _logger.exception("Falló el refresco de metadatos de %s", programacion.display_name)
+            if _puede_hacer_commit():
+                self.env.cr.commit()
 
     @api.model
     def _cron_generar_solicitudes(self):
@@ -245,7 +366,8 @@ class SatSyncSchedule(models.Model):
         las que ya estén listas. Es el que hace que el usuario no tenga que
         apretar botones."""
         pendientes = self.env['sat.download.request'].search([
-            ('state', 'in', ('draft', 'authenticated', 'requested', 'verifying', 'downloading')),
+            '|', ('state', 'in', ('draft', 'authenticated', 'requested', 'verifying', 'downloading')),
+            '&', ('state', '=', 'processed'), ('metadata_pending', '=', True),
         ])
         Licencia = self.env['dsi.license.client.state']
         con_licencia = pendientes.company_id.filtered(

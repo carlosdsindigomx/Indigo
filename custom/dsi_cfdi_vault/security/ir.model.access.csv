@@ -10,3 +10,11 @@ access_cfdi_match_suggestion_wizard_user,cfdi.match.suggestion.wizard.user,model
 access_cfdi_match_suggestion_wizard_line_user,cfdi.match.suggestion.wizard.line.user,model_cfdi_match_suggestion_wizard_line,group_cfdi_vault_user,1,1,1,1
 access_cfdi_efos_check_wizard_user,dsi.cfdi.efos.check.wizard.user,model_dsi_cfdi_efos_check_wizard,group_cfdi_vault_user,1,1,1,1
 access_cfdi_efos_check_wizard_line_user,dsi.cfdi.efos.check.wizard.line.user,model_dsi_cfdi_efos_check_wizard_line,group_cfdi_vault_user,1,1,1,1
+access_dsi_cfdi_nomina_poliza_wizard_user,dsi.cfdi.nomina.poliza.wizard.user,model_dsi_cfdi_nomina_poliza_wizard,group_cfdi_vault_user,1,1,1,1
+access_dsi_cfdi_nomina_poliza_wizard_line_user,dsi.cfdi.nomina.poliza.wizard.line.user,model_dsi_cfdi_nomina_poliza_wizard_line,group_cfdi_vault_user,1,1,1,1
+access_dsi_cfdi_inconsistency_user,dsi.cfdi.inconsistency.user,model_dsi_cfdi_inconsistency,group_cfdi_vault_user,1,1,0,0
+access_dsi_cfdi_inconsistency_manager,dsi.cfdi.inconsistency.manager,model_dsi_cfdi_inconsistency,account.group_account_manager,1,1,1,1
+access_dsi_cfdi_payment_line_user,dsi.cfdi.payment.line.user,model_dsi_cfdi_payment_line,group_cfdi_vault_user,1,0,0,0
+access_dsi_cfdi_payment_line_manager,dsi.cfdi.payment.line.manager,model_dsi_cfdi_payment_line,account.group_account_manager,1,1,1,1
+access_dsi_cfdi_rep_pago_wizard_user,dsi.cfdi.rep.pago.wizard.user,model_dsi_cfdi_rep_pago_wizard,group_cfdi_vault_user,1,1,1,1
+access_dsi_cfdi_rep_pago_wizard_line_user,dsi.cfdi.rep.pago.wizard.line.user,model_dsi_cfdi_rep_pago_wizard_line,group_cfdi_vault_user,1,1,1,1

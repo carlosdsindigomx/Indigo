@@ -10,12 +10,14 @@ Existen por dos defectos reales:
     responde; la misma dirección por http sí. El cron fallaba cada semana y
     solo lo dejaba en el log.
 """
+import base64
 from datetime import date
 from unittest.mock import MagicMock, patch
 
 import requests
 
-from odoo.tests.common import TransactionCase, tagged
+from odoo import Command
+from odoo.tests.common import TransactionCase, new_test_user, tagged
 
 from odoo.addons.dsi_cfdi_vault.models.cfdi_efos_entry import DEFAULT_69B_URLS
 
@@ -42,13 +44,14 @@ class TestLista69B(TransactionCase):
         cls.contador = 0
         cls.efos = cls.env['dsi.cfdi.efos.entry']
 
-    def _cfdi_de(self, rfc_emisor):
+    def _cfdi_de(self, rfc_emisor, company=None):
         type(self).contador += 1
         uuid = f"BBBBBBBB-0000-0000-0000-{self.contador:012d}"
         adjunto = self.env['ir.attachment'].create({
             'name': f'{uuid}.xml', 'raw': b'<cfdi/>', 'mimetype': 'text/xml',
         })
         return self.env['cfdi.document'].create({
+            'company_id': (company or self.env.company).id,
             'uuid': uuid,
             'direction': 'received',
             'move_type': 'I',
@@ -92,6 +95,28 @@ class TestLista69B(TransactionCase):
         self.efos._import_csv_bytes(csv_sat([('OTR010101AA1', 'Algo que el SAT agregue después')]))
         self.assertEqual(self.efos.search([('rfc', '=', 'OTR010101AA1')]).situation, 'other')
         self.assertTrue(doc.is_efos_risk)
+
+    def test_el_csv_subido_en_el_asistente_se_lee(self):
+        """«Cargar lista 69-B» recibe el archivo en base64, como lo manda el
+        navegador. En 18 y 19 se leía el base64 como si fuera el CSV («No se
+        encontró una columna de RFC»); en 20 el campo ya lo da decodificado.
+        Lo carga un gestor contable con una sola empresa abierta, y aun así se
+        recalculan los CFDI de todas: la lista es una sola."""
+        empresa_b = self.env['res.company'].create({'name': "Empresa B de prueba"})
+        de_b = self._cfdi_de('PRE010101AA1', company=empresa_b)
+        gestor = new_test_user(
+            self.env, login='gestor-69b', groups='base.group_user,account.group_account_manager',
+            company_id=self.env.company.id, company_ids=[Command.set(self.env.company.ids)])
+        asistente = self.env['dsi.cfdi.efos.import.wizard'].with_user(gestor).with_context(
+            allowed_company_ids=self.env.company.ids).create({
+                'csv_file': base64.b64encode(csv_sat([('PRE010101AA1', 'Presunto')])).decode(),
+                'csv_filename': 'Listado_Completo_69-B.csv',
+            })
+
+        asistente.action_import()
+
+        self.assertEqual(self.efos.search([]).mapped('rfc'), ['PRE010101AA1'])
+        self.assertTrue(de_b.is_efos_risk, "también en la empresa que el gestor no tiene abierta")
 
     def test_si_https_no_responde_se_descarga_por_http(self):
         respuesta = MagicMock(content=csv_sat([('PRE010101AA1', 'Presunto')]))

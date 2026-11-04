@@ -24,6 +24,9 @@
                 <header>
                     <button name="action_generar_ahora" type="object" class="btn-primary"
                             string="Generar el siguiente periodo ahora"/>
+                    <button name="action_refrescar_metadatos" type="object"
+                            string="Refrescar metadatos ahora"
+                            invisible="not download_metadata or metadata_refresh_days &lt;= 0"/>
                 </header>
                 <sheet>
                     <widget name="web_ribbon" title="Archivada" bg_color="text-bg-secondary"
@@ -54,6 +57,7 @@
                             <field name="sync_issued"/>
                             <field name="download_xml"/>
                             <field name="download_metadata"/>
+                            <field name="metadata_refresh_days" invisible="not download_metadata"/>
                             <field name="active"/>
                         </group>
                     </group>
@@ -61,6 +65,7 @@
                     <group string="Avance">
                         <field name="date_covered_to"/>
                         <field name="last_run"/>
+                        <field name="metadata_refreshed_on" invisible="not metadata_refreshed_on"/>
                         <field name="last_error"/>
                     </group>
                 </sheet>

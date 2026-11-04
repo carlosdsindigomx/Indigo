@@ -7,10 +7,16 @@ from io import BytesIO
 
 from lxml import etree
 
-from odoo import _, api, fields, models
+from odoo import Command, _, api, fields, models, tools
 from odoo.exceptions import RedirectWarning, UserError
 
+from odoo.addons.dsi_cfdi_vault.models.cfdi_conceptos import _bytes_de_adjunto
+from odoo.addons.dsi_cfdi_vault.models.cfdi_document import ERRORES_DE_CONCURRENCIA
+from odoo.addons.dsi_cfdi_vault.models.cfdi_inconsistency import MARGEN_TRAS_UN_CHOQUE
+
 from . import sat_soap_client as soap
+from .cfdi_document import METADATOS_AL_FINAL
+from .sat_metadata import leer_paquete_de_metadatos
 from .sat_soap_client import NS
 
 _logger = logging.getLogger(__name__)
@@ -20,6 +26,11 @@ _logger = logging.getLogger(__name__)
 # "No se encontro la informacion" — sin este corte, el cron la reintentaría
 # indefinidamente y el usuario esperaría algo que nunca va a llegar.
 MAX_ESPERA_HORAS = 24
+
+# Tipo de los TXT de metadatos adjuntos: no text/*, que Odoo indexa copiando
+# todo el contenido, ni application/octet-stream, que Odoo vuelve a adivinar
+# por el contenido (y da text/plain). Se descargan igual, con su nombre .txt.
+MIMETYPE_DEL_TXT = 'application/x-sat-metadata'
 
 
 class SatDownloadRequest(models.Model):
@@ -71,6 +82,27 @@ class SatDownloadRequest(models.Model):
     imported_count = fields.Integer(string="CFDI importados", readonly=True)
     error_message = fields.Text(string="Último error", readonly=True)
 
+    # Metadatos: los TXT del paquete se quedan adjuntos para poder volver a
+    # leerlos (el paquete del SAT caduca). Se leen al terminar la descarga y
+    # con «Volver a leer los metadatos».
+    is_refresh = fields.Boolean(
+        string="Refresco de metadatos", readonly=True,
+        help="La pidió el refresco semanal de metadatos (los últimos días, para ver las "
+             "cancelaciones de lo ya descargado). No mueve «Cubierto hasta» de la programación.")
+    metadata_attachment_ids = fields.Many2many(
+        'ir.attachment', 'sat_download_request_metadata_rel', 'request_id', 'attachment_id',
+        string="Archivos de metadatos", readonly=True)
+    metadata_pending = fields.Boolean(
+        string="Metadatos por leer", readonly=True,
+        help="Los TXT ya están adjuntos y falta guardarlos: la lectura chocó con otra transacción. "
+             "La tarea de cada hora lo vuelve a intentar.")
+    metadata_count = fields.Integer(string="Metadatos leídos", readonly=True)
+    metadata_error_count = fields.Integer(string="Líneas ilegibles", readonly=True)
+    metadata_errors = fields.Text(
+        string="Detalle de las líneas ilegibles", readonly=True,
+        help="Las primeras líneas de los TXT que no se pudieron leer (no se adivinan: no se "
+             "guardan). Compáralas con los archivos adjuntos.")
+
     # -------------------------------------------------------------------
     # Máquina de estados: borrador -> autenticado -> solicitado ->
     #                      verificando -> descargando -> procesado
@@ -112,6 +144,8 @@ class SatDownloadRequest(models.Model):
                     self.action_descargar_y_procesar()
             elif self.state == 'downloading':
                 self.action_descargar_y_procesar()
+            elif self.state == 'processed' and self.metadata_pending:
+                self._procesar_metadatos()
         except (UserError, RedirectWarning) as e:
             # Errores de negocio esperables (el SAT aún no la registra, rechazo
             # con motivo, etc.). Ya quedaron escritos en error_message.
@@ -513,6 +547,9 @@ class SatDownloadRequest(models.Model):
         # en 'pending' y los tableros dicen "sin vincular" cuando en realidad
         # nadie lo intentó nunca.
         self._conciliar_importados(importados)
+        self._ligar_reps_importados(importados)
+        if self.request_type == 'metadata':
+            self._procesar_metadatos()
 
     # Tamaño de lote para conciliar. La cascada hace búsquedas sobre
     # account.move por UUID y por RFC+importe+fecha; con paquetes de miles de
@@ -528,6 +565,14 @@ class SatDownloadRequest(models.Model):
         se puede repetir desde el botón «Conciliar automáticamente». Por eso un
         error aquí se registra y se sigue, en vez de tumbar la transacción y
         perder la importación completa.
+
+        Cada lote va en su savepoint. Conciliar escribe filas que otros
+        también escriben (la factura, al recalcular su Estado bóveda; y la
+        revisión diaria, al ligar los REP con ella): si otra transacción las
+        tocó a la vez, PostgreSQL aborta la transacción. Sin el savepoint ya
+        no había a dónde volver, y se perdía la descarga entera. Un choque así
+        no es una falla: se deshace ese lote, queda un aviso y la revisión de
+        discrepancias se vuelve a programar para ligar sus REP.
         """
         if not documentos:
             return
@@ -535,8 +580,16 @@ class SatDownloadRequest(models.Model):
         for inicio in range(0, len(documentos), self.CONCILIACION_LOTE):
             lote = documentos[inicio:inicio + self.CONCILIACION_LOTE]
             try:
-                lote.action_match_automatically()
+                with self.env.cr.savepoint(), tools.mute_logger('odoo.sql_db'):
+                    lote.action_match_automatically()
                 conciliados += len(lote.filtered('move_id'))
+            except ERRORES_DE_CONCURRENCIA as error:
+                _logger.warning(
+                    "Solicitud %s: la conciliación de un lote de %s comprobantes chocó con otra "
+                    "transacción (%s) y se deshizo. Quedan importados y en 'pendiente'; se pueden "
+                    "conciliar con el botón «Conciliar automáticamente».",
+                    self.id, len(lote), type(error).__name__)
+                self.env['dsi.cfdi.inconsistency']._programar_revision(MARGEN_TRAS_UN_CHOQUE)
             except Exception:
                 _logger.exception(
                     "Solicitud %s: falló la conciliación automática de un lote de %s "
@@ -547,16 +600,175 @@ class SatDownloadRequest(models.Model):
             "Solicitud %s: %s comprobantes importados, %s vinculados automáticamente.",
             self.id, len(documentos), conciliados)
 
+    def _ligar_reps_importados(self, documentos):
+        """Liga con sus facturas los pagos (REP) recién descargados, y los REP
+        ya guardados con las facturas cuyo CFDI acaba de llegar. Va después de
+        conciliar todo el paquete: el REP y la factura que paga pueden venir
+        en el mismo paquete, en cualquier orden.
+
+        A prueba de fallos, como la conciliación: lo descargado ya está
+        guardado y es lo irrepetible. Si algo falla se deshace solo esta parte
+        y la revisión diaria de discrepancias lo vuelve a intentar; si fue un
+        choque con otra transacción, se le pide que corra pronto.
+        """
+        if not documentos:
+            return
+        try:
+            with self.env.cr.savepoint(), tools.mute_logger('odoo.sql_db'):
+                documentos._ligar_reps('download')
+        except ERRORES_DE_CONCURRENCIA as error:
+            _logger.warning(
+                "Solicitud %s: ligar los pagos (REP) con sus facturas chocó con otra transacción (%s) "
+                "y se deshizo; la revisión de discrepancias lo vuelve a intentar.",
+                self.id, type(error).__name__)
+            self.env['dsi.cfdi.inconsistency']._programar_revision(MARGEN_TRAS_UN_CHOQUE)
+        except Exception:
+            _logger.exception(
+                "Solicitud %s: falló ligar los pagos (REP) con sus facturas. Los comprobantes "
+                "quedan importados; la revisión diaria de discrepancias lo vuelve a intentar.", self.id)
+
+    # -------------------------------------------------------------------
+    # Metadatos
+    # -------------------------------------------------------------------
+
+    def _guardar_txt_de_metadatos(self, zip_bytes):
+        """Adjunta a la solicitud cada TXT del paquete, tal como vino. Es lo
+        irrepetible (el paquete caduca en el SAT): lo que se lee de ellos se
+        puede repetir con «Volver a leer los metadatos». Se buscan por la
+        extensión en cualquier nombre: el SAT ya cambió una vez cómo los
+        nombra (de <id>_01.txt a <id>-0001.txt).
+
+        Un TXT que ya está adjunto (mismo nombre y contenido) no se vuelve a
+        adjuntar: si falla la descarga de un paquete posterior, los anteriores
+        ya quedaron guardados y el reintento los descarga otra vez. Antes
+        quedaban dos veces y sus líneas ilegibles se contaban doble.
+
+        Van como MIMETYPE_DEL_TXT y no como text/plain: Odoo copia el
+        contenido de todo adjunto text/* a su índice de búsqueda (en la base y
+        en memoria al crearlo), y aquí son decenas de MB por semana."""
+        self.ensure_one()
+        Adjunto = self.env['ir.attachment'].sudo()
+        ya_adjuntos = {(adjunto.name, adjunto.checksum) for adjunto in self.sudo().metadata_attachment_ids}
+        nuevos = []
+        with zipfile.ZipFile(BytesIO(zip_bytes)) as zf:
+            for member in zf.namelist():
+                if not member.lower().endswith('.txt'):
+                    continue
+                nombre, contenido = member.rsplit('/', 1)[-1], zf.read(member)
+                if (nombre, Adjunto._compute_checksum(contenido)) in ya_adjuntos:
+                    continue
+                nuevos.append({
+                    'name': nombre,
+                    'raw': contenido,
+                    'mimetype': MIMETYPE_DEL_TXT,
+                    'res_model': self._name,
+                    'res_id': self.id,
+                    'company_id': self.company_id.id,
+                })
+        adjuntos = Adjunto.create(nuevos) if nuevos else Adjunto
+        if adjuntos:
+            self.sudo().write({
+                'metadata_attachment_ids': [Command.link(adjunto.id) for adjunto in adjuntos],
+                'metadata_pending': True,
+            })
+        return adjuntos
+
+    def _procesar_metadatos(self):
+        """Lee los TXT adjuntos y guarda sus filas en dsi.cfdi.sat.metadata;
+        después los pasa a la Bóveda y a las facturas (_aplicar_metadatos).
+
+        Leer otra vez los mismos archivos no cambia nada: lo ya guardado y
+        aplicado no se vuelve a escribir. Guardar va en su savepoint: si choca
+        con otra transacción que guarda los mismos folios, se deshace solo
+        esa parte, los TXT siguen adjuntos y la tarea de cada hora lo vuelve a
+        intentar (metadata_pending). Si falla por otra cosa, queda en el log
+        y en «Último error» y se vuelve a intentar con el botón.
+
+        Devuelve los metadatos de los archivos.
+        """
+        self.ensure_one()
+        Metadato = self.env['dsi.cfdi.sat.metadata'].sudo()
+        archivos = [(adjunto.name, _bytes_de_adjunto(adjunto)) for adjunto in self.sudo().metadata_attachment_ids]
+        filas, ilegibles = leer_paquete_de_metadatos(archivos)
+        del archivos  # el contenido de los TXT ya no hace falta: pueden ser decenas de MB
+        try:
+            with self.env.cr.savepoint(), tools.mute_logger('odoo.sql_db'):
+                metadatos, cambiados = Metadato._guardar_filas(self, filas)
+        except ERRORES_DE_CONCURRENCIA as error:
+            _logger.warning(
+                "Solicitud %s: guardar los metadatos del SAT chocó con otra transacción (%s) y se "
+                "deshizo; los archivos siguen adjuntos y se vuelven a leer en la siguiente corrida.",
+                self.id, type(error).__name__)
+            return Metadato
+        except Exception:
+            _logger.exception("Solicitud %s: falló guardar los metadatos del SAT.", self.id)
+            self.sudo().write({'metadata_pending': False, 'error_message': _(
+                "No se pudieron guardar los metadatos de los archivos adjuntos. Revisa el detalle en "
+                "el log y vuelve a intentarlo con «Volver a leer los metadatos».")})
+            return Metadato
+        self.sudo().write({
+            'metadata_pending': False,
+            'metadata_count': len(metadatos),
+            'metadata_error_count': len(ilegibles),
+            'metadata_errors': Metadato._registrar_ilegibles(self, ilegibles) or False,
+        })
+        del filas, ilegibles  # ya se guardaron: que no ocupen memoria mientras se aplican
+        self._aplicar_metadatos(metadatos, cambiados)
+        return metadatos
+
+    def _aplicar_metadatos(self, metadatos, cambiados):
+        """Pasa los metadatos a los CFDI de la Bóveda y a las facturas. A
+        prueba de fallos, como la conciliación: los metadatos ya están
+        guardados y es lo que importa conservar; si esto se deshace, la
+        revisión diaria de discrepancias lo aplica (los metadatos que la
+        Bóveda no refleja) y, si fue un choque, se le pide que corra pronto."""
+        try:
+            with self.env.cr.savepoint(), tools.mute_logger('odoo.sql_db'):
+                metadatos._aplicar('metadata', cambiados=cambiados)
+        except ERRORES_DE_CONCURRENCIA as error:
+            _logger.warning(
+                "Solicitud %s: pasar los metadatos del SAT a la Bóveda chocó con otra transacción (%s) "
+                "y se deshizo; la revisión de discrepancias lo vuelve a intentar.",
+                self.id, type(error).__name__)
+            self.env['dsi.cfdi.inconsistency']._programar_revision(MARGEN_TRAS_UN_CHOQUE)
+        except Exception:
+            _logger.exception(
+                "Solicitud %s: falló pasar los metadatos del SAT a la Bóveda. Quedan guardados; la "
+                "revisión diaria de discrepancias lo vuelve a intentar.", self.id)
+
+    def action_reprocesar_metadatos(self):
+        """«Volver a leer los metadatos»: lee otra vez los TXT adjuntos, por
+        ejemplo después de corregir el lector. No vuelve a hablar con el SAT."""
+        self.ensure_one()
+        self.env['dsi.license.client.state']._check_feature(
+            'vault', _("leer los metadatos del SAT"), self.company_id)
+        if self.request_type != 'metadata' or not self.metadata_attachment_ids:
+            raise UserError(_("Esta solicitud no tiene archivos de metadatos adjuntos."))
+        self._procesar_metadatos()
+
     def _procesar_paquete_zip(self, zip_bytes):
         """Descomprime el paquete y da de alta cada XML en la Bóveda CFDI,
         reutilizando exactamente el mismo parser/dedup que la carga manual.
 
         Devuelve el recordset de los cfdi.document creados (no un contador):
         quien llama necesita los registros para conciliarlos, igual que hace
-        la importación manual."""
+        la importación manual.
+
+        El paquete de una solicitud de metadatos no trae XML sino TXT: se
+        guardan como adjuntos de la solicitud (_guardar_txt_de_metadatos) y se
+        leen al terminar la descarga, todos juntos.
+
+        Los metadatos que ya estaban guardados de estos folios (el paquete de
+        metadatos del mismo periodo suele llegar antes) se les pasan una sola
+        vez, al final del paquete. Al crear cada CFDI costaba una búsqueda, un
+        savepoint y una aplicación completa por XML: casi el doble de tiempo
+        por XML, dentro de la transacción de la descarga."""
         CfdiDocument = self.env['cfdi.document']
         company = self.company_id
         creados = CfdiDocument
+        if self.request_type == 'metadata':
+            self._guardar_txt_de_metadatos(zip_bytes)
+            return creados
         with zipfile.ZipFile(BytesIO(zip_bytes)) as zf:
             for member in zf.namelist():
                 if not member.lower().endswith('.xml'):
@@ -573,8 +785,7 @@ class SatDownloadRequest(models.Model):
                     'name': member, 'raw': xml_bytes, 'mimetype': 'text/xml',
                     'res_model': 'cfdi.document', 'res_id': 0,
                 })
-                company_rfc = (company.partner_id.vat or '').upper()
-                direction = 'issued' if vals.get('partner_rfc_issuer', '').upper() == company_rfc else 'received'
+                direction = CfdiDocument._direccion_para(company, vals.get('partner_rfc_issuer'))
                 doc_vals = {
                     'company_id': company.id,
                     'direction': direction,
@@ -587,7 +798,8 @@ class SatDownloadRequest(models.Model):
                 # o con un código que no existe en esta base.
                 if not doc_vals.get('currency_id'):
                     doc_vals['currency_id'] = company.currency_id.id
-                doc = CfdiDocument.create(doc_vals)
+                doc = CfdiDocument.with_context(**{METADATOS_AL_FINAL: True}).create(doc_vals)
                 xml_attachment.write({'res_id': doc.id})
                 creados |= doc
+        self.env['dsi.cfdi.sat.metadata']._aplicar_a_cfdi_nuevos(creados)
         return creados

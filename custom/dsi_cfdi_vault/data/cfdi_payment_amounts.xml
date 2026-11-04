@@ -1,0 +1,7 @@
+<odoo>
+    <!-- Corrige el monto de los CFDI de Pago ya guardados, que quedaban en 0
+         porque se leía el Total del comprobante (el SAT lo exige en 0) y no
+         el complemento de pagos. Corre al instalar o actualizar el módulo y
+         solo escribe lo que cambia. -->
+    <function model="cfdi.document" name="_recompute_payment_amounts"/>
+</odoo>

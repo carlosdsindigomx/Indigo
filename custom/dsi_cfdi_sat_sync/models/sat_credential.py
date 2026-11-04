@@ -15,6 +15,19 @@ _logger = logging.getLogger(__name__)
 _RFC_RE = re.compile(r'\b([A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3})\b')
 
 
+def _vigencia(cert):
+    """(desde, hasta) del certificado, como fechas.
+
+    cryptography 42 agregó not_valid_before_utc / not_valid_after_utc y dejó
+    obsoletas las versiones sin zona horaria. Odoo.sh corre sobre Ubuntu Noble
+    con cryptography 41.0.7, que solo tiene las segundas: usar las nuevas ahí
+    tronaba la carga de la e.firma. En las dos versiones las fechas son UTC.
+    """
+    if hasattr(cert, 'not_valid_before_utc'):
+        return cert.not_valid_before_utc.date(), cert.not_valid_after_utc.date()
+    return cert.not_valid_before.date(), cert.not_valid_after.date()
+
+
 class SatCredential(models.Model):
     _name = 'sat.credential'
     _description = "e.firma (FIEL) del contribuyente, custodiada de forma cifrada"
@@ -92,8 +105,7 @@ class SatCredential(models.Model):
                 "No se pudo extraer el RFC del subject del certificado (%s); se guarda sin "
                 "verificar contra el RFC de la compañía.", subject_str)
 
-        not_valid_before = cert.not_valid_before_utc.date()
-        not_valid_after = cert.not_valid_after_utc.date()
+        not_valid_before, not_valid_after = _vigencia(cert)
         today = fields.Date.today()
         if today > not_valid_after:
             raise UserError(_(

@@ -29,6 +29,11 @@
 
     <menuitem id="menu_cfdi_vault_discrepancies" name="Discrepancias" parent="menu_cfdi_vault_root" sequence="30"/>
 
+    <!-- Las guardadas, con historial y marca de revisado. Las de abajo siguen
+         siendo listas en vivo. -->
+    <menuitem id="menu_dsi_cfdi_inconsistency" name="Por revisar" parent="menu_cfdi_vault_discrepancies"
+              action="action_dsi_cfdi_inconsistency" sequence="5"/>
+
     <menuitem id="menu_cfdi_document_no_move" name="CFDI sin factura" parent="menu_cfdi_vault_discrepancies"
               action="action_cfdi_document_no_move" sequence="10"/>
 
@@ -44,10 +49,19 @@
     <menuitem id="menu_cfdi_efos_check_wizard" name="Revisar periodo contra lista 69-B"
               parent="menu_cfdi_vault_discrepancies" action="action_cfdi_efos_check_wizard" sequence="45"/>
 
-    <menuitem id="menu_cfdi_document_payment_no_move" name="Pagos (REP) sin vincular"
+    <menuitem id="menu_cfdi_document_payment_no_move" name="Pagos (REP) sin asiento de pago"
               parent="menu_cfdi_vault_discrepancies" action="action_cfdi_document_payment_no_move" sequence="50"/>
 
-    <menuitem id="menu_cfdi_document_payroll_no_move" name="CFDI de nómina sin factura"
+    <menuitem id="menu_dsi_cfdi_payment_line_por_ligar" name="Pagos (REP) por relacionar con su pago"
+              parent="menu_cfdi_vault_discrepancies" action="action_dsi_cfdi_payment_line_por_ligar" sequence="52"/>
+
+    <menuitem id="menu_dsi_cfdi_payment_line_no_invoice" name="Pagos (REP) de facturas fuera de Odoo"
+              parent="menu_cfdi_vault_discrepancies" action="action_dsi_cfdi_payment_line_no_invoice" sequence="55"/>
+
+    <menuitem id="menu_dsi_cfdi_inconsistency_ppd_sin_rep" name="Compras PPD pagadas sin REP"
+              parent="menu_cfdi_vault_discrepancies" action="action_dsi_cfdi_inconsistency_ppd_sin_rep" sequence="57"/>
+
+    <menuitem id="menu_cfdi_document_payroll_no_move" name="CFDI de nómina sin póliza"
               parent="menu_cfdi_vault_discrepancies" action="action_cfdi_document_payroll_no_move" sequence="60"/>
 
     <menuitem id="menu_cfdi_efos_entry" name="Lista 69-B (EFOS)" parent="menu_cfdi_vault_root"

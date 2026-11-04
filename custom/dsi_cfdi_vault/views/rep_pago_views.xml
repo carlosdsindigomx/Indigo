@@ -1,0 +1,144 @@
+<odoo>
+
+    <!-- El pago de Odoo muestra los REP ligados a él: botón «REP» y una
+         pestaña con sus documentos relacionados. Solo para la Bóveda, como en
+         la factura. El button_box y el payment_notebook son los mismos en 18,
+         19 y 20. -->
+    <record id="view_account_payment_form_dsi_rep" model="ir.ui.view">
+        <field name="name">account.payment.form.dsi.rep</field>
+        <field name="model">account.payment</field>
+        <field name="inherit_id" ref="account.view_account_payment_form"/>
+        <field name="arch" type="xml">
+            <div name="button_box" position="inside">
+                <button name="action_view_rep_lines" type="object" class="oe_stat_button" icon="fa-money"
+                        invisible="not dsi_rep_count" groups="dsi_cfdi_vault.group_cfdi_vault_user">
+                    <field name="dsi_rep_count" widget="statinfo" string="REP"/>
+                </button>
+            </div>
+            <notebook name="payment_notebook" position="inside">
+                <page string="Complementos de pago (REP)" name="page_dsi_rep" invisible="not dsi_rep_line_ids"
+                      groups="dsi_cfdi_vault.group_cfdi_vault_user">
+                    <field name="dsi_rep_line_ids" readonly="1">
+                        <list>
+                            <field name="payment_doc_id" string="REP"/>
+                            <field name="fecha_pago"/>
+                            <field name="invoice_id"/>
+                            <field name="num_parcialidad" invisible="not num_parcialidad"/>
+                            <field name="currency_id" column_invisible="True"/>
+                            <field name="imp_pagado" sum="Pagado"/>
+                            <field name="imp_saldo_insoluto" optional="show"/>
+                            <field name="moneda_dr" optional="hide"/>
+                            <field name="payment_link_state" widget="badge"
+                                   decoration-success="payment_link_state in ('linked', 'manual')"/>
+                            <field name="payment_sat_status" widget="badge" optional="hide"
+                                   decoration-danger="payment_sat_status == 'canceled'"/>
+                        </list>
+                    </field>
+                    <div class="text-muted">La copia del XML de cada REP está en los adjuntos de este pago.</div>
+                </page>
+            </notebook>
+        </field>
+    </record>
+
+    <!-- En el REP, a qué pago de Odoo quedó ligado cada documento relacionado. -->
+    <record id="view_cfdi_document_form_dsi_rep_pago" model="ir.ui.view">
+        <field name="name">cfdi.document.form.dsi.rep.pago</field>
+        <field name="model">cfdi.document</field>
+        <field name="inherit_id" ref="view_cfdi_document_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='dsi_payment_line_ids']/list/field[@name='invoice_id']" position="after">
+                <field name="account_payment_id" optional="show"/>
+                <field name="payment_move_id" optional="hide"/>
+                <field name="payment_link_state" widget="badge" optional="show"
+                       decoration-success="payment_link_state in ('linked', 'manual')"
+                       decoration-warning="payment_link_state in ('to_choose', 'amount_mismatch')"
+                       decoration-danger="payment_link_state == 'no_payment'"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- «Pagos (REP) sin asiento de pago» se redefine aquí (mismo id, solo el
+         dominio y la ayuda) y no en cfdi_document_views.xml: depende de la
+         liga con el pago, que es de este archivo, y así ese otro no se toca.
+         Un REP cuyos documentos relacionados ya están ligados a un pago de
+         Odoo ya tiene su pago, aunque nadie le haya puesto el asiento a mano. -->
+    <record id="action_cfdi_document_payment_no_move" model="ir.actions.act_window">
+        <field name="domain">[('move_type', '=', 'P'), ('sat_status', '!=', 'canceled'), '|', ('move_id', '=', False), ('move_id.move_type', '!=', 'entry'), ('dsi_payment_line_ids', 'not any', [('payment_link_state', 'in', ('linked', 'manual'))])]</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Todos los complementos de pago (REP) tienen su asiento de pago.
+            </p>
+            <p>
+                Aquí aparecen los CFDI de tipo Pago (complemento REP) que todavía no están
+                vinculados al asiento del pago en la contabilidad, ni ligados a un pago de Odoo por
+                sus documentos relacionados (columna «Liga con el pago»): el pago se recibió o se
+                emitió fiscalmente pero no se ha registrado en Odoo. Los cancelados en el SAT no
+                cuentan. Las facturas que paga cada REP se ligan solas y se ven en su pestaña
+                «Documentos relacionados»; el filtro «Pagos (REP) con facturas en Odoo» deja los que
+                pagan facturas que ya están en Odoo, y las que no están, salen en «Pagos (REP) de
+                facturas fuera de Odoo». Los que están por elegir salen en «Pagos (REP) por
+                relacionar con su pago».
+            </p>
+        </field>
+    </record>
+
+    <record id="view_dsi_cfdi_rep_pago_wizard_form" model="ir.ui.view">
+        <field name="name">dsi.cfdi.rep.pago.wizard.form</field>
+        <field name="model">dsi.cfdi.rep.pago.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Elegir pago">
+                <group>
+                    <group>
+                        <field name="payment_doc_id"/>
+                        <field name="invoice_id"/>
+                        <field name="fecha_pago"/>
+                        <field name="num_parcialidad" invisible="not num_parcialidad"/>
+                    </group>
+                    <group>
+                        <field name="currency_id" invisible="1"/>
+                        <field name="invoice_currency_id" invisible="1"/>
+                        <field name="imp_pagado"/>
+                        <field name="payment_link_state"/>
+                        <field name="payment_link_note" invisible="not payment_link_note"/>
+                    </group>
+                </group>
+                <p class="text-muted">
+                    Estos son los pagos que Odoo aplicó a la factura. «Cuadra» quiere decir que aplicó
+                    lo que dice el REP, a cinco centavos, en la moneda de la factura o en la del pago;
+                    si ninguno lo hace porque Odoo repartió el pago entre las facturas distinto que el
+                    REP, que el total del pago es el monto del REP.
+                    Elegir uno lo deja «Ligado a mano»: la Bóveda lo respeta mientras ese pago siga
+                    aplicado a la factura.
+                </p>
+                <p class="text-muted" invisible="option_ids">
+                    La factura no tiene pagos en Odoo: regístralo y la Bóveda lo liga sola.
+                </p>
+                <group>
+                    <field name="apply_to_node"/>
+                </group>
+                <field name="option_ids" invisible="not option_ids">
+                    <list create="0" delete="0" edit="0" decoration-success="matches" decoration-muted="taken_by">
+                        <field name="date"/>
+                        <field name="account_payment_id"/>
+                        <field name="payment_move_id" optional="hide"/>
+                        <field name="journal_id"/>
+                        <field name="amount_known" column_invisible="True"/>
+                        <field name="currency_id" column_invisible="True"/>
+                        <field name="amount" invisible="not amount_known"/>
+                        <field name="payment_currency_id" column_invisible="True"/>
+                        <field name="payment_amount" optional="show"/>
+                        <field name="days"/>
+                        <field name="matches"/>
+                        <field name="is_current"/>
+                        <field name="taken_by"/>
+                        <button name="action_elegir" type="object" string="Elegir" class="btn-link"/>
+                    </list>
+                </field>
+                <footer>
+                    <button string="Cerrar" special="cancel" class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+</odoo>
