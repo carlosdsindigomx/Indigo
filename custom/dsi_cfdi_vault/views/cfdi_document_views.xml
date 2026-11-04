@@ -77,13 +77,23 @@
                     <button name="action_verify_sat_status" type="object" string="Verificar estatus SAT" class="btn-primary"/>
                     <button name="action_match_automatically" type="object" string="Conciliar automáticamente"
                             invisible="move_id"/>
+                    <!-- Propone facturas: en un CFDI de Pago el vínculo es el asiento
+                         del pago, y las facturas que paga se ligan solas; en uno de
+                         Nómina, la póliza. -->
                     <button name="action_open_match_suggestions" type="object" string="Ver sugerencias"
-                            invisible="move_id"/>
+                            invisible="move_id or move_type == 'P' or move_type == 'N'"/>
+                    <!-- En un CFDI de Nómina el vínculo es la póliza del periodo: el asistente la
+                         busca y deja una copia del XML en ella. -->
+                    <button name="action_relacionar_con_poliza" type="object" string="Relacionar con póliza" class="btn-primary"
+                            invisible="move_id or move_type != 'N'"/>
                     <button name="action_crear_factura_proveedor" type="object" class="btn-primary"
                             string="Crear factura de proveedor"
                             invisible="move_id or direction != 'received' or move_type not in ['I', 'E']"/>
                     <button name="action_unlink_move" type="object" string="Desvincular"
-                            invisible="not move_id" confirm="¿Desvincular este CFDI de su factura?"/>
+                            invisible="not move_id or move_type == 'N'" confirm="¿Desvincular este CFDI de su factura?"/>
+                    <button name="action_unlink_move" type="object" string="Desvincular"
+                            invisible="not move_id or move_type != 'N'"
+                            confirm="¿Desvincular este CFDI de su póliza? La copia del XML se queda en los adjuntos de la póliza."/>
                     <field name="match_state" widget="statusbar" statusbar_visible="pending,matched,manual"/>
                 </header>
                 <sheet>
@@ -94,8 +104,15 @@
                         <button name="action_open_move" type="object" class="oe_stat_button" icon="fa-file-text-o"
                                 invisible="not move_id">
                             <div class="o_stat_info">
-                                <span class="o_stat_text">Factura</span>
+                                <span class="o_stat_text" invisible="move_type in ('P', 'N')">Factura</span>
+                                <span class="o_stat_text" invisible="move_type != 'P'">Asiento</span>
+                                <span class="o_stat_text" invisible="move_type != 'N'">Póliza</span>
                             </div>
+                        </button>
+                        <button name="action_view_inconsistencies" type="object" class="oe_stat_button"
+                                icon="fa-exclamation-triangle" invisible="not dsi_inconsistency_total">
+                            <field name="dsi_inconsistency_count" widget="statinfo" string="Discrepancias"/>
+                            <field name="dsi_inconsistency_total" invisible="1"/>
                         </button>
                     </div>
                     <div class="oe_title">
@@ -119,9 +136,26 @@
                             <field name="partner_name_receiver"/>
                         </group>
                     </group>
+                    <!-- Del complemento de nómina: la Fecha del comprobante es la de
+                         emisión, y la póliza se busca por la fecha de pago. -->
+                    <group string="Nómina" name="group_dsi_nomina" invisible="move_type != 'N'">
+                        <field name="dsi_nomina_tipo"/>
+                        <field name="dsi_nomina_fecha_pago"/>
+                        <field name="dsi_nomina_fecha_inicial"/>
+                        <field name="dsi_nomina_fecha_final"/>
+                    </group>
                     <group>
                         <group string="Conciliación">
-                            <field name="move_id"/>
+                            <field name="move_id" invisible="move_type in ('P', 'N')"/>
+                            <!-- En un CFDI de Pago el vínculo es el asiento del pago; las
+                                 facturas que paga están en «Documentos relacionados». -->
+                            <field name="move_id" string="Asiento del pago" invisible="move_type != 'P'"
+                                   domain="[('move_type', '=', 'entry')]"/>
+                            <!-- En un CFDI de Nómina, la póliza del periodo: un asiento de su
+                                 empresa, no cancelado (_check_poliza_de_nomina y
+                                 _check_poliza_no_cancelada lo revisan en el servidor). -->
+                            <field name="move_id" string="Póliza" invisible="move_type != 'N'" options="{'no_create': True}"
+                                   domain="[('move_type', '=', 'entry'), ('company_id', '=', company_id), ('state', '!=', 'cancel')]"/>
                             <field name="match_method" invisible="not move_id"/>
                         </group>
                         <group string="Estatus SAT">
@@ -136,12 +170,67 @@
                         <field name="source"/>
                         <field name="xml_attachment_id"/>
                         <field name="pdf_attachment_id"/>
+                        <field name="dsi_poliza_attachment_id" invisible="not dsi_poliza_attachment_id"/>
                         <field name="parse_state" widget="badge"
                                decoration-success="parse_state == 'ok'"
                                decoration-warning="parse_state == 'partial'"
                                decoration-danger="parse_state == 'error'"/>
                         <field name="parse_error" invisible="parse_state == 'ok'"/>
                     </group>
+                    <notebook>
+                        <!-- En un CFDI de Pago: las facturas que paga. -->
+                        <page string="Documentos relacionados" name="page_dsi_payment_lines"
+                              invisible="move_type != 'P'">
+                            <field name="dsi_payment_line_ids" readonly="1">
+                                <list>
+                                    <field name="pago_idx" optional="hide"/>
+                                    <field name="fecha_pago"/>
+                                    <field name="id_documento"/>
+                                    <field name="folio" optional="show"/>
+                                    <field name="num_parcialidad" invisible="not num_parcialidad"/>
+                                    <field name="currency_id" column_invisible="True"/>
+                                    <field name="imp_saldo_ant"/>
+                                    <field name="imp_pagado" sum="Pagado"/>
+                                    <field name="imp_saldo_insoluto"/>
+                                    <field name="moneda_dr"/>
+                                    <field name="equivalencia_dr" optional="hide"/>
+                                    <field name="related_cfdi_id" optional="hide"/>
+                                    <field name="invoice_id"/>
+                                    <field name="link_state" widget="badge"
+                                           decoration-success="link_state == 'linked'"
+                                           decoration-info="link_state == 'other_company'"
+                                           decoration-warning="link_state == 'in_vault'"
+                                           decoration-danger="link_state == 'missing'"/>
+                                </list>
+                            </field>
+                            <!-- Sin abrir el documento de Odoo: en 18 y 19 no tiene
+                                 formulario propio y el genérico deja editarlo todo. -->
+                            <field name="dsi_edi_document_id" invisible="1"/>
+                            <div class="text-muted" invisible="not dsi_edi_document_id">
+                                Sale como «Pago recibido» en la pestaña CFDI de las compras que paga.
+                            </div>
+                        </page>
+                        <!-- En un CFDI de ingreso o egreso: los pagos que lo abonan. -->
+                        <page string="Pagos (REP)" name="page_dsi_rep_lines"
+                              invisible="move_type not in ('I', 'E') or not dsi_rep_line_ids">
+                            <field name="dsi_rep_line_ids" readonly="1">
+                                <list>
+                                    <field name="payment_date"/>
+                                    <field name="payment_doc_id" string="REP"/>
+                                    <field name="fecha_pago"/>
+                                    <field name="num_parcialidad" invisible="not num_parcialidad"/>
+                                    <field name="currency_id" column_invisible="True"/>
+                                    <field name="imp_saldo_ant"/>
+                                    <field name="imp_pagado" sum="Pagado"/>
+                                    <field name="imp_saldo_insoluto"/>
+                                    <field name="moneda_dr"/>
+                                    <field name="payment_sat_status" widget="badge"
+                                           decoration-success="payment_sat_status == 'valid'"
+                                           decoration-danger="payment_sat_status == 'canceled'"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
                 </sheet>
                 <chatter/>
             </form>
@@ -169,6 +258,9 @@
                 <separator/>
                 <filter string="Sin verificar en el SAT" name="filter_not_verified" domain="[('sat_status', '=', 'not_verified')]"/>
                 <filter string="Cancelados" name="filter_canceled" domain="[('sat_status', '=', 'canceled')]"/>
+                <separator/>
+                <filter string="Pagos (REP) con facturas en Odoo" name="filter_rep_with_invoices"
+                        domain="[('move_type', '=', 'P'), ('dsi_payment_line_ids.invoice_id', '!=', False)]"/>
                 <group>
                     <filter string="Dirección" name="group_direction" context="{'group_by': 'direction'}"/>
                     <filter string="Tipo de comprobante" name="group_move_type" context="{'group_by': 'move_type'}"/>
@@ -176,6 +268,63 @@
                     <filter string="Estatus SAT" name="group_sat_status" context="{'group_by': 'sat_status'}"/>
                 </group>
             </search>
+        </field>
+    </record>
+
+    <!-- Lista y búsqueda de los CFDI de nómina: la fecha de pago del complemento
+         primero (la de emisión llega semanas después), el empleado y la póliza. -->
+    <record id="view_cfdi_document_list_nomina" model="ir.ui.view">
+        <field name="name">cfdi.document.list.nomina</field>
+        <field name="model">cfdi.document</field>
+        <field name="inherit_id" ref="view_cfdi_document_list"/>
+        <field name="mode">primary</field>
+        <field name="arch" type="xml">
+            <field name="invoice_date" position="before">
+                <field name="dsi_nomina_fecha_pago"/>
+            </field>
+            <field name="invoice_date" position="attributes">
+                <attribute name="string">Emisión</attribute>
+                <attribute name="optional">hide</attribute>
+            </field>
+            <field name="move_type" position="after">
+                <field name="dsi_nomina_tipo" optional="hide"/>
+                <field name="dsi_nomina_fecha_inicial" optional="hide"/>
+                <field name="dsi_nomina_fecha_final" optional="hide"/>
+            </field>
+            <field name="partner_name_receiver" position="attributes">
+                <attribute name="string">Empleado</attribute>
+                <attribute name="optional">show</attribute>
+            </field>
+            <field name="amount_total" position="attributes">
+                <attribute name="string">Neto</attribute>
+                <attribute name="sum">Neto</attribute>
+            </field>
+            <field name="move_id" position="attributes">
+                <attribute name="string">Póliza</attribute>
+            </field>
+        </field>
+    </record>
+
+    <record id="view_cfdi_document_search_nomina" model="ir.ui.view">
+        <field name="name">cfdi.document.search.nomina</field>
+        <field name="model">cfdi.document</field>
+        <field name="inherit_id" ref="view_cfdi_document_search"/>
+        <field name="mode">primary</field>
+        <field name="arch" type="xml">
+            <filter name="filter_no_move" position="before">
+                <filter string="Fecha de pago" name="filter_nomina_fecha_pago" date="dsi_nomina_fecha_pago"/>
+                <separator/>
+            </filter>
+            <filter name="filter_no_move" position="attributes">
+                <attribute name="string">Sin póliza</attribute>
+            </filter>
+            <filter name="filter_with_move" position="attributes">
+                <attribute name="string">Con póliza</attribute>
+            </filter>
+            <filter name="group_direction" position="before">
+                <filter string="Fecha de pago" name="group_nomina_fecha_pago"
+                        context="{'group_by': 'dsi_nomina_fecha_pago:day'}"/>
+            </filter>
         </field>
     </record>
 
@@ -219,42 +368,56 @@
                 Sin discrepancias.
             </p>
             <p>
-                Aquí aparecerían los CFDI cancelados en el SAT que siguen vinculados a una factura.
+                Aquí aparecerían los CFDI cancelados en el SAT que siguen vinculados a una factura
+                o, si son de nómina, a una póliza.
             </p>
         </field>
     </record>
 
     <record id="action_cfdi_document_payment_no_move" model="ir.actions.act_window">
-        <field name="name">Pagos (REP) sin vincular</field>
+        <field name="name">Pagos (REP) sin asiento de pago</field>
         <field name="res_model">cfdi.document</field>
         <field name="view_mode">list,form</field>
-        <field name="domain">[('move_type', '=', 'P'), ('move_id', '=', False)]</field>
+        <!-- También los vinculados a mano a una factura (antes no había otro
+             lugar para la que pagan): una factura no es el asiento del pago.
+             Un REP cancelado no necesita asiento. -->
+        <field name="domain">[('move_type', '=', 'P'), ('sat_status', '!=', 'canceled'), '|', ('move_id', '=', False), ('move_id.move_type', '!=', 'entry')]</field>
         <field name="search_view_id" ref="view_cfdi_document_search"/>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
-                No hay complementos de pago (REP) sin vincular.
+                Todos los complementos de pago (REP) tienen su asiento de pago.
             </p>
             <p>
                 Aquí aparecen los CFDI de tipo Pago (complemento REP) que todavía no están
-                vinculados a un asiento de pago en la contabilidad — señal de que el pago
-                se recibió/emitió fiscalmente pero no se ha registrado en Odoo.
+                vinculados al asiento del pago en la contabilidad: el pago se recibió o se emitió
+                fiscalmente pero no se ha registrado en Odoo. Los cancelados en el SAT no cuentan.
+                Las facturas que paga cada REP se ligan solas y se ven en su pestaña «Documentos
+                relacionados»; el filtro «Pagos (REP) con facturas en Odoo» deja los que pagan
+                facturas que ya están en Odoo, y las que no están, salen en «Pagos (REP) de
+                facturas fuera de Odoo».
             </p>
         </field>
     </record>
 
     <record id="action_cfdi_document_payroll_no_move" model="ir.actions.act_window">
-        <field name="name">CFDI de nómina sin factura</field>
+        <field name="name">CFDI de nómina sin póliza</field>
         <field name="res_model">cfdi.document</field>
         <field name="view_mode">list,form</field>
-        <field name="domain">[('move_type', '=', 'N'), ('move_id', '=', False)]</field>
-        <field name="search_view_id" ref="view_cfdi_document_search"/>
+        <field name="view_id" ref="view_cfdi_document_list_nomina"/>
+        <!-- Una N cancelada no necesita póliza, como un REP cancelado no
+             necesita asiento. La ligada a una póliza cancelada o (de antes de
+             0.3.0) a una factura sigue pendiente. -->
+        <field name="domain">[('move_type', '=', 'N'), ('sat_status', '!=', 'canceled'), '|', '|', ('move_id', '=', False), ('move_id.state', '=', 'cancel'), ('move_id.move_type', '!=', 'entry')]</field>
+        <field name="search_view_id" ref="view_cfdi_document_search_nomina"/>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
-                No hay CFDI de nómina sin factura.
+                No hay CFDI de nómina sin póliza.
             </p>
             <p>
-                Aquí aparecen los CFDI de tipo Nómina que todavía no están vinculados al
-                asiento contable del periodo correspondiente.
+                Aquí aparecen los CFDI de nómina que todavía no están relacionados con la póliza
+                del periodo. Selecciónalos (por fecha de pago) y usa Acciones › Relacionar con
+                póliza: el asistente busca la póliza, los liga y deja una copia de cada XML en sus
+                adjuntos.
             </p>
         </field>
     </record>
@@ -280,6 +443,19 @@
         <field name="binding_view_types">list</field>
         <field name="state">code</field>
         <field name="code">action = records.action_verify_sat_status_batch()</field>
+    </record>
+
+    <!-- En Acciones de cualquier lista de CFDI: el método se queda con los de
+         nómina y avisa de los demás. En el formulario ya está el botón. Sin
+         grupos: el campo se llama groups_id en 18 y group_ids en 19 y 20, y el
+         modelo ya es solo de la Bóveda. -->
+    <record id="action_cfdi_relacionar_con_poliza" model="ir.actions.server">
+        <field name="name">Relacionar con póliza</field>
+        <field name="model_id" ref="model_cfdi_document"/>
+        <field name="binding_model_id" ref="model_cfdi_document"/>
+        <field name="binding_view_types">list</field>
+        <field name="state">code</field>
+        <field name="code">action = records.action_relacionar_con_poliza()</field>
     </record>
 
 </odoo>

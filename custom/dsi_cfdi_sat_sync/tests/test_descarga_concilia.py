@@ -16,6 +16,8 @@ from unittest.mock import patch
 
 from odoo.tests.common import TransactionCase, tagged
 
+from odoo.addons.dsi_cfdi_vault.tests.test_cfdi_pago import cfdi_pago_xml
+from odoo.addons.dsi_cfdi_vault.tests.test_rep_facturas import docto, rep_xml
 from odoo.addons.dsi_license_client.tests.common import activar_licencia
 
 RFC_EMISOR = 'PRO010101AA1'
@@ -50,6 +52,40 @@ def paquete_zip(*xmls):
         for i, contenido in enumerate(xmls):
             zf.writestr(f'comprobante_{i}.xml', contenido)
     return buf.getvalue()
+
+
+def descargar(solicitud, zip_bytes):
+    """Corre action_descargar_y_procesar con el SAT simulado.
+
+    Se simula únicamente el transporte (firma, token y respuesta SOAP).
+    Todo lo que viene después del ZIP —descomprimir, parsear, dar de alta
+    y conciliar— es el código real, que es lo que estas pruebas verifican.
+    """
+    respuesta_soap = (
+        '<?xml version="1.0"?>'
+        '<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body>'
+        '<RespuestaDescargaMasivaTercerosSalida'
+        ' xmlns="http://DescargaMasivaTerceros.sat.gob.mx">'
+        f'<Paquete>{base64.b64encode(zip_bytes).decode()}</Paquete>'
+        '</RespuestaDescargaMasivaTercerosSalida>'
+        '</s:Body></s:Envelope>'
+    )
+
+    class RespuestaFalsa:
+        text = respuesta_soap
+        content = respuesta_soap.encode()
+        status_code = 200
+
+    Cred = type(solicitud.credential_id)
+    Req = type(solicitud)
+    SOAP = 'odoo.addons.dsi_cfdi_sat_sync.models.sat_soap_client'
+    with patch.object(Cred, '_get_private_key', return_value=None), \
+         patch.object(Cred, '_get_cer_bytes', return_value=b''), \
+         patch(f'{SOAP}.sign_enveloped', return_value=None), \
+         patch(f'{SOAP}._soap_call', return_value=RespuestaFalsa()), \
+         patch('cryptography.x509.load_der_x509_certificate', return_value=None), \
+         patch.object(Req, '_ensure_token', return_value='token-de-prueba'):
+        solicitud.action_descargar_y_procesar()
 
 
 @tagged('post_install', '-at_install')
@@ -108,37 +144,7 @@ class TestDescargaConcilia(TransactionCase):
         return factura
 
     def _descargar(self, solicitud, zip_bytes):
-        """Corre action_descargar_y_procesar con el SAT simulado.
-
-        Se simula únicamente el transporte (firma, token y respuesta SOAP).
-        Todo lo que viene después del ZIP —descomprimir, parsear, dar de alta
-        y conciliar— es el código real, que es lo que esta prueba verifica.
-        """
-        respuesta_soap = (
-            '<?xml version="1.0"?>'
-            '<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body>'
-            '<RespuestaDescargaMasivaTercerosSalida'
-            ' xmlns="http://DescargaMasivaTerceros.sat.gob.mx">'
-            f'<Paquete>{base64.b64encode(zip_bytes).decode()}</Paquete>'
-            '</RespuestaDescargaMasivaTercerosSalida>'
-            '</s:Body></s:Envelope>'
-        )
-
-        class RespuestaFalsa:
-            text = respuesta_soap
-            content = respuesta_soap.encode()
-            status_code = 200
-
-        Cred = type(self.credential)
-        Req = type(solicitud)
-        SOAP = 'odoo.addons.dsi_cfdi_sat_sync.models.sat_soap_client'
-        with patch.object(Cred, '_get_private_key', return_value=None), \
-             patch.object(Cred, '_get_cer_bytes', return_value=b''), \
-             patch(f'{SOAP}.sign_enveloped', return_value=None), \
-             patch(f'{SOAP}._soap_call', return_value=RespuestaFalsa()), \
-             patch('cryptography.x509.load_der_x509_certificate', return_value=None), \
-             patch.object(Req, '_ensure_token', return_value='token-de-prueba'):
-            solicitud.action_descargar_y_procesar()
+        descargar(solicitud, zip_bytes)
 
     # -- la prueba de regresión -----------------------------------------
 
@@ -174,6 +180,18 @@ class TestDescargaConcilia(TransactionCase):
         self.assertFalse(doc.move_id, "no debe inventar un vínculo")
         self.assertEqual(doc.match_state, 'pending')
 
+    def test_un_pago_descargado_trae_el_monto_del_complemento(self):
+        # Antes quedaba en 0: el SAT exige Total="0" en el comprobante de un
+        # pago, y lo pagado va en el complemento.
+        uuid = 'FFFFFFFF-3333-4000-8000-000000000001'
+        self._descargar(self._solicitud(),
+                        paquete_zip(cfdi_pago_xml(uuid, [(125.22, 'MXN', 1)], totales=125.22)))
+        pago = self.env['cfdi.document'].search([
+            ('company_id', '=', self.company.id), ('uuid', '=', uuid)])
+        self.assertEqual(pago.move_type, 'P')
+        self.assertEqual(pago.amount_total, 125.22)
+        self.assertEqual(pago.currency_id.name, 'MXN')
+
     def test_un_fallo_al_conciliar_no_pierde_la_descarga(self):
         """Si la conciliación truena, los comprobantes YA están guardados.
 
@@ -183,12 +201,101 @@ class TestDescargaConcilia(TransactionCase):
         solicitud = self._solicitud()
         Doc = type(self.env['cfdi.document'])
 
+        # El error se registra a propósito; se captura aquí para que no llegue al
+        # log del build (Odoo.sh marca en rojo cualquier ERROR, aunque la prueba pase).
         with patch.object(Doc, 'action_match_automatically',
-                          side_effect=ValueError("fallo simulado al conciliar")):
+                          side_effect=ValueError("fallo simulado al conciliar")), \
+                self.assertLogs('odoo.addons.dsi_cfdi_sat_sync.models.sat_download_request',
+                                level='ERROR') as registro:
             self._descargar(solicitud, paquete_zip(cfdi_xml(UUID_CON_FACTURA, IMPORTE, FECHA)))
+        self.assertIn("falló la conciliación automática", registro.output[0])
 
         doc = self.env['cfdi.document'].search([
             ('company_id', '=', self.company.id), ('uuid', '=', UUID_CON_FACTURA)])
         self.assertEqual(len(doc), 1, "la descarga no se pierde por un fallo de conciliación")
         self.assertEqual(solicitud.state, 'processed')
         self.assertEqual(doc.match_state, 'pending')
+
+    # -- Pagos (REP) ------------------------------------------------------
+
+    def test_el_rep_descargado_se_liga_a_la_factura_que_paga(self):
+        """El REP llega antes que la factura en el mismo paquete. Al terminar
+        la descarga queda ligado a la factura del contador, que se concilió
+        con su CFDI por RFC, total y fecha."""
+        factura = self._factura_del_contador()
+        uuid_rep = 'FFFFFFFF-3333-4000-8000-000000000002'
+        rep = rep_xml(uuid_rep, [(IMPORTE, 'MXN', '1', [docto(UUID_CON_FACTURA.lower(), IMPORTE)])])
+        self._descargar(self._solicitud(), paquete_zip(rep, cfdi_xml(UUID_CON_FACTURA, IMPORTE, FECHA)))
+
+        pago = self.env['cfdi.document'].search([
+            ('company_id', '=', self.company.id), ('uuid', '=', uuid_rep)])
+        linea = pago.dsi_payment_line_ids
+        self.assertEqual(linea.id_documento, UUID_CON_FACTURA)
+        self.assertEqual(linea.related_cfdi_id.uuid, UUID_CON_FACTURA)
+        self.assertEqual(linea.invoice_id, factura)
+        self.assertEqual(pago.dsi_edi_document_id.invoice_ids, factura)
+        self.assertEqual(linea.invoice_attachment_id.res_id, factura.id)
+
+    def test_el_rep_se_liga_a_su_cfdi_aunque_falle_la_conciliacion(self):
+        """Ligar los REP va aparte de la conciliación: si esa truena, el REP
+        igual queda ligado al CFDI de la factura que paga."""
+        uuid_rep = 'FFFFFFFF-3333-4000-8000-000000000003'
+        rep = rep_xml(uuid_rep, [(999.99, 'MXN', '1', [docto(UUID_SIN_FACTURA, 999.99)])])
+        Doc = type(self.env['cfdi.document'])
+        with patch.object(Doc, 'action_match_automatically', side_effect=ValueError("fallo simulado")), \
+                self.assertLogs('odoo.addons.dsi_cfdi_sat_sync.models.sat_download_request', level='ERROR'):
+            self._descargar(self._solicitud(), paquete_zip(rep, cfdi_xml(UUID_SIN_FACTURA, 999.99, FECHA)))
+        linea = self.env['cfdi.document'].search([('uuid', '=', uuid_rep)]).dsi_payment_line_ids
+        self.assertEqual(linea.link_state, 'in_vault')
+        self.assertEqual(linea.related_cfdi_id.uuid, UUID_SIN_FACTURA)
+
+    def test_un_fallo_al_ligar_los_rep_no_pierde_la_descarga(self):
+        solicitud = self._solicitud()
+        uuid_rep = 'FFFFFFFF-3333-4000-8000-000000000004'
+        rep = rep_xml(uuid_rep, [(999.99, 'MXN', '1', [docto(UUID_SIN_FACTURA, 999.99)])])
+        Doc = type(self.env['cfdi.document'])
+        with patch.object(Doc, '_ligar_reps', side_effect=ValueError("fallo simulado al ligar")), \
+                self.assertLogs('odoo.addons.dsi_cfdi_sat_sync.models.sat_download_request',
+                                level='ERROR') as registro:
+            self._descargar(solicitud, paquete_zip(rep))
+        self.assertIn("falló ligar los pagos (REP)", registro.output[0])
+        self.assertEqual(solicitud.state, 'processed')
+        pago = self.env['cfdi.document'].search([('uuid', '=', uuid_rep)])
+        self.assertEqual(len(pago.dsi_payment_line_ids), 1, "lo descargado se queda, con sus líneas")
+
+    def test_un_choque_con_otra_transaccion_no_pierde_la_descarga(self):
+        """La revisión diaria liga los REP con la misma compra que la
+        descarga concilia, y PostgreSQL aborta a la transacción que llega
+        segunda. Sin un savepoint por lote no había a dónde volver: se perdía
+        la descarga entera. El choque se simula con el mismo error de
+        PostgreSQL al ligar los REP, dentro de la conciliación y después: lo
+        descargado se queda, quedan avisos (no errores) y se pide la revisión
+        de discrepancias, que vuelve a ligar los REP."""
+        self._factura_del_contador()
+        uuid_rep = 'FFFFFFFF-3333-4000-8000-000000000005'
+        rep = rep_xml(uuid_rep, [(IMPORTE, 'MXN', '1', [docto(UUID_CON_FACTURA, IMPORTE)])])
+        solicitud = self._solicitud()
+        Doc = type(self.env['cfdi.document'])
+
+        def choque(docs, source='rep'):
+            docs.env.cr.execute(
+                "DO $$ BEGIN RAISE EXCEPTION 'choque simulado' USING ERRCODE = 'serialization_failure'; END $$")
+
+        cron = self.env.ref('dsi_cfdi_vault.ir_cron_detect_inconsistencies')
+        Disparo = self.env['ir.cron.trigger']
+        disparos = Disparo.search_count([('cron_id', '=', cron.id)])
+        with patch.object(Doc, '_ligar_reps', choque), \
+                self.assertLogs('odoo.addons.dsi_cfdi_sat_sync.models.sat_download_request',
+                                level='WARNING') as registro:
+            self._descargar(solicitud, paquete_zip(rep, cfdi_xml(UUID_CON_FACTURA, IMPORTE, FECHA)))
+        self.assertEqual([r.levelname for r in registro.records], ['WARNING', 'WARNING'], "conciliar y ligar")
+        self.assertIn("chocó con otra transacción (SerializationFailure)", registro.output[0])
+
+        self.assertEqual(solicitud.state, 'processed')
+        docs = self.env['cfdi.document'].search([
+            ('company_id', '=', self.company.id), ('uuid', 'in', [uuid_rep, UUID_CON_FACTURA])])
+        self.assertEqual(len(docs), 2, "lo descargado se queda")
+        pago = docs.filtered(lambda d: d.uuid == uuid_rep)
+        self.assertEqual(len(pago.dsi_payment_line_ids), 1)
+        self.assertFalse((docs - pago).move_id, "la conciliación de ese lote se deshizo")
+        self.assertGreater(Disparo.search_count([('cron_id', '=', cron.id)]), disparos)

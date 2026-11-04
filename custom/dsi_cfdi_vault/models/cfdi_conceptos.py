@@ -110,10 +110,33 @@ class CfdiDocument(models.Model):
                 'clave_prod_serv': nodo.get('ClaveProdServ') or '',
                 'clave_unidad': nodo.get('ClaveUnidad') or '',
                 'no_identificacion': nodo.get('NoIdentificacion') or '',
+                'objeto_imp': nodo.get('ObjetoImp') or '',
                 'traslados': traslados,
                 'retenciones': retenciones,
             })
         return conceptos
+
+    def _datos_cabecera(self):
+        """Lo que el comprobante dice de sí mismo y que Odoo guarda en la
+        factura cuando importa el XML: forma y método de pago, uso CFDI, moneda
+        y tipo de cambio, y el RFC al que se emitió.
+
+        Lectura propia, como la de los conceptos: `_decode_cfdi_attachment` de
+        Odoo devuelve un dict cuyas claves cambian de una versión a otra.
+        """
+        self.ensure_one()
+        root = self._get_xml_root()
+        receptor = next((el for el in root if _local(el.tag) == 'Receptor'), None)
+        if receptor is None:
+            receptor = {}
+        return {
+            'forma_pago': root.get('FormaPago') or '',
+            'metodo_pago': root.get('MetodoPago') or '',
+            'moneda': root.get('Moneda') or '',
+            'tipo_cambio': _num(root.get('TipoCambio')),
+            'uso_cfdi': receptor.get('UsoCFDI') or '',
+            'rfc_receptor': receptor.get('Rfc') or '',
+        }
 
     # -------------------------------------------------------------------
     # Traducción de impuestos del SAT a impuestos de Odoo

@@ -20,6 +20,7 @@ from datetime import date
 from odoo.exceptions import UserError
 from odoo.tests.common import TransactionCase, tagged
 
+from odoo.addons.dsi_cfdi_vault.models.cfdi_conceptos import _bytes_de_adjunto
 from odoo.addons.dsi_license_client.tests.common import activar_licencia
 
 RFC_EMISOR = 'PRO010101AA1'
@@ -207,6 +208,17 @@ class TestConversionFactura(TransactionCase):
             self.assertFalse(factura.checked,
                              "la factura con avisos debe quedar marcada por revisar")
 
+    def test_los_avisos_se_ven_como_lista_en_el_chatter(self):
+        """El mensaje se armaba como texto: message_post lo escapaba y el
+        contador veía «<br/><br/><b>Revisa esto…</b><ul><li>…» tal cual."""
+        factura = self._convertir(self._documento(impuestos_xml=IMPUESTO_CUOTA))
+        mensaje = factura.message_ids.filtered(lambda m: "Creada desde el CFDI" in str(m.body))
+        self.assertEqual(len(mensaje), 1)
+        cuerpo = str(mensaje.body)
+        self.assertIn("<b>Revisa esto antes de confirmar:</b>", cuerpo)
+        self.assertIn("<li>", cuerpo)
+        self.assertNotIn("&lt;", cuerpo)
+
     # -- Lo esencial que no debe perderse -------------------------------
 
     def test_la_factura_nace_en_borrador(self):
@@ -217,6 +229,32 @@ class TestConversionFactura(TransactionCase):
         """La Descripcion del CFDI es lo que lee el auditor."""
         factura = self._convertir(self._documento())
         self.assertEqual(factura.invoice_line_ids[0].name, "Servicio profesional")
+
+    # -- El XML llega a la factura ---------------------------------------
+    # Antes la factura quedaba sin XML ni documento CFDI, y por eso sin Folio
+    # fiscal. El folio en sí se prueba en test_folio_fiscal.py, con una empresa
+    # mexicana: Odoo 20 solo lo calcula en empresas de México en pesos.
+
+    def test_el_xml_queda_adjunto_a_la_factura(self):
+        doc = self._documento()
+        factura = self._convertir(doc)
+        documento = factura.l10n_mx_edi_invoice_document_ids
+        self.assertEqual(documento.state, 'invoice_received')
+        self.assertEqual(documento.sat_state, 'valid')
+        adjunto = documento.attachment_id
+        self.assertEqual((adjunto.res_model, adjunto.res_id), ('account.move', factura.id))
+        self.assertEqual(_bytes_de_adjunto(adjunto), _bytes_de_adjunto(doc.xml_attachment_id))
+        # Es una copia: el XML de la Bóveda se queda en la Bóveda.
+        self.assertNotEqual(adjunto, doc.xml_attachment_id)
+        self.assertEqual(doc.xml_attachment_id.res_model, 'cfdi.document')
+
+    def test_la_factura_borrador_se_puede_borrar(self):
+        doc = self._documento()
+        factura = self._convertir(doc)
+        factura.unlink()
+        doc.invalidate_recordset(['move_id'])
+        self.assertFalse(doc.move_id)
+        self.assertTrue(doc.xml_attachment_id.exists())
 
     def test_vincula_el_comprobante_con_la_factura(self):
         doc = self._documento()

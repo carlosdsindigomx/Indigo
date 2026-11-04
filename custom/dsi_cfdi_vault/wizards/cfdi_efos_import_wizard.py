@@ -1,3 +1,5 @@
+import base64
+
 from odoo import _, fields, models
 
 
@@ -10,7 +12,13 @@ class CfdiEfosImportWizard(models.TransientModel):
 
     def action_import(self):
         self.ensure_one()
-        count = self.env['dsi.cfdi.efos.entry']._import_csv_bytes(self.csv_file)
+        # Odoo 18 y 19 devuelven el base64 que mandó el navegador; Odoo 20, un
+        # BinaryValue con el archivo ya decodificado. Sin esto, en 18 y 19 se
+        # leía el base64 como si fuera el CSV y nunca aparecía la columna RFC.
+        datos = getattr(self.csv_file, 'content', None)
+        if datos is None:
+            datos = base64.b64decode(self.csv_file)
+        count = self.env['dsi.cfdi.efos.entry']._import_csv_bytes(datos)
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',

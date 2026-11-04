@@ -1,21 +1,23 @@
 ================================================================================
  ADDOBI - Boveda CFDI y Servidor de Licencias
  Guia de instalacion
- Paquete generado el 2026-10-12  -  Odoo 19
+ Version 0.3.0  -  Odoo 18, 19 y 20 (una rama del repositorio por version)
 ================================================================================
 
 QUE TRAE ESTE PAQUETE
 ---------------------
 
-  servidor-licencias/          -> va en el Odoo de DS INDIGO
-      dsi_license_server         Emite y valida las licencias.
-
-  cliente/                     -> va en el Odoo de CADA CLIENTE
+  En este repositorio          -> van en el Odoo de CADA CLIENTE
+  (una carpeta por modulo)
       dsi_license_client         Activa y verifica la licencia. Obligatorio.
       dsi_cfdi_vault             La boveda de CFDI. Es el producto.
       dsi_cfdi_sat_sync          Descarga automatica del SAT con e.firma.
                                  Opcional: instalalo solo si el cliente
                                  va a descargar sus CFDI directo del SAT.
+
+  Aparte (no viene aqui)       -> va en el Odoo de DS INDIGO
+      dsi_license_server         Emite y valida las licencias. Es
+                                 infraestructura de DS Indigo.
 
   Orden de instalacion en el cliente: dsi_cfdi_vault instala solo
   dsi_license_client porque depende de el. dsi_cfdi_sat_sync va despues.
@@ -24,7 +26,8 @@ QUE TRAE ESTE PAQUETE
 REQUISITOS
 ----------
 
-  * Odoo 19 ENTERPRISE. No funciona en Community: dsi_cfdi_vault depende de
+  * Odoo ENTERPRISE 18, 19 o 20, con la rama de este repositorio que le
+    corresponde. No funciona en Community: dsi_cfdi_vault depende de
     l10n_mx_edi, que es un modulo Enterprise (licencia OEEL-1). El cliente
     necesita su propia suscripcion de Odoo Enterprise vigente.
 
@@ -32,7 +35,15 @@ REQUISITOS
     mexicano cargado. Con un catalogo generico el mapeo de impuestos no
     encuentra los impuestos correctos.
 
-  * Python: la libreria 'cryptography'. Ya viene con Odoo 19.
+  * La empresa, y cada sucursal, con pais Mexico y moneda MXN. En Odoo 20,
+    si falta alguno de los dos, Odoo no registra el folio fiscal, el
+    estatus SAT ni la pestana CFDI de sus facturas: las que se crean desde
+    la boveda quedan sin folio y sin el "Pago recibido" en la pestana CFDI,
+    y los pagos (REP) y el Estado boveda ya no se ligan por folio fiscal,
+    solo por el vinculo de la boveda. Una sucursal nueva hereda la moneda
+    de su matriz, pero no el pais: hay que ponerselo.
+
+  * Python: la libreria 'cryptography'. Ya viene con Odoo.
 
 
 ================================================================================
@@ -79,9 +90,10 @@ SI ALGUN DIA HAY QUE GENERAR UN PAR NUEVO
  PASO 2 - INSTALAR EL SERVIDOR DE LICENCIAS   (en el Odoo de DS Indigo)
 ================================================================================
 
-  2.1  Copia la carpeta del modulo al addons-path del servidor:
+  2.1  Copia la carpeta del modulo (no viene en este repositorio: la
+       entrega DS Indigo) al addons-path del servidor:
 
-           cp -R servidor-licencias/dsi_license_server  /ruta/a/tus/addons/
+           cp -R dsi_license_server  /ruta/a/tus/addons/
 
   2.2  Confirma que esa ruta este en el addons_path.
 
@@ -124,10 +136,13 @@ SI ALGUN DIA HAY QUE GENERAR UN PAR NUEVO
     - RFC autorizado   el RFC del cliente. LA LICENCIA QUEDA ATADA A ESTE
                        RFC: si no coincide con el de la empresa en el Odoo
                        del cliente, la activacion falla.
-    - Versiones Odoo   19.0  (o "19.0,20.0" si el cliente corre Odoo 20:
-                       el cliente manda su version y el servidor la compara
-                       contra esta lista; si no coincide, rechaza la
-                       activacion aunque todo lo demas este bien)
+    - Versiones Odoo   la serie del Odoo del cliente: 18.0, 19.0 o 20.0
+                       (varias separadas por coma si va a migrar, p. ej.
+                       "19.0,20.0"). El cliente manda su version y el
+                       servidor la compara contra esta lista; si no
+                       coincide, rechaza la activacion aunque todo lo
+                       demas este bien. Al elegir el producto se llena
+                       con las versiones del producto: revisala.
     - Max. instancias  cuantas bases puede activar (produccion + pruebas)
     - Vigencia         fecha de inicio y, si aplica, de fin
 
@@ -139,11 +154,12 @@ SI ALGUN DIA HAY QUE GENERAR UN PAR NUEVO
  PASO 4 - INSTALAR EN EL ODOO DEL CLIENTE
 ================================================================================
 
-  4.1  Copia las carpetas al addons-path del cliente:
+  4.1  Copia las carpetas de este repositorio, de la rama de la version
+       de Odoo del cliente, al addons-path del cliente:
 
-           cp -R cliente/dsi_license_client  /ruta/a/tus/addons/
-           cp -R cliente/dsi_cfdi_vault      /ruta/a/tus/addons/
-           cp -R cliente/dsi_cfdi_sat_sync   /ruta/a/tus/addons/    (opcional)
+           cp -R dsi_license_client  /ruta/a/tus/addons/
+           cp -R dsi_cfdi_vault      /ruta/a/tus/addons/
+           cp -R dsi_cfdi_sat_sync   /ruta/a/tus/addons/    (opcional)
 
        La llave publica ya viene embebida: no hay que editar nada.
 
@@ -228,7 +244,22 @@ SI ALGUN DIA HAY QUE GENERAR UN PAR NUEVO
 
   IMPORTANTE: la e.firma se usa SOLO PARA DESCARGAR. El sistema no timbra,
   no cancela y no reporta nada al SAT. Las tres integraciones con el SAT
-  (consulta de estatus, lista 69-B y Descarga Masiva) son de solo lectura.
+  (consulta de estatus, lista 69-B y Descarga Masiva, metadatos incluidos)
+  son de solo lectura hacia el SAT.
+
+  Hacia la contabilidad hay UNA excepcion (ver "ACTUALIZAR SAT EN VENTAS
+  CON SOLICITUD DE CANCELACION" en el paso 7): en las facturas de cliente
+  cuya cancelacion ya se pidio desde Odoo, el sistema ejecuta por su cuenta
+  el boton "Actualizar SAT" de Odoo. Si el SAT confirma la cancelacion,
+  Odoo cancela la factura y su asiento, igual que si alguien apretara el
+  boton.
+
+  Fuera de eso, lo que la boveda escribe por su cuenta en las facturas no
+  toca el asiento: el "Estado boveda", la marca "Por revisar" en compras
+  canceladas en el SAT o con avisos al convertir, la copia del XML de sus
+  pagos (REP) y, en compras, el "Pago recibido" de la pestana CFDI (ver
+  USO DIARIO). En los pagos solo deja la copia del XML de su REP en los
+  adjuntos (ver PAGO EN ODOO en USO DIARIO).
 
 
 ================================================================================
@@ -244,12 +275,126 @@ SI ALGUN DIA HAY QUE GENERAR UN PAR NUEVO
                         cubierto, para atrapar lo que el proveedor timbro
                         tarde. Los duplicados se descartan por folio fiscal.
 
-  A partir de ahi, dos tareas programadas hacen el resto: una diaria genera
-  el periodo que toca y lo manda al SAT, y otra cada hora verifica y
-  descarga lo que ya este listo.
+    - Refrescar metadatos (dias)
+                        90 por omision. Una vez por semana vuelve a pedir
+                        los metadatos de emitidos y recibidos de esos
+                        ultimos dias, para ver las cancelaciones de lo que
+                        ya se descargo (cada periodo se pide una sola vez, y
+                        un CFDI se puede cancelar despues). No mueve
+                        "Cubierto hasta" y nunca repite una solicitud con
+                        los mismos parametros. 0 lo apaga. Requiere
+                        "Descargar metadatos". Boton: "Refrescar metadatos
+                        ahora".
+
+  A partir de ahi, tres tareas programadas hacen el resto: una diaria genera
+  el periodo que toca y lo manda al SAT, otra cada hora verifica y
+  descarga lo que ya este listo, y una semanal pide el refresco de
+  metadatos. Hay una cuarta, "Actualizar SAT", que se explica abajo.
 
   El SAT tarda de minutos a varias horas en preparar un paquete. Es normal
   que una solicitud pase un rato en "Verificando".
+
+  METADATOS DEL SAT
+  El paquete de metadatos trae un TXT, no XML. Se guarda adjunto a su
+  solicitud y se lee: un renglon por folio fiscal en Boveda CFDI >
+  Metadatos del SAT. Una linea que no se puede leer no se adivina: se
+  cuenta en la solicitud (ver PRIMERA DESCARGA DE METADATOS, abajo).
+
+  Lo que dicen los metadatos pasa al estatus SAT del CFDI en la boveda (con
+  la fecha de cancelacion y el origen: consulta publica o metadatos) y al
+  "Estado boveda" de la factura. El Estado boveda sale del XML ligado con
+  el folio fiscal que la factura lleva hoy: si se cancelo, se regreso a
+  borrador y se volvio a timbrar, el XML anterior que siga ligado ya no
+  cuenta. Una factura cuyo XML no esta ligado en la boveda (por ejemplo, un
+  CFDI cancelado: el SAT no deja descargar su XML) toma su Estado boveda de
+  los metadatos de su folio fiscal. Si esos metadatos la dan vigente y Odoo
+  ya la tiene cancelada en el SAT, no es diferencia: la consulta de Odoo es
+  mas reciente.
+
+  Una cancelacion es definitiva: ni un archivo posterior ni la consulta
+  publica la regresan a vigente. Si el gestor contable corrige a mano un
+  CFDI que los metadatos dan cancelado, la revision diaria vuelve a aplicar
+  la cancelacion.
+
+  Los metadatos se ligan con los CFDI y las facturas de la empresa que los
+  descarga (la de la programacion), igual que el resto de la boveda. Las
+  facturas de una sucursal que recibe con el RFC de su matriz no los toman.
+
+  PRIMERA DESCARGA DE METADATOS
+  El formato del TXT se tomo de la libreria publica que mas se usa con este
+  servicio, no de un paquete real: se confirma con el primer paquete de
+  cada cliente. En una base que viene de 0.1.x ya hay solicitudes de
+  metadatos en "Procesado": son de antes, no guardaron el TXT y salen
+  con "Metadatos leidos" en 0 y sin archivos. No sirven para revisar el
+  lector. Cuando la primera solicitud de metadatos que se procese
+  despues de instalar o actualizar a 0.2.0 quede "Procesado", abrela
+  (Boveda CFDI > Descarga Masiva SAT > Solicitudes) y revisa:
+
+    - "Metadatos leidos": cuantos folios fiscales se guardaron.
+    - "Lineas ilegibles" (solo aparece si hay): las lineas que no cuadran
+      con el encabezado (traen mas o menos campos que el), las que no
+      traen folio fiscal y las de un estatus que no es vigente ni
+      cancelado. Se cuentan y no se guardan; las primeras 20 salen en
+      "Lineas que no se pudieron leer", con el archivo, el numero de linea
+      y el motivo. Si no se reconoce el encabezado de un archivo (Uuid y
+      Estatus, o Uuid y RfcACuentaTerceros en el de terceros), no se lee
+      nada de ese archivo.
+    - En Boveda CFDI > Metadatos del SAT, "Columnas adicionales del TXT" en
+      algun renglon: las columnas que el lector no conoce y las fechas o
+      montos que no entendio.
+
+  Si algo no cuadra, avisa a DS Indigo con ese detalle. Los TXT se quedan
+  adjuntos a la solicitud (el paquete caduca en el SAT): con el lector
+  corregido, "Volver a leer los metadatos" en la solicitud los lee otra vez
+  sin hablar con el SAT, guarda las lineas que antes no se pudieron leer y
+  corrige los demas datos, pero no deshace una cancelacion ya guardada.
+
+  ACTUALIZAR SAT EN VENTAS CON SOLICITUD DE CANCELACION
+  Con el PAC en produccion, cancelar una factura de cliente desde Odoo deja
+  una "solicitud de cancelacion": la factura sigue publicada hasta que
+  alguien aprieta "Actualizar SAT" (Odoo solo revisa por su cuenta las
+  solicitudes de hasta 60 dias). Cuando los metadatos del SAT o la consulta
+  publica de la boveda ya dan cancelado ese CFDI, una tarea programada
+  ("Boveda CFDI: Actualizar SAT en ventas con solicitud de cancelacion")
+  ejecuta ese mismo boton, factura por factura. Solo cuenta la solicitud
+  del CFDI que la factura lleva hoy: si se cancelo, se regreso a borrador y
+  se volvio a timbrar, una solicitud del CFDI anterior no la dispara. Si el
+  XML de la venta esta en la boveda sin ligar, antes la concilia por folio
+  fiscal.
+
+    - Si el SAT confirma, Odoo registra la cancelacion y cancela la factura
+      y su asiento. Si una fecha de bloqueo no deja cancelar el asiento,
+      queda la discrepancia "Cancelado con factura contabilizada".
+    - Si el SAT todavia no la confirma, queda la discrepancia "Cancelacion
+      por actualizar" con lo que dice cada lado, y se vuelve a intentar al
+      dia siguiente (nunca antes de 20 horas).
+
+  Corre a diario y, ademas, en cuanto los metadatos o la consulta publica
+  encuentran una. Solo en empresas con licencia de la boveda y solo en
+  facturas de cliente CON solicitud de cancelacion:
+
+    - A una factura de proveedor NUNCA se le ejecuta: Odoo cancelaria el
+      asiento, y eso lo decide el contador. Queda "Estatus SAT distinto" y
+      la factura "Por revisar".
+    - Una factura de cliente cancelada en el SAT sin solicitud desde Odoo
+      (por ejemplo, desde el portal del SAT) tampoco: queda "Estatus SAT
+      distinto" y se registra con su boton "Actualizar SAT".
+    - En Odoo 19 y 20, "Actualizar SAT" no hace nada en una empresa que no
+      sea de Mexico con moneda MXN; la discrepancia lo explica.
+
+  AVISO: si una venta se cancelo, se regreso a borrador y se volvio a
+  timbrar, una solicitud de cancelacion de su folio anterior que el SAT
+  RECHAZO se queda en la venta. Si alguien aprieta a mano el boton
+  "Actualizar SAT" de Odoo en esa venta, Odoo consulta tambien esa
+  solicitud vieja y puede cancelar la venta aunque su CFDI nuevo este
+  vigente. La boveda no lo ejecuta ni lo recomienda en ese caso, pero no
+  puede quitar el boton: antes de apretarlo en una venta vuelta a timbrar,
+  revisa si su pestana CFDI tiene una "Cancelacion solicitada" de otro
+  folio fiscal. La columna "Folio fiscal" de esa lista viene oculta: se
+  muestra desde el selector de columnas opcionales, a la derecha.
+
+  Necesita salida a internet al servicio de consulta publica del SAT; no
+  usa la e.firma ni el PAC.
 
 
 ================================================================================
@@ -258,7 +403,13 @@ SI ALGUN DIA HAY QUE GENERAR UN PAR NUEVO
 
   Boveda CFDI > CFDI                   todos los comprobantes
   Boveda CFDI > Por tipo               Ingresos, Egresos, Pagos, Nomina...
-  Boveda CFDI > Discrepancias          lo que no cuadra contra contabilidad
+  Boveda CFDI > Metadatos del SAT      vigentes y cancelados segun el SAT
+                                       (solo con dsi_cfdi_sat_sync)
+  Boveda CFDI > Discrepancias          lo que no cuadra contra contabilidad.
+                                       Las guardadas estan en "Por
+                                       revisar", con su historial y los
+                                       botones "Marcar como revisado" y
+                                       "Reabrir".
 
   CREAR LA FACTURA DE PROVEEDOR
   Abre un comprobante de Ingreso o Egreso que no este vinculado y pulsa
@@ -266,15 +417,218 @@ SI ALGUN DIA HAY QUE GENERAR UN PAR NUEVO
   la lista. Se crea un BORRADOR por comprobante con sus partidas e
   impuestos; tu completas producto y cuenta y lo confirmas.
 
+  La factura queda como si se hubiera subido el XML en Odoo: con su folio
+  fiscal y el XML en la pestana CFDI, la forma de pago, el uso CFDI, el
+  tipo de cambio del comprobante (si esta en otra moneda y la empresa
+  lleva pesos) y, si la boveda tiene el PDF, el PDF como vista previa.
+  Si Odoo ya tiene en esa empresa una factura con ese folio fiscal, el
+  comprobante se vincula a ella en lugar de crear otra; si la tiene en
+  otra empresa con el mismo RFC, no se convierte.
+
   La factura NUNCA se contabiliza sola. Es deliberado: un mapeo equivocado
   multiplicado por cientos de facturas cuesta mas que el tiempo que ahorra.
 
   Si algo no se pudo resolver (un impuesto sin equivalente configurado, por
-  ejemplo) la factura queda marcada como PENDIENTE DE REVISION y el detalle
-  aparece en su chatter.
+  ejemplo) la factura queda "Por revisar", el detalle aparece en su chatter
+  y queda la discrepancia "Aviso al convertir".
 
   No se convierten: los CFDI de Pago, Nomina y Traslado (no son cuentas por
-  pagar) ni los cancelados en el SAT.
+  pagar), los cancelados en el SAT ni los emitidos a otro RFC.
+
+  En Odoo 20, que trae su propia descarga masiva del SAT: si esa descarga
+  ya trajo el CFDI, Odoo tiene un documento "Por importar" que su tarea
+  programada convierte en factura. La boveda ocupa ese documento al
+  convertir, asi que la tarea de Odoo ya no crea una segunda factura. Si
+  el "Por importar" quedo en otra empresa con el mismo RFC (la matriz de
+  una sucursal, por ejemplo), la boveda no lo convierte: conviertelo en
+  esa empresa.
+
+  PAGOS (REP)
+  Cada CFDI de Pago se lee: un renglon por factura que paga (parcialidad,
+  importe pagado y saldo insoluto), ligado a la factura de Odoo por su
+  folio fiscal. La factura muestra sus pagos en el boton "REP" y lleva una
+  copia del XML del REP. En las compras, el REP sale ademas en la pestana
+  CFDI como "Pago recibido": no tiene botones de cancelar ni de imprimir y
+  no cambia el folio ni el estado CFDI de la factura. En Odoo 20 no sale
+  en Contabilidad > Revision > Mexico > Documentos CFDI (MX), que es la
+  lista de lo que Odoo timbro, importo o descargo. Los REP de facturas
+  que no estan en Odoo salen en Discrepancias > Pagos (REP) de facturas
+  fuera de Odoo.
+
+  PAGO EN ODOO
+  Cada documento relacionado de un REP recibido se liga ademas, solo, al
+  pago de Odoo de su factura: el pago registrado o, si el movimiento del
+  banco se concilio directo con la factura, el asiento del banco. Se liga
+  si se cumplen dos cosas:
+
+    - lo que ese pago aplico a la factura cuadra a 5 centavos con el REP,
+      en la moneda de la factura o en la del pago;
+    - la fecha del pago esta a 10 dias o menos de la del REP. Se cambia
+      con el parametro de sistema opcional
+      dsi_cfdi_vault.rep_pago_ventana_dias (un numero de dias).
+
+  Si ningun pago de la factura cuadra asi porque Odoo repartio el pago
+  entre las facturas distinto que el proveedor (una nota de credito
+  aplicada a otra factura del pago, un descuento por pronto pago o un
+  quebranto que salda la factura), se prueban dos reglas de respaldo:
+
+    - el total del pago de Odoo, en su moneda, es el Monto del nodo Pago
+      del REP, y ese pago le aplico algo a cada factura del nodo (todas
+      deben estar en Odoo). No basta con que la factura este en el pago:
+      "Registrar pago" la deja aunque no le haya tocado nada. Un pago sin
+      asiento todavia sin conciliar solo cuenta si alcanza para el saldo
+      de todas sus facturas;
+    - un pago sin asiento de varias facturas (con el modulo Contabilidad),
+      todavia sin conciliar, alcanza para el saldo de todas: el REP se
+      compara con el saldo de la factura, que es lo que le aplicara al
+      conciliar.
+
+  El respaldo respeta la ventana de dias, nunca le quita a otro REP un
+  pago que le cuadra por la regla normal y solo liga si queda un solo
+  pago posible: con dos o mas no elige, y queda "Importe distinto". Un
+  pago que cuadra por la regla normal pero esta fuera de la ventana (la
+  siguiente parcialidad del mismo importe) no le quita a la linea su
+  liga por el respaldo. La nota de la liga dice que cuadro por el
+  respaldo.
+
+  Las notas de credito, las compensaciones y las diferencias cambiarias no
+  son pagos. Una nota de credito pagada junto con su factura tampoco
+  cuenta como otra factura del pago: un pago de 900 por una factura de
+  1,000 y su nota de 100 es el pago de esa factura (pero si la nota es
+  mayor y el proveedor devuelve la diferencia, ese pago no es de la
+  factura). La liga se ve en el
+  documento relacionado ("Liga con el pago"), con su motivo:
+
+    Ligado             un solo pago cuadra (por la regla o el respaldo).
+    Ligado a mano      lo eligio el contador con "Elegir pago".
+    Por elegir         varios pagos cuadran, el que cuadra ya es de otro
+                       REP o su fecha esta lejos de la del REP.
+    Importe distinto   la factura tiene pagos, pero ninguno aplico lo que
+                       dice el REP.
+    Sin pago en Odoo   la factura todavia no tiene pagos.
+    No aplica          REP emitido, cancelado o archivado, sin factura
+                       publicada en Odoo, o una forma de pago sin
+                       movimiento del banco (compensacion, condonacion...).
+
+  Los pendientes salen en Boveda CFDI > Discrepancias > Pagos (REP) por
+  relacionar con su pago. Abre el documento relacionado y usa "Elegir
+  pago": el asistente muestra los pagos de la factura y cuales cuadran.
+  "Volver a automatico" deshace la eleccion. Una liga a mano que deja de
+  valer (el pago ya no esta aplicado o se borro, la factura vuelve a
+  borrador, el REP se cancela) vuelve a automatico con un mensaje en el
+  REP que nombra el pago y el motivo. Registrar, confirmar, conciliar o
+  desconciliar un pago revisa la liga en ese momento; si esa revision
+  falla, el pago se registra igual y queda en el log. La revision diaria
+  repara la que haya quedado vieja.
+
+  En Odoo 18, regresar a borrador una factura la desconcilia de sus pagos
+  (lo hace Odoo; en 19 y 20 los conserva): sus REP quedan "No aplica" en
+  ese momento. Al volver a publicarla hay que conciliarla otra vez con sus
+  pagos, y entonces se vuelven a ligar; si se queda sin pagos, la
+  revision diaria los pasa a "Sin pago en Odoo".
+
+  El XML del REP queda en los adjuntos del pago (o del asiento del banco),
+  con la pestana "Complementos de pago (REP)" y el boton REP. Las copias
+  no se borran: si el pago se desconcilia, la liga se quita y la copia se
+  queda.
+
+  Con el modulo Contabilidad (accountant) un pago no tiene asiento hasta
+  conciliar el banco: el REP se liga al pago y gana su asiento al
+  conciliar. En Odoo 18 el movimiento del banco no se concilia con el
+  pago sin asiento sino directo con sus facturas: si les aplico el
+  importe del pago, la boveda lo toma como ese mismo pago y el REP sigue
+  ligado a el, con el asiento del banco. Un pago de varias facturas que
+  Odoo 18 deja "En proceso" cuenta igual si a sus facturas ya no les
+  queda saldo.
+
+  COMPRAS PPD PAGADAS SIN REP
+  Boveda CFDI > Discrepancias > Compras PPD pagadas sin REP: un registro
+  por cada pago de Odoo aplicado a una compra PPD que no tiene un REP
+  vigente ligado a ese pago (ver PAGO EN ODOO). Aparece desde el dia 6 del
+  mes siguiente al pago, en la hora de Mexico: el proveedor tiene hasta el
+  dia 5 para emitirlo. Se resuelve solo cuando el REP se importa o se
+  descarga y se liga al pago, y tambien si el pago se desconcilia o la
+  compra deja de ser PPD.
+
+  El plazo corre desde que el proveedor recibe el pago. Si el pago es un
+  movimiento del banco conciliado con la compra (o un pago sin asiento ya
+  conciliado con el banco) y la fecha del banco es posterior a la del
+  pago, cuenta desde la del banco: un cheque registrado el 31 de octubre
+  y cobrado el 3 de noviembre vence el 5 de diciembre. Si esa fecha se
+  conoce despues, el mismo registro se resuelve (o se corrige) solo. Un
+  pago con asiento propio que despues se concilia con el banco cuenta
+  desde la fecha del pago.
+
+    - Que la compra es PPD lo dice su CFDI en la boveda (metodo de pago
+      PPD, no cancelado): las compras sin su XML en la boveda no se
+      revisan.
+    - Las notas de credito y las compensaciones no cuentan como pago.
+    - Una compra en parcialidades da un registro por cada pago que no
+      tenga su REP.
+    - Si el REP esta en la boveda pero no se pudo ligar al pago, el
+      registro lo dice, con su folio fiscal: ligalo con "Elegir pago". Es
+      el mismo registro: si ya estaba revisado, sigue revisado.
+    - El texto del registro va en el idioma de la empresa.
+    - La compra no queda "Por revisar". La lista sale agrupada por
+      proveedor, para pedirle a cada uno los REP que faltan.
+    - Corte opcional: el parametro de sistema
+      dsi_cfdi_vault.ppd_sin_rep_desde (AAAA-MM-DD). Sin el se revisa
+      todo el historico; con el, solo los pagos desde esa fecha.
+
+  NOMINA
+  Un CFDI de nomina se liga con su poliza (el asiento que la contabiliza),
+  no con una factura. Boveda CFDI > Discrepancias > CFDI de nomina sin
+  poliza lista los que no la tienen. La fecha de pago y el periodo salen
+  del complemento de nomina: filtra o agrupa por "Fecha de pago",
+  selecciona los recibos de un pago y usa Acciones > Relacionar con
+  poliza.
+
+  El asistente busca las polizas de la empresa alrededor de la fecha de
+  pago y del fin del periodo (7 dias antes y despues) y pone primero las
+  que tienen una cuenta con el neto de los recibos; despues, las del
+  diario de la ultima nomina relacionada y las mas cercanas a la fecha de
+  pago. No propone los asientos de impuestos en base de efectivo (CABA)
+  ni los del diario de diferencias cambiarias, salvo que ese diario se
+  elija en el filtro o sea el de la ultima nomina. Se puede filtrar por
+  diario, referencia o etiqueta, incluir borradores o escribir la poliza
+  en el campo "Poliza". "Elegir" la marca y "Relacionar" liga todos los
+  recibos y deja una copia de cada XML en los adjuntos de la poliza, con
+  una nota.
+
+    - Una nomina va con UNA poliza. Un recibo que ya tiene otra no se
+      mueve, salvo que se marque "Reemplazar la poliza de los que ya
+      tienen otra"; la poliza anterior recibe una nota.
+    - La poliza es un asiento de la misma empresa y no cancelado: no se
+      liga a una cancelada, ni a mano ni por importacion. Si se cancela
+      despues, la liga se queda y el CFDI sale en "CFDI de nomina sin
+      poliza".
+    - Si el complemento de nomina no se puede leer, el CFDI se guarda
+      igual, sin fecha de pago: el asistente usa la fecha del
+      comprobante.
+    - "Desvincular" en el CFDI suelta la poliza; la copia del XML se queda
+      en sus adjuntos.
+    - Tambien se puede poner la poliza a mano en el CFDI (campo "Poliza");
+      la copia del XML se deja igual.
+    - La conciliacion automatica ya no liga una nomina con una factura por
+      RFC, total y fecha.
+
+  ESTADO BOVEDA EN LAS FACTURAS
+  Las facturas de clientes y proveedores llevan el "Estado boveda", el
+  estatus en el SAT de su CFDI segun la boveda (ver METADATOS DEL SAT en el
+  paso 7). En el formulario se ve cuando tiene valor; en la lista es una
+  columna opcional, oculta al principio. Filtros: "Diferencia SAT /
+  boveda", "Discrepancia de estatus sin revisar" y "Cancelado en
+  boveda". Una compra que el SAT cancelo y Odoo no queda con la marca
+  "Por revisar" de Odoo; el asiento no se toca.
+
+  VARIAS EMPRESAS
+  Desde la 0.2.0 cada usuario ve solo los CFDI, la e.firma, la descarga
+  automatica, las solicitudes de descarga, los metadatos, las
+  discrepancias y los pagos (REP) de las empresas que tiene abiertas en el
+  selector de empresas. Antes veia los CFDI, la e.firma, la programacion y
+  las solicitudes de TODAS. Aplica a todos los usuarios, administradores
+  incluidos: para revisar varias empresas a la vez, abrelas en el
+  selector. La lista 69-B es una sola para todas las empresas.
 
 
 ================================================================================
@@ -291,6 +645,115 @@ SI ALGUN DIA HAY QUE GENERAR UN PAR NUEVO
 
   Un cambio en codigo Python o en reglas de acceso SIEMPRE necesita el -u y
   un reinicio: Odoo no recarga eso en caliente.
+
+  DE 0.1.x A 0.2.0
+  Se actualizan dsi_cfdi_vault y dsi_cfdi_sat_sync (a 18.0.0.2.0,
+  19.0.0.2.0 o 20.0.0.2.0), con el comando de arriba. dsi_license_client
+  no cambia en la 0.2.0: ya llego a esa version con el cliente de licencias
+  multiproducto. Si la base lo tiene en una version anterior, agregalo al
+  -u; Odoo actualiza tambien los modulos que dependen de el.
+
+  El -u hace lo siguiente, en este orden. La boveda no hace commits
+  durante la actualizacion: cada modulo queda completo o sin actualizar
+  (Odoo confirma uno a la vez; por eso el respaldo del paso 1).
+
+    - Llena el "Estado boveda" de las facturas por SQL, sin recalcularlas
+      una por una. En el log: "... llenado por SQL: N facturas con estado".
+    - Registra como discrepancia "Riesgo 69-B" (Discrepancias > Por
+      revisar) cada CFDI que la lista 69-B ya marcaba.
+    - Fija el corte de la discrepancia "Pago (REP) de factura fuera de
+      Odoo" en la fecha de Mexico del dia de la actualizacion. Los REP de
+      antes no se guardan como discrepancia: solo salen en la lista en vivo
+      (Discrepancias > Pagos (REP) de facturas fuera de Odoo). El corte es
+      el parametro de sistema dsi_cfdi_vault.rep_sin_factura_desde
+      (AAAA-MM-DD) y solo se fija si no existe.
+    - Corrige si los CFDI ya guardados son emitidos o recibidos, con el RFC
+      de su empresa.
+    - Llena los renglones de los REP ya guardados (uno por factura que
+      pagan), los liga con sus facturas, deja la copia del XML en cada una
+      y, en compras, el "Pago recibido". En el log: "Pagos (REP): N CFDI de
+      pago con M documentos relacionados".
+    - Desvincula los CFDI de Pago que alguien vinculo a mano a una de las
+      facturas que pagan (en un CFDI de Pago el vinculo es para el asiento
+      del pago; las facturas que paga ya quedan en sus renglones). Quedan
+      por conciliar, con una nota en su historial.
+    - En Odoo 20, saca los "Pago recibido" de Contabilidad > Revision >
+      Mexico > Documentos CFDI (MX).
+
+  Correrlo otra vez no repite nada.
+
+  Despues de actualizar (las tres tareas programadas que se nombran
+  abajo son nuevas y corren por primera vez poco despues de levantar
+  Odoo):
+
+    - Cambia lo que ve cada usuario con varias empresas (ver VARIAS
+      EMPRESAS en USO DIARIO).
+    - Refresco de metadatos (tarea semanal): las programaciones que ya
+      existian quedan con "Refrescar metadatos (dias)" en 90. En las
+      activas con "Descargar metadatos" y licencia vigente, pide al SAT
+      los metadatos de emitidos y recibidos de los ultimos 90 dias,
+      aunque la programacion solo descargue unos (ver PRIMERA DESCARGA
+      DE METADATOS en el paso 7). Para apagarlo, pon 0 en la
+      programacion (la primera corrida normalmente ya habra salido).
+    - "Actualizar SAT" en ventas (con dsi_cfdi_sat_sync): ejecuta el
+      boton en las ventas que ya tenian una solicitud de cancelacion de
+      su folio fiscal actual y que la boveda ya tiene canceladas, sin
+      importar su antiguedad, en empresas con licencia. Si el SAT
+      confirma, Odoo cancela la factura y su asiento (ver ACTUALIZAR SAT
+      EN VENTAS CON SOLICITUD DE CANCELACION en el paso 7). Para saber
+      antes cuales son, actualiza primero una copia de la base, corre ahi
+      la revision diaria y mira las discrepancias "Cancelacion por
+      actualizar".
+    - Revision diaria de discrepancias (tarea "Boveda CFDI: detectar y
+      resolver discrepancias"): registra lo que ya habia. Entre otras
+      cosas, las compras que la boveda tiene canceladas en el SAT y Odoo
+      no, aunque sean antiguas: quedan con la marca "Por revisar" de Odoo
+      en la lista de facturas de proveedor (el asiento no se toca). Si el
+      contador las da por revisadas, la revision diaria no las vuelve a
+      marcar.
+
+  DE 0.2.0 A 0.3.0
+  En 18 y 19 se actualiza solo dsi_cfdi_vault, a 18.0.0.3.0 o
+  19.0.0.3.0: dsi_cfdi_sat_sync y dsi_license_client no cambian. El
+  comando de arriba sirve igual. En 20 cambian los tres, a 20.0.0.3.0
+  (Odoo 20 quito Font Awesome y los iconos de los botones pasan a sus
+  nombres nuevos), asi que el comando lleva los tres:
+
+         odoo-bin -d <base> -u dsi_license_client,dsi_cfdi_vault,dsi_cfdi_sat_sync --stop-after-init
+
+  Desde 0.1.x se llega directo con ese comando (agrega dsi_license_client
+  si esta en 0.1.x): un solo -u hace lo de las dos versiones.
+
+  RECOMENDACION: si no se quiere el historico de "Compras PPD pagadas sin
+  REP" (por ejemplo, porque la boveda solo tiene los REP desde cierta
+  fecha), crea ANTES de actualizar el parametro de sistema
+  dsi_cfdi_vault.ppd_sin_rep_desde (Ajustes > Tecnico > Parametros del
+  sistema), con la fecha AAAA-MM-DD desde la que se descargan los REP.
+
+  El -u hace lo siguiente. Igual que en la 0.2.0, la boveda no hace
+  commits durante la actualizacion.
+
+    1. Liga TODOS los REP recibidos ya guardados con sus pagos y copia los
+       XML a los pagos (ver PAGO EN ODOO en USO DIARIO). En el log:
+       "Pagos (REP): N ligados a su pago, N por elegir, ...". Desde 0.1.x
+       esa linea no sale: los liga al crear sus renglones.
+    2. Lee la fecha de pago y el periodo de las nominas guardadas. En el
+       log: "Nomina: N de M CFDI sin fecha de pago la tomaron de su
+       complemento".
+    3. Desliga las nominas que se habian ligado solas a una factura por
+       RFC, total y fecha, con una nota en su historial. Las ligadas a
+       mano se dejan.
+    4. Copia el XML de las nominas ya ligadas a una poliza a los adjuntos
+       de la poliza. Las ligadas antes a un asiento de otra empresa se
+       dejan como estan, sin copia, y salen en el log ("Nomina: N CFDI
+       ligados a un asiento de otra empresa se quedan sin copia del
+       XML"); el asistente las trata como libres.
+    5. Programa la primera revision de discrepancias, que corre poco
+       despues de levantar Odoo y registra las "Compras PPD pagadas sin
+       REP" (todo el historico, o desde la fecha del parametro).
+
+  Correrlo otra vez no repite nada. Las nominas del paso 3 salen en
+  Discrepancias > CFDI de nomina sin poliza (antes "sin factura").
 
 
 ================================================================================

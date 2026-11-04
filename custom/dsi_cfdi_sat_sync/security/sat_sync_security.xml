@@ -18,4 +18,29 @@
         <field name="user_ids" eval="[(4, ref('base.user_admin'))]"/>
     </record>
 
+    <!-- La e.firma, la descarga automática, las solicitudes y los metadatos
+         del SAT de una empresa solo los ve quien trabaja en ella, como los CFDI
+         y las discrepancias de la Bóveda. Los metadatos los escribe solo el
+         sistema: el Usuario de la Bóveda solo los lee. -->
+    <record id="rule_sat_credential_company" model="ir.rule">
+        <field name="name">e.firma: multiempresa</field>
+        <field name="model_id" ref="model_sat_credential"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_sat_sync_schedule_company" model="ir.rule">
+        <field name="name">Descarga automática del SAT: multiempresa</field>
+        <field name="model_id" ref="model_sat_sync_schedule"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_sat_download_request_company" model="ir.rule">
+        <field name="name">Solicitudes de descarga del SAT: multiempresa</field>
+        <field name="model_id" ref="model_sat_download_request"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_dsi_cfdi_sat_metadata_company" model="ir.rule">
+        <field name="name">Metadatos del SAT: multiempresa</field>
+        <field name="model_id" ref="model_dsi_cfdi_sat_metadata"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+
 </odoo>

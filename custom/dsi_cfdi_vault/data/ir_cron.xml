@@ -10,6 +10,21 @@
         <field name="active">True</field>
     </record>
 
+    <!-- Después de la verificación de estatus SAT: esa la dispara al terminar.
+         Corre además por su cuenta una vez al día por si la verificación está
+         apagada, y con menor prioridad (número mayor), para que si a las dos
+         les toca a la vez, esta vaya al final. -->
+    <record id="ir_cron_detect_inconsistencies" model="ir.cron">
+        <field name="name">Bóveda CFDI: detectar y resolver discrepancias</field>
+        <field name="model_id" ref="model_dsi_cfdi_inconsistency"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_detectar_inconsistencias()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="priority">10</field>
+        <field name="active">True</field>
+    </record>
+
     <record id="ir_cron_refresh_efos_list" model="ir.cron">
         <field name="name">Bóveda CFDI: refresco automático de la lista 69-B (best-effort)</field>
         <field name="model_id" ref="model_dsi_cfdi_efos_entry"/>

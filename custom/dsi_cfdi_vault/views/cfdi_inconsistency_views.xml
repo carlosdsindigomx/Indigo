@@ -1,0 +1,183 @@
+<odoo>
+
+    <record id="view_dsi_cfdi_inconsistency_list" model="ir.ui.view">
+        <field name="name">dsi.cfdi.inconsistency.list</field>
+        <field name="model">dsi.cfdi.inconsistency</field>
+        <field name="arch" type="xml">
+            <list string="Discrepancias" create="0"
+                  decoration-danger="state == 'open' and severity == 'critical'"
+                  decoration-warning="state == 'open' and severity == 'warning'"
+                  decoration-muted="state == 'resolved'">
+                <!-- Con varias seleccionadas: revisarlas en lote. -->
+                <header>
+                    <button name="action_marcar_revisado" type="object" string="Marcar como revisado"/>
+                </header>
+                <field name="last_seen"/>
+                <field name="kind"/>
+                <field name="severity" optional="hide"/>
+                <field name="company_id" groups="base.group_multi_company" optional="show"/>
+                <field name="uuid"/>
+                <field name="cfdi_document_id" optional="hide"/>
+                <field name="move_id"/>
+                <field name="account_payment_id" optional="hide"/>
+                <field name="payment_move_id" optional="hide"/>
+                <field name="partner_id" optional="hide"/>
+                <field name="vault_value"/>
+                <field name="odoo_value"/>
+                <field name="observation" optional="hide"/>
+                <field name="first_seen" optional="hide"/>
+                <field name="reviewed_by_id" optional="hide"/>
+                <field name="state" widget="badge"
+                       decoration-warning="state == 'open'"
+                       decoration-info="state == 'reviewed'"
+                       decoration-success="state == 'resolved'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_dsi_cfdi_inconsistency_form" model="ir.ui.view">
+        <field name="name">dsi.cfdi.inconsistency.form</field>
+        <field name="model">dsi.cfdi.inconsistency</field>
+        <field name="arch" type="xml">
+            <form string="Discrepancia" create="0">
+                <header>
+                    <button name="action_marcar_revisado" type="object" string="Marcar como revisado"
+                            class="btn-primary" invisible="state != 'open'"/>
+                    <button name="action_reabrir" type="object" string="Reabrir"
+                            invisible="state != 'reviewed'"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="kind"/></h1>
+                    </div>
+                    <group>
+                        <group string="Hallazgo">
+                            <field name="severity" widget="badge"
+                                   decoration-danger="severity == 'critical'"
+                                   decoration-warning="severity == 'warning'"
+                                   decoration-info="severity == 'info'"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="uuid"/>
+                            <field name="cfdi_document_id"/>
+                            <field name="payment_line_id" invisible="not payment_line_id"/>
+                            <field name="account_payment_id" invisible="not account_payment_id"/>
+                            <field name="payment_move_id" invisible="not payment_move_id"/>
+                            <field name="move_id"/>
+                            <field name="partner_id"/>
+                            <field name="source"/>
+                        </group>
+                        <group string="Fechas">
+                            <field name="first_seen"/>
+                            <field name="last_seen"/>
+                            <field name="resolved_date" invisible="state != 'resolved'"/>
+                        </group>
+                    </group>
+                    <group string="Lo que se encontró">
+                        <field name="vault_value"/>
+                        <field name="odoo_value"/>
+                        <field name="observation"/>
+                    </group>
+                    <group string="Revisión">
+                        <field name="reviewed_by_id" invisible="not reviewed_by_id"/>
+                        <field name="reviewed_date" invisible="not reviewed_date"/>
+                        <!-- Una vez revisada, la nota es de quien la revisó
+                             (el modelo lo hace cumplir; el gestor contable
+                             puede todo). -->
+                        <field name="review_note" placeholder="Qué se revisó y por qué se deja así."
+                               readonly="reviewed_by_id and reviewed_by_id != uid"/>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_dsi_cfdi_inconsistency_search" model="ir.ui.view">
+        <field name="name">dsi.cfdi.inconsistency.search</field>
+        <field name="model">dsi.cfdi.inconsistency</field>
+        <field name="arch" type="xml">
+            <search string="Buscar discrepancias">
+                <field name="uuid"/>
+                <field name="move_id"/>
+                <field name="cfdi_document_id"/>
+                <field name="account_payment_id"/>
+                <field name="payment_move_id"/>
+                <field name="partner_id"/>
+                <field name="observation"/>
+                <filter string="Pendientes" name="filter_open" domain="[('state', '=', 'open')]"/>
+                <filter string="Revisadas" name="filter_reviewed" domain="[('state', '=', 'reviewed')]"/>
+                <filter string="Resueltas" name="filter_resolved" domain="[('state', '=', 'resolved')]"/>
+                <separator/>
+                <filter string="Críticas" name="filter_critical" domain="[('severity', '=', 'critical')]"/>
+                <group>
+                    <filter string="Tipo" name="group_kind" context="{'group_by': 'kind'}"/>
+                    <filter string="Severidad" name="group_severity" context="{'group_by': 'severity'}"/>
+                    <filter string="Estado" name="group_state" context="{'group_by': 'state'}"/>
+                    <filter string="Contacto" name="group_partner" context="{'group_by': 'partner_id'}"/>
+                    <filter string="Empresa" name="group_company" context="{'group_by': 'company_id'}"
+                            groups="base.group_multi_company"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_dsi_cfdi_inconsistency" model="ir.actions.act_window">
+        <field name="name">Discrepancias por revisar</field>
+        <field name="res_model">dsi.cfdi.inconsistency</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_dsi_cfdi_inconsistency_search"/>
+        <field name="context">{'search_default_filter_open': 1, 'search_default_group_kind': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No hay discrepancias pendientes.
+            </p>
+            <p>
+                Aquí quedan las que la Bóveda encuentra: estatus SAT distinto entre la
+                Bóveda y Odoo, CFDI cancelados con factura contabilizada, emisores o
+                receptores en la lista 69-B, avisos al convertir un CFDI en factura,
+                pagos (REP) de facturas que no están en Odoo y los pagos de compras PPD
+                que no tienen su REP pasado el día 5 del mes siguiente. Las
+                revisadas no vuelven a Pendientes mientras sigan apareciendo. Las que
+                dejan de aparecer se resuelven solas, aunque estuvieran revisadas; si
+                vuelven a aparecer, regresan a Pendientes.
+            </p>
+        </field>
+    </record>
+
+    <!-- Pendientes y revisadas (en el mismo grupo de filtros se suman), por
+         proveedor: para pedirle a cada uno los REP que faltan. -->
+    <record id="action_dsi_cfdi_inconsistency_ppd_sin_rep" model="ir.actions.act_window">
+        <field name="name">Compras PPD pagadas sin REP</field>
+        <field name="res_model">dsi.cfdi.inconsistency</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('kind', '=', 'ppd_sin_rep')]</field>
+        <field name="search_view_id" ref="view_dsi_cfdi_inconsistency_search"/>
+        <field name="context">{'search_default_filter_open': 1, 'search_default_filter_reviewed': 1, 'search_default_group_partner': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No hay compras PPD pagadas sin su REP.
+            </p>
+            <p>
+                Un registro por cada pago de Odoo aplicado a una compra PPD (según su CFDI
+                en la Bóveda) que no tiene un REP vigente ligado. Aparece desde el día 6 del
+                mes siguiente al pago, en la hora de México: el proveedor tiene hasta el día 5
+                para emitirlo. El plazo corre desde que recibe el pago: si ya se conoce el
+                movimiento del banco del pago y es posterior, desde ese día. Las notas de
+                crédito y las compensaciones no son pagos.
+            </p>
+            <p>
+                Si la compra tiene un REP que no se pudo ligar a ningún pago, el mismo
+                registro lo dice en su observación, sin perder su revisión: elige su pago con
+                «Elegir pago» en el REP.
+            </p>
+            <p>
+                Se revisa todo el histórico, salvo que el parámetro del sistema
+                dsi_cfdi_vault.ppd_sin_rep_desde tenga una fecha (AAAA-MM-DD): entonces solo
+                los pagos desde esa fecha. Al importar o descargar el REP y ligarse con su
+                pago, el registro se resuelve solo.
+            </p>
+        </field>
+    </record>
+
+</odoo>

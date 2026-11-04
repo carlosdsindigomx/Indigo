@@ -138,6 +138,12 @@ class CfdiEfosCheckWizard(models.TransientModel):
             key=lambda v: (ORDEN_SITUACION.get(v['situation'], 9), -(v['cfdi_count'] + v['move_count'])),
         )
 
+        # Lo que el asistente encuentra ya no se pierde al cerrarlo: queda en
+        # Discrepancias › Por revisar. Las facturas sin un CFDI en riesgo que ya
+        # las señale son las únicas que nadie más registra.
+        self.env['dsi.cfdi.inconsistency']._sincronizar_desde_gancho(
+            '_sincronizar_riesgo_69b', cfdis=cfdis, facturas=facturas)
+
         self.line_ids.unlink()
         self.write({
             'state': 'done',

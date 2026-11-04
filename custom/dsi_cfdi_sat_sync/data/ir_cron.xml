@@ -20,4 +20,31 @@
         <field name="active">True</field>
     </record>
 
+    <!-- Vuelve a pedir los metadatos de los últimos días (90 por omisión) para
+         ver las cancelaciones de lo ya descargado. Las solicitudes las avanza
+         la tarea de cada hora. -->
+    <record id="ir_cron_refrescar_metadatos" model="ir.cron">
+        <field name="name">Descarga SAT: refrescar metadatos (cancelaciones)</field>
+        <field name="model_id" ref="model_sat_sync_schedule"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_refrescar_metadatos()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">weeks</field>
+        <field name="active">True</field>
+    </record>
+
+    <!-- «Actualizar SAT» en las ventas con solicitud de cancelación que el SAT
+         ya canceló según los metadatos o la consulta pública de la Bóveda.
+         Además de a diario, la piden los metadatos y la consulta pública al
+         encontrar una. -->
+    <record id="ir_cron_actualizar_cancelaciones_emitidas" model="ir.cron">
+        <field name="name">Bóveda CFDI: «Actualizar SAT» en ventas con solicitud de cancelación</field>
+        <field name="model_id" ref="account.model_account_move"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_actualizar_cancelaciones_emitidas()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="active">True</field>
+    </record>
+
 </odoo>

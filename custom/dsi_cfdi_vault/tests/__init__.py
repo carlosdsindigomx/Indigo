@@ -4,3 +4,13 @@ from . import test_verificacion_sat
 from . import test_lista_69b
 from . import test_revision_periodo_69b
 from . import test_bloqueo_licencia
+from . import test_folio_fiscal
+from . import test_cfdi_pago
+from . import test_factura_como_odoo
+from . import test_inconsistencias
+from . import test_estado_boveda
+from . import test_rep_facturas
+from . import test_rep_pagos
+from . import test_ppd_sin_rep
+from . import test_nomina_poliza
+from . import test_iconos

@@ -17,4 +17,28 @@
         <field name="implied_ids" eval="[(4, ref('account.group_account_invoice'))]"/>
         <field name="user_ids" eval="[(4, ref('base.user_admin'))]"/>
     </record>
+
+    <!-- Cada quien ve los CFDI de las empresas que tiene abiertas. Va sin
+         grupo para que aplique a todos, gestor contable incluido. Lo que la
+         Bóveda tiene que ver en todas (la lista 69-B, la liga con la matriz o
+         la sucursal) lo busca con sudo. -->
+    <record id="rule_cfdi_document_company" model="ir.rule">
+        <field name="name">CFDI de la Bóveda: multiempresa</field>
+        <field name="model_id" ref="model_cfdi_document"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+
+    <!-- Lo mismo con las discrepancias. -->
+    <record id="rule_dsi_cfdi_inconsistency_company" model="ir.rule">
+        <field name="name">Discrepancias de la Bóveda: multiempresa</field>
+        <field name="model_id" ref="model_dsi_cfdi_inconsistency"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+
+    <!-- Lo mismo con los documentos relacionados de los REP. -->
+    <record id="rule_dsi_cfdi_payment_line_company" model="ir.rule">
+        <field name="name">Pagos (REP) de la Bóveda: multiempresa</field>
+        <field name="model_id" ref="model_dsi_cfdi_payment_line"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
 </odoo>

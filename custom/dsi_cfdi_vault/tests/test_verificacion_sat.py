@@ -58,8 +58,12 @@ class TestVerificacionSatLote(TransactionCase):
             fallido.uuid: {'value': 'error', 'error': "el SAT no respondió"},
             cancelado.uuid: {'value': 'cancelled'},
         }
-        with self._sat_responde(respuestas):
+        # El aviso se registra a propósito; se captura para que no llegue al log
+        # del build (Odoo.sh marca en amarillo cualquier WARNING).
+        with self._sat_responde(respuestas), \
+                self.assertLogs('odoo.addons.dsi_cfdi_vault.models.cfdi_document', level='WARNING') as registro:
             accion = (vigente | fallido | cancelado).action_verify_sat_status_batch()
+        self.assertIn(fallido.uuid, registro.output[0])
 
         self.assertEqual(vigente.sat_status, 'valid')
         self.assertEqual(cancelado.sat_status, 'canceled')
