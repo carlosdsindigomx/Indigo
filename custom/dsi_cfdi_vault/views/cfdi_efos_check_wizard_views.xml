@@ -1,0 +1,79 @@
+<odoo>
+
+    <record id="view_cfdi_efos_check_wizard_form" model="ir.ui.view">
+        <field name="name">dsi.cfdi.efos.check.wizard.form</field>
+        <field name="model">dsi.cfdi.efos.check.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Revisar periodo contra lista 69-B">
+                <field name="state" invisible="1"/>
+                <div invisible="state == 'done'">
+                    <p class="text-muted">
+                        Busca, entre las compras del periodo, las de proveedores que están en la
+                        lista 69-B del SAT como presuntos o definitivos: los CFDI recibidos de la
+                        bóveda y las facturas de proveedor de Odoo, tengan o no CFDI.
+                    </p>
+                    <group>
+                        <field name="company_id" groups="base.group_multi_company"/>
+                        <field name="date_from"/>
+                        <field name="date_to"/>
+                        <field name="refresh_list"/>
+                    </group>
+                </div>
+                <div invisible="state != 'done'">
+                    <div class="alert alert-warning" role="alert" invisible="not refresh_error">
+                        <field name="refresh_error" readonly="1"/>
+                    </div>
+                    <div class="row text-center mb-3">
+                        <div class="col">
+                            <h2><field name="cfdi_count" readonly="1"/></h2>
+                            <span class="text-muted">CFDI en riesgo, de <field name="cfdi_checked_count" readonly="1" class="oe_inline"/> recibidos</span>
+                        </div>
+                        <div class="col">
+                            <h2><field name="move_count" readonly="1"/></h2>
+                            <span class="text-muted">Facturas en riesgo, de <field name="move_checked_count" readonly="1" class="oe_inline"/> de proveedor</span>
+                        </div>
+                    </div>
+                    <p class="text-muted">
+                        Periodo <field name="date_from" readonly="1" class="oe_inline"/> a
+                        <field name="date_to" readonly="1" class="oe_inline"/>. Lista con
+                        <field name="list_risk_count" readonly="1" class="oe_inline"/> contribuyentes
+                        presuntos o definitivos, cargada el
+                        <field name="list_date" readonly="1" class="oe_inline"/>.
+                    </p>
+                    <p invisible="line_ids">
+                        Ninguna compra del periodo es de un proveedor presunto o definitivo.
+                    </p>
+                    <field name="line_ids" readonly="1" invisible="not line_ids">
+                        <list>
+                            <field name="situation" widget="badge"
+                                   decoration-danger="situation == 'definitivo'"
+                                   decoration-warning="situation != 'definitivo'"/>
+                            <field name="rfc"/>
+                            <field name="name"/>
+                            <field name="partner_id"/>
+                            <field name="cfdi_count"/>
+                            <field name="move_count"/>
+                        </list>
+                    </field>
+                </div>
+                <footer>
+                    <button name="action_check" type="object" string="Revisar" class="btn-primary"
+                            invisible="state == 'done'"/>
+                    <button name="action_view_cfdi" type="object" string="Ver CFDI" class="btn-primary"
+                            invisible="state != 'done' or not cfdi_count"/>
+                    <button name="action_view_moves" type="object" string="Ver facturas" class="btn-primary"
+                            invisible="state != 'done' or not move_count"/>
+                    <button string="Cerrar" special="cancel" class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_cfdi_efos_check_wizard" model="ir.actions.act_window">
+        <field name="name">Revisar periodo contra lista 69-B</field>
+        <field name="res_model">dsi.cfdi.efos.check.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+</odoo>

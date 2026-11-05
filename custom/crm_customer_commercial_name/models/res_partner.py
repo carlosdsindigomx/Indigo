@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from odoo import models, api
-from odoo.osv import expression
+from odoo.fields import Domain
 
 class ResPartner(models.Model):
     _inherit = 'res.partner'
@@ -20,7 +20,7 @@ class ResPartner(models.Model):
         
         if value and self.env.context.get('usar_nombre_comercial'):
             custom_domain = [('x_studio_nombre_comercial_1', operator, value)]
-            domain = expression.OR([domain, custom_domain])
+            domain = Domain.OR([domain, custom_domain])
             
         return domain
 

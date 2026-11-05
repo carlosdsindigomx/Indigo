@@ -1,0 +1,224 @@
+<odoo>
+
+    <record id="view_dsi_cfdi_payment_line_list" model="ir.ui.view">
+        <field name="name">dsi.cfdi.payment.line.list</field>
+        <field name="model">dsi.cfdi.payment.line</field>
+        <field name="arch" type="xml">
+            <list string="Pagos (REP)" create="false" edit="false" delete="false"
+                  decoration-muted="payment_sat_status == 'canceled'">
+                <field name="payment_date"/>
+                <field name="payment_doc_id" string="REP"/>
+                <field name="direction" widget="badge" optional="hide"
+                       decoration-info="direction == 'issued'" decoration-success="direction == 'received'"/>
+                <field name="fecha_pago" optional="show"/>
+                <field name="forma_pago" optional="hide"/>
+                <field name="id_documento"/>
+                <field name="serie" optional="hide"/>
+                <field name="folio" optional="show"/>
+                <field name="num_parcialidad" invisible="not num_parcialidad"/>
+                <field name="currency_id" column_invisible="True"/>
+                <field name="imp_saldo_ant" optional="show"/>
+                <field name="imp_pagado" sum="Pagado"/>
+                <field name="imp_saldo_insoluto"/>
+                <field name="moneda_dr" optional="show"/>
+                <field name="related_cfdi_id" optional="hide"/>
+                <field name="invoice_id"/>
+                <field name="account_payment_id" optional="show"/>
+                <field name="payment_move_id" optional="hide"/>
+                <field name="invoice_currency_id" column_invisible="True"/>
+                <field name="payment_amount_applied" optional="hide"/>
+                <field name="payment_link_state" widget="badge" optional="show"
+                       decoration-success="payment_link_state in ('linked', 'manual')"
+                       decoration-warning="payment_link_state in ('to_choose', 'amount_mismatch')"
+                       decoration-danger="payment_link_state == 'no_payment'"
+                       decoration-muted="payment_link_state == 'not_applicable'"/>
+                <field name="payment_link_note" optional="hide"/>
+                <field name="link_state" widget="badge"
+                       decoration-success="link_state == 'linked'"
+                       decoration-info="link_state == 'other_company'"
+                       decoration-warning="link_state == 'in_vault'"
+                       decoration-danger="link_state == 'missing'"/>
+                <field name="payment_sat_status" widget="badge" optional="hide"
+                       decoration-success="payment_sat_status == 'valid'"
+                       decoration-danger="payment_sat_status == 'canceled'"/>
+                <field name="company_id" groups="base.group_multi_company" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_dsi_cfdi_payment_line_form" model="ir.ui.view">
+        <field name="name">dsi.cfdi.payment.line.form</field>
+        <field name="model">dsi.cfdi.payment.line</field>
+        <field name="arch" type="xml">
+            <form string="Documento relacionado del REP" create="false" edit="false" delete="false">
+                <header>
+                    <button name="action_elegir_pago" type="object" string="Elegir pago" class="btn-primary"
+                            invisible="direction != 'received' or not invoice_id or payment_link_state == 'not_applicable'"/>
+                    <button name="action_liga_automatica" type="object" string="Volver a automático"
+                            invisible="payment_link_state != 'manual'"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="id_documento"/></h1>
+                    </div>
+                    <group>
+                        <group string="Pago (REP)">
+                            <field name="payment_doc_id" string="REP"/>
+                            <field name="payment_date"/>
+                            <field name="payment_sat_status" widget="badge"
+                                   decoration-success="payment_sat_status == 'valid'"
+                                   decoration-danger="payment_sat_status == 'canceled'"/>
+                            <field name="direction"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="pago_idx"/>
+                            <field name="fecha_pago"/>
+                            <field name="forma_pago"/>
+                            <field name="moneda_p"/>
+                            <field name="currency_p_id" invisible="1"/>
+                            <field name="tipo_cambio_p"/>
+                            <field name="monto_pago"/>
+                        </group>
+                        <group string="Factura que paga">
+                            <field name="docto_idx"/>
+                            <field name="serie"/>
+                            <field name="folio"/>
+                            <field name="moneda_dr"/>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="equivalencia_dr"/>
+                            <field name="num_parcialidad" invisible="not num_parcialidad"/>
+                            <field name="imp_saldo_ant"/>
+                            <field name="imp_pagado"/>
+                            <field name="imp_saldo_insoluto"/>
+                        </group>
+                    </group>
+                    <group string="Liga">
+                        <field name="link_state" widget="badge"
+                               decoration-success="link_state == 'linked'"
+                               decoration-info="link_state == 'other_company'"
+                               decoration-warning="link_state == 'in_vault'"
+                               decoration-danger="link_state == 'missing'"/>
+                        <field name="related_cfdi_id"/>
+                        <field name="invoice_id"/>
+                        <field name="invoice_attachment_id" invisible="not invoice_attachment_id"/>
+                    </group>
+                    <group string="Pago en Odoo" name="group_dsi_pago_odoo">
+                        <field name="payment_link_state" widget="badge"
+                               decoration-success="payment_link_state in ('linked', 'manual')"
+                               decoration-warning="payment_link_state in ('to_choose', 'amount_mismatch')"
+                               decoration-danger="payment_link_state == 'no_payment'"
+                               decoration-muted="payment_link_state == 'not_applicable'"/>
+                        <field name="payment_link_note" invisible="not payment_link_note"/>
+                        <field name="account_payment_id"/>
+                        <field name="payment_move_id"/>
+                        <field name="invoice_currency_id" invisible="1"/>
+                        <field name="payment_amount_applied"/>
+                        <field name="payment_attachment_id" invisible="not payment_attachment_id"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_dsi_cfdi_payment_line_search" model="ir.ui.view">
+        <field name="name">dsi.cfdi.payment.line.search</field>
+        <field name="model">dsi.cfdi.payment.line</field>
+        <field name="arch" type="xml">
+            <search string="Buscar pagos (REP)">
+                <field name="id_documento"/>
+                <field name="payment_doc_id" string="REP"/>
+                <field name="invoice_id"/>
+                <field name="account_payment_id"/>
+                <field name="folio"/>
+                <filter string="Recibidos" name="filter_received" domain="[('direction', '=', 'received')]"/>
+                <filter string="Emitidos" name="filter_issued" domain="[('direction', '=', 'issued')]"/>
+                <separator/>
+                <filter string="Con factura" name="filter_linked" domain="[('link_state', '=', 'linked')]"/>
+                <filter string="En otra empresa del mismo RFC" name="filter_other_company"
+                        domain="[('link_state', '=', 'other_company')]"/>
+                <filter string="En la Bóveda, sin factura" name="filter_in_vault" domain="[('link_state', '=', 'in_vault')]"/>
+                <filter string="Fuera de la Bóveda" name="filter_missing" domain="[('link_state', '=', 'missing')]"/>
+                <separator/>
+                <!-- Un REP cancelado y su sustituto sumarían el pago dos veces. -->
+                <filter string="Sin cancelar" name="filter_not_canceled"
+                        domain="[('payment_doc_id.sat_status', '!=', 'canceled')]"/>
+                <separator/>
+                <filter string="Ligados a su pago" name="filter_payment_linked"
+                        domain="[('payment_link_state', 'in', ('linked', 'manual'))]"/>
+                <filter string="Por elegir" name="filter_payment_to_choose"
+                        domain="[('payment_link_state', '=', 'to_choose')]"/>
+                <filter string="Importe distinto" name="filter_payment_amount_mismatch"
+                        domain="[('payment_link_state', '=', 'amount_mismatch')]"/>
+                <filter string="Sin pago en Odoo" name="filter_payment_none"
+                        domain="[('payment_link_state', '=', 'no_payment')]"/>
+                <separator/>
+                <filter string="Fecha del REP" name="filter_payment_date" date="payment_date"/>
+                <group>
+                    <filter string="Liga" name="group_link_state" context="{'group_by': 'link_state'}"/>
+                    <filter string="Liga con el pago" name="group_payment_link_state"
+                            context="{'group_by': 'payment_link_state'}"/>
+                    <filter string="Pago en Odoo" name="group_account_payment" context="{'group_by': 'account_payment_id'}"/>
+                    <filter string="Dirección" name="group_direction" context="{'group_by': 'direction'}"/>
+                    <filter string="REP" name="group_payment_doc" context="{'group_by': 'payment_doc_id'}"/>
+                    <filter string="Factura" name="group_invoice" context="{'group_by': 'invoice_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Lista en vivo, como «CFDI sin factura»: lo que los REP pagan y no está
+         en Odoo. Los REP desde la fecha de corte además quedan en «Por
+         revisar»; los anteriores solo salen aquí. Los REP cancelados o
+         archivados no cuentan, como en «Por revisar», ni las facturas que
+         están en otra empresa del mismo RFC (la sucursal): esas sí están en
+         Odoo. -->
+    <record id="action_dsi_cfdi_payment_line_no_invoice" model="ir.actions.act_window">
+        <field name="name">Pagos (REP) de facturas fuera de Odoo</field>
+        <field name="res_model">dsi.cfdi.payment.line</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('link_state', 'in', ('in_vault', 'missing')), ('payment_doc_id.sat_status', '!=', 'canceled'), ('payment_doc_id.active', '=', True)]</field>
+        <field name="search_view_id" ref="view_dsi_cfdi_payment_line_search"/>
+        <field name="context">{'search_default_group_link_state': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Todos los pagos (REP) de la Bóveda están ligados a su factura.
+            </p>
+            <p>
+                Aquí aparecen las facturas que un complemento de pago (REP) abona y que no están en
+                Odoo: «En la Bóveda» si su CFDI ya está en la Bóveda (regístralo o vincúlalo) y
+                «Fuera de la Bóveda» si tampoco. Se ligan solas en cuanto la factura llega a Odoo.
+                Las que están en otra empresa del mismo RFC (la matriz o una sucursal) no salen
+                aquí: el REP solo se liga dentro de su empresa, pero la factura no falta.
+            </p>
+        </field>
+    </record>
+
+    <!-- Lista en vivo de los documentos relacionados de REP recibidos y
+         vigentes que la Bóveda no pudo ligar sola con su pago de Odoo. Los de
+         facturas que no están en Odoo salen en la lista de arriba. -->
+    <record id="action_dsi_cfdi_payment_line_por_ligar" model="ir.actions.act_window">
+        <field name="name">Pagos (REP) por relacionar con su pago</field>
+        <field name="res_model">dsi.cfdi.payment.line</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('direction', '=', 'received'), ('payment_link_state', 'in', ('to_choose', 'amount_mismatch', 'no_payment')), ('payment_doc_id.sat_status', '!=', 'canceled'), ('payment_doc_id.active', '=', True)]</field>
+        <field name="search_view_id" ref="view_dsi_cfdi_payment_line_search"/>
+        <field name="context">{'search_default_group_payment_link_state': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Todos los pagos (REP) recibidos están ligados a su pago en Odoo.
+            </p>
+            <p>
+                La Bóveda liga sola cada documento relacionado de un REP recibido con el pago de Odoo
+                que aplicó ese importe a la factura, a cinco centavos (en la moneda de la factura o
+                en la del pago), si su fecha está a 10 días o menos de la del REP; si Odoo repartió
+                el pago entre las facturas distinto que el REP, con el único pago cuyo total es el
+                monto del REP (o, sin asiento, que alcanza para el saldo de sus facturas). Aquí
+                quedan los
+                demás: «Por elegir» cuando varios pagos cuadran o el que cuadra está fuera de fecha,
+                «Importe distinto» cuando ningún pago de la factura aplicó lo que dice el REP y
+                «Sin pago en Odoo» cuando la factura todavía no tiene pagos. Abre el documento y usa
+                «Elegir pago».
+            </p>
+        </field>
+    </record>
+
+</odoo>

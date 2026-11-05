@@ -1,0 +1,146 @@
+<odoo>
+
+    <record id="view_dsi_cfdi_sat_metadata_list" model="ir.ui.view">
+        <field name="name">dsi.cfdi.sat.metadata.list</field>
+        <field name="model">dsi.cfdi.sat.metadata</field>
+        <field name="arch" type="xml">
+            <list string="Metadatos del SAT" create="false" edit="false" delete="false"
+                  decoration-danger="estatus == '0'">
+                <field name="fecha_emision"/>
+                <field name="uuid"/>
+                <field name="direction"/>
+                <field name="efecto"/>
+                <field name="rfc_emisor"/>
+                <field name="nombre_emisor" optional="hide"/>
+                <field name="rfc_receptor"/>
+                <field name="nombre_receptor" optional="hide"/>
+                <field name="monto"/>
+                <field name="estatus" widget="badge"
+                       decoration-success="estatus == '1'" decoration-danger="estatus == '0'"/>
+                <field name="fecha_cancelacion" optional="show"/>
+                <field name="cfdi_document_id" optional="show"/>
+                <field name="move_id" optional="show"/>
+                <field name="last_seen" optional="hide"/>
+                <field name="company_id" groups="base.group_multi_company" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_dsi_cfdi_sat_metadata_form" model="ir.ui.view">
+        <field name="name">dsi.cfdi.sat.metadata.form</field>
+        <field name="model">dsi.cfdi.sat.metadata</field>
+        <field name="arch" type="xml">
+            <form string="Metadatos del SAT" create="false" edit="false" delete="false">
+                <sheet>
+                    <widget name="web_ribbon" title="Cancelado" bg_color="text-bg-danger" invisible="estatus != '0'"/>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_open_cfdi" type="object" class="oe_stat_button" icon="fa-file-code-o"
+                                invisible="not cfdi_document_id">
+                            <div class="o_stat_info"><span class="o_stat_text">CFDI</span></div>
+                        </button>
+                        <button name="action_open_move" type="object" class="oe_stat_button" icon="fa-file-text-o"
+                                invisible="not move_id">
+                            <div class="o_stat_info"><span class="o_stat_text">Factura</span></div>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <h1><field name="uuid"/></h1>
+                    </div>
+                    <group>
+                        <group string="Comprobante">
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="direction"/>
+                            <field name="efecto"/>
+                            <field name="monto"/>
+                            <field name="fecha_emision"/>
+                            <field name="fecha_certificacion"/>
+                            <field name="rfc_pac"/>
+                        </group>
+                        <group string="Estatus en el SAT">
+                            <field name="estatus" widget="badge"
+                                   decoration-success="estatus == '1'" decoration-danger="estatus == '0'"/>
+                            <field name="fecha_cancelacion" invisible="estatus != '0'"/>
+                            <field name="first_seen"/>
+                            <field name="last_seen"/>
+                            <field name="request_id"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Partes">
+                            <field name="rfc_emisor"/>
+                            <field name="nombre_emisor"/>
+                            <field name="rfc_receptor"/>
+                            <field name="nombre_receptor"/>
+                            <field name="rfc_a_cuenta_terceros" invisible="not rfc_a_cuenta_terceros"/>
+                            <field name="nombre_a_cuenta_terceros" invisible="not rfc_a_cuenta_terceros"/>
+                        </group>
+                        <group string="En Odoo">
+                            <field name="cfdi_document_id"/>
+                            <field name="move_id"/>
+                        </group>
+                    </group>
+                    <group string="Columnas adicionales del TXT" invisible="not extra_text">
+                        <field name="extra_text" nolabel="1" colspan="2"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_dsi_cfdi_sat_metadata_search" model="ir.ui.view">
+        <field name="name">dsi.cfdi.sat.metadata.search</field>
+        <field name="model">dsi.cfdi.sat.metadata</field>
+        <field name="arch" type="xml">
+            <search string="Metadatos del SAT">
+                <field name="uuid"/>
+                <field name="rfc_emisor"/>
+                <field name="rfc_receptor"/>
+                <field name="nombre_emisor"/>
+                <field name="nombre_receptor"/>
+                <filter string="Cancelados" name="filter_canceled" domain="[('estatus', '=', '0')]"/>
+                <filter string="Vigentes" name="filter_valid" domain="[('estatus', '=', '1')]"/>
+                <separator/>
+                <filter string="Emitidos" name="filter_issued" domain="[('direction', '=', 'issued')]"/>
+                <filter string="Recibidos" name="filter_received" domain="[('direction', '=', 'received')]"/>
+                <separator/>
+                <filter string="Sin el XML en la Bóveda" name="filter_no_cfdi" domain="[('cfdi_document_id', '=', False)]"/>
+                <filter string="Con factura en Odoo" name="filter_with_move" domain="[('move_id', '!=', False)]"/>
+                <group>
+                    <filter string="Estatus" name="group_estatus" context="{'group_by': 'estatus'}"/>
+                    <filter string="Efecto" name="group_efecto" context="{'group_by': 'efecto'}"/>
+                    <filter string="Emisor" name="group_emisor" context="{'group_by': 'rfc_emisor'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_dsi_cfdi_sat_metadata" model="ir.actions.act_window">
+        <field name="name">Metadatos del SAT</field>
+        <field name="res_model">dsi.cfdi.sat.metadata</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Todavía no hay metadatos del SAT.
+            </p>
+            <p>
+                Llegan con las solicitudes de tipo Metadata de la descarga masiva y con su refresco
+                semanal. Dicen qué CFDI están vigentes y cuáles se cancelaron, también de los que la
+                Bóveda no tiene el XML.
+            </p>
+        </field>
+    </record>
+
+    <!-- En el CFDI: de dónde salió su estatus SAT y cuándo se canceló. -->
+    <record id="view_cfdi_document_form_sat_metadata" model="ir.ui.view">
+        <field name="name">cfdi.document.form.sat.metadata</field>
+        <field name="model">cfdi.document</field>
+        <field name="inherit_id" ref="dsi_cfdi_vault.view_cfdi_document_form"/>
+        <field name="arch" type="xml">
+            <field name="sat_last_check" position="after">
+                <field name="sat_cancel_date" invisible="not sat_cancel_date"/>
+                <field name="sat_status_source" invisible="not sat_status_source"/>
+            </field>
+        </field>
+    </record>
+
+</odoo>

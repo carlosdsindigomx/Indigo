@@ -1,0 +1,9 @@
+<odoo>
+    <!-- Recalcula el riesgo 69-B de los CFDI ya guardados cada vez que se
+         instala o actualiza el módulo. El campo es almacenado y solo se
+         recalcula cuando cambia el RFC del CFDI o se vuelve a cargar la lista,
+         así que un cambio en la regla (como dejar de contar a los desvirtuados
+         y a los de sentencia favorable) no llegaría a los CFDI que ya estaban
+         marcados. -->
+    <function model="cfdi.document" name="_recompute_efos_risk_all"/>
+</odoo>

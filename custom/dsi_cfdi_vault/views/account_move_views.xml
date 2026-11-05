@@ -1,0 +1,115 @@
+<odoo>
+
+    <record id="view_move_form_cfdi_vault" model="ir.ui.view">
+        <field name="name">account.move.form.cfdi.vault</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_move_form"/>
+        <field name="arch" type="xml">
+            <div name="button_box" position="inside">
+                <button name="action_view_cfdi_documents" type="object" class="oe_stat_button" icon="fa-archive"
+                        invisible="not cfdi_document_count"
+                        groups="dsi_cfdi_vault.group_cfdi_vault_user">
+                    <field name="cfdi_document_count" widget="statinfo" string="CFDI"/>
+                </button>
+                <button name="action_view_rep_lines" type="object" class="oe_stat_button" icon="fa-money"
+                        invisible="not dsi_rep_count"
+                        groups="dsi_cfdi_vault.group_cfdi_vault_user">
+                    <field name="dsi_rep_count" widget="statinfo" string="REP"/>
+                </button>
+                <button name="action_view_inconsistencies" type="object" class="oe_stat_button"
+                        icon="fa-exclamation-triangle" invisible="not dsi_inconsistency_total"
+                        groups="dsi_cfdi_vault.group_cfdi_vault_user">
+                    <field name="dsi_inconsistency_count" widget="statinfo" string="Discrepancias"/>
+                    <field name="dsi_inconsistency_total" invisible="1"/>
+                </button>
+            </div>
+        </field>
+    </record>
+
+    <!-- Junto al estado SAT de Odoo, que es con lo que se compara. La vista de
+         l10n_mx_edi tiene el mismo ancla en 18, 19 y 20. -->
+    <record id="view_move_form_dsi_vault_sat_state" model="ir.ui.view">
+        <field name="name">account.move.form.dsi.vault.sat.state</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="l10n_mx_edi.account_move_form_inherit_l10n_mx_edi"/>
+        <field name="arch" type="xml">
+            <field name="l10n_mx_edi_cfdi_sat_state" position="after">
+                <field name="dsi_vault_sat_state" invisible="not dsi_vault_sat_state"/>
+                <field name="dsi_vault_sat_mismatch" invisible="not dsi_vault_sat_mismatch"/>
+            </field>
+        </field>
+    </record>
+
+    <!-- account.view_invoice_tree es la lista de clientes y de proveedores en
+         19 y 20; en 18, la base de las cuatro listas de facturas. -->
+    <record id="view_invoice_tree_dsi_vault_sat_state" model="ir.ui.view">
+        <field name="name">account.move.list.dsi.vault.sat.state</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_invoice_tree"/>
+        <field name="arch" type="xml">
+            <field name="status_in_payment" position="before">
+                <field name="dsi_vault_sat_mismatch" column_invisible="True"/>
+                <field name="dsi_vault_sat_state" optional="hide" widget="badge"
+                       decoration-danger="dsi_vault_sat_mismatch"
+                       decoration-success="dsi_vault_sat_state == 'valid' and not dsi_vault_sat_mismatch"
+                       decoration-warning="dsi_vault_sat_state == 'not_found'"/>
+            </field>
+        </field>
+    </record>
+
+    <!-- account.view_account_bill_filter (proveedores) es primaria y hereda de
+         esta, así que los filtros salen en clientes y en proveedores. -->
+    <record id="view_move_list_no_cfdi" model="ir.ui.view">
+        <field name="name">account.move.list.no.cfdi.search</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_account_invoice_filter"/>
+        <field name="arch" type="xml">
+            <filter name="draft" position="after">
+                <filter string="Sin CFDI vinculado" name="filter_no_cfdi_document"
+                        domain="[('cfdi_document_ids', '=', False), ('move_type', '!=', 'entry')]"
+                        groups="dsi_cfdi_vault.group_cfdi_vault_user"/>
+            </filter>
+            <!-- En su propio grupo: se combinan con «Por revisar» y los demás. -->
+            <filter name="to_check" position="after">
+                <separator/>
+                <filter string="Diferencia SAT / bóveda" name="filter_dsi_vault_sat_mismatch"
+                        domain="[('dsi_vault_sat_mismatch', '=', True)]"/>
+                <!-- Las facturas con una discrepancia de estatus pendiente:
+                     estatus SAT distinto, cancelación por actualizar y también
+                     cancelado con factura contabilizada, que no es
+                     «Diferencia SAT / bóveda» (la Bóveda y Odoo coinciden en
+                     cancelado y el asiento sigue publicado). Por eso no se
+                     llama «Diferencia…». -->
+                <filter string="Discrepancia de estatus sin revisar" name="filter_dsi_vault_sat_unreviewed"
+                        domain="[('dsi_inconsistency_ids', 'any', [('state', '=', 'open'),
+                                 ('kind', 'in', ['sat_distinto', 'cancelado_contabilizado', 'cancelacion_por_actualizar'])])]"
+                        groups="dsi_cfdi_vault.group_cfdi_vault_user"/>
+                <filter string="Cancelado en bóveda" name="filter_dsi_vault_cancelled"
+                        domain="[('dsi_vault_sat_state', '=', 'cancelled')]"/>
+                <!-- Las compras PPD con algún pago sin su REP, también las
+                     revisadas: siguen sin REP. -->
+                <filter string="PPD pagada sin REP" name="filter_dsi_ppd_sin_rep"
+                        domain="[('dsi_inconsistency_ids', 'any', [('kind', '=', 'ppd_sin_rep'), ('state', '!=', 'resolved')])]"
+                        groups="dsi_cfdi_vault.group_cfdi_vault_user"/>
+            </filter>
+            <filter name="status" position="after">
+                <filter string="Estado bóveda" name="group_by_dsi_vault_sat_state"
+                        context="{'group_by': 'dsi_vault_sat_state'}"/>
+            </filter>
+        </field>
+    </record>
+
+    <record id="action_move_no_cfdi_document" model="ir.actions.act_window">
+        <field name="name">Facturas sin CFDI</field>
+        <field name="res_model">account.move</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('cfdi_document_ids', '=', False), ('move_type', '!=', 'entry'), ('state', '!=', 'cancel')]</field>
+        <field name="context">{'search_default_posted': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No hay facturas sin CFDI de respaldo.
+            </p>
+        </field>
+    </record>
+
+</odoo>

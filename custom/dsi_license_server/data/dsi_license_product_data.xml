@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Sin noupdate a propósito: corre en cada instalación y en cada -u.
+         _ensure_default_products solo crea los productos que falten (mrp_manufactura
+         nace con «Permitir prueba» apagado) y nunca escribe sobre uno existente
+         ni revive uno archivado. -->
+    <function model="dsi.license.product" name="_ensure_default_products"/>
+</odoo>

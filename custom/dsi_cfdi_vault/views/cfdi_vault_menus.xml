@@ -1,0 +1,80 @@
+<odoo>
+
+    <menuitem id="menu_cfdi_vault_root" name="Bóveda CFDI" sequence="15"
+              web_icon="dsi_cfdi_vault,static/description/icon.png"
+              groups="group_cfdi_vault_user"/>
+
+    <menuitem id="menu_cfdi_document" name="CFDI" parent="menu_cfdi_vault_root"
+              action="action_cfdi_vault_entry" sequence="10"/>
+
+    <menuitem id="menu_cfdi_import_wizard" name="Importar CFDI" parent="menu_cfdi_vault_root"
+              action="action_cfdi_import_wizard" sequence="20"/>
+
+    <menuitem id="menu_cfdi_vault_por_tipo" name="Por tipo" parent="menu_cfdi_vault_root" sequence="25"/>
+
+    <menuitem id="menu_cfdi_document_ingresos" name="Ingresos"
+              parent="menu_cfdi_vault_por_tipo" action="action_cfdi_document_ingresos" sequence="10"/>
+
+    <menuitem id="menu_cfdi_document_egresos" name="Egresos"
+              parent="menu_cfdi_vault_por_tipo" action="action_cfdi_document_egresos" sequence="20"/>
+
+    <menuitem id="menu_cfdi_document_pagos" name="Pagos (REP)"
+              parent="menu_cfdi_vault_por_tipo" action="action_cfdi_document_pagos" sequence="30"/>
+
+    <menuitem id="menu_cfdi_document_nomina" name="Nómina"
+              parent="menu_cfdi_vault_por_tipo" action="action_cfdi_document_nomina" sequence="40"/>
+
+    <menuitem id="menu_cfdi_document_traslados" name="Traslados"
+              parent="menu_cfdi_vault_por_tipo" action="action_cfdi_document_traslados" sequence="50"/>
+
+    <menuitem id="menu_cfdi_vault_discrepancies" name="Discrepancias" parent="menu_cfdi_vault_root" sequence="30"/>
+
+    <!-- Las guardadas, con historial y marca de revisado. Las de abajo siguen
+         siendo listas en vivo. -->
+    <menuitem id="menu_dsi_cfdi_inconsistency" name="Por revisar" parent="menu_cfdi_vault_discrepancies"
+              action="action_dsi_cfdi_inconsistency" sequence="5"/>
+
+    <menuitem id="menu_cfdi_document_no_move" name="CFDI sin factura" parent="menu_cfdi_vault_discrepancies"
+              action="action_cfdi_document_no_move" sequence="10"/>
+
+    <menuitem id="menu_move_no_cfdi_document" name="Facturas sin CFDI" parent="menu_cfdi_vault_discrepancies"
+              action="action_move_no_cfdi_document" sequence="20"/>
+
+    <menuitem id="menu_cfdi_document_discrepancy" name="CFDI cancelados que siguen contabilizados"
+              parent="menu_cfdi_vault_discrepancies" action="action_cfdi_document_discrepancy" sequence="30"/>
+
+    <menuitem id="menu_cfdi_document_efos_risk" name="Proveedores en lista 69-B"
+              parent="menu_cfdi_vault_discrepancies" action="action_cfdi_document_efos_risk" sequence="40"/>
+
+    <menuitem id="menu_cfdi_efos_check_wizard" name="Revisar periodo contra lista 69-B"
+              parent="menu_cfdi_vault_discrepancies" action="action_cfdi_efos_check_wizard" sequence="45"/>
+
+    <menuitem id="menu_cfdi_document_payment_no_move" name="Pagos (REP) sin asiento de pago"
+              parent="menu_cfdi_vault_discrepancies" action="action_cfdi_document_payment_no_move" sequence="50"/>
+
+    <menuitem id="menu_dsi_cfdi_payment_line_por_ligar" name="Pagos (REP) por relacionar con su pago"
+              parent="menu_cfdi_vault_discrepancies" action="action_dsi_cfdi_payment_line_por_ligar" sequence="52"/>
+
+    <menuitem id="menu_dsi_cfdi_payment_line_no_invoice" name="Pagos (REP) de facturas fuera de Odoo"
+              parent="menu_cfdi_vault_discrepancies" action="action_dsi_cfdi_payment_line_no_invoice" sequence="55"/>
+
+    <menuitem id="menu_dsi_cfdi_inconsistency_ppd_sin_rep" name="Compras PPD pagadas sin REP"
+              parent="menu_cfdi_vault_discrepancies" action="action_dsi_cfdi_inconsistency_ppd_sin_rep" sequence="57"/>
+
+    <menuitem id="menu_cfdi_document_payroll_no_move" name="CFDI de nómina sin póliza"
+              parent="menu_cfdi_vault_discrepancies" action="action_cfdi_document_payroll_no_move" sequence="60"/>
+
+    <menuitem id="menu_cfdi_efos_entry" name="Lista 69-B (EFOS)" parent="menu_cfdi_vault_root"
+              action="action_cfdi_efos_entry" sequence="40"
+              groups="account.group_account_manager"/>
+
+    <menuitem id="menu_cfdi_efos_import_wizard" name="Cargar lista 69-B" parent="menu_cfdi_vault_root"
+              action="action_cfdi_efos_import_wizard" sequence="41"
+              groups="account.group_account_manager"/>
+
+    <!-- Para cualquier usuario de la Bóveda: ver cuánto le queda a la prueba,
+         comprar y activar la licencia sin pasar por Ajustes. -->
+    <menuitem id="menu_cfdi_vault_license" name="Licencia" parent="menu_cfdi_vault_root"
+              action="dsi_license_client.action_license_notice" sequence="90"/>
+
+</odoo>

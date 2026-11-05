@@ -1,0 +1,5 @@
+<odoo>
+    <record id="dsi_license_client_state_default" model="dsi.license.client.state">
+        <field name="company_id" ref="base.main_company"/>
+    </record>
+</odoo>

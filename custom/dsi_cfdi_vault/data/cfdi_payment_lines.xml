@@ -1,0 +1,26 @@
+<odoo>
+    <!-- Primero la fecha de corte de «Pago (REP) de factura fuera de Odoo»:
+         la de la instalación o la actualización a 0.2.0, y solo si no está.
+         Así los REP que ya estaban guardados no llenan «Por revisar». -->
+    <function model="dsi.cfdi.payment.line" name="_corte_rep_sin_factura"/>
+    <!-- La dirección de los CFDI ya guardados con el RFC de su empresa (antes
+         se comparaba el texto tal cual): decide si un REP se liga a compras o
+         a ventas. Solo escribe los que cambian. -->
+    <function model="cfdi.document" name="_corregir_direcciones"/>
+    <!-- Después, las líneas de los CFDI de Pago que ya estaban guardados (un
+         renglón por DoctoRelacionado) y su liga con las facturas. Solo los
+         que aún no tienen líneas: correrlo otra vez no hace nada. -->
+    <function model="cfdi.document" name="_backfill_lineas_de_pago"/>
+    <!-- 0.3.0: la liga de cada documento relacionado con su pago de Odoo y la
+         copia del XML en el pago, para TODOS los REP ya guardados. Solo las
+         líneas sin evaluar (estado vacío): correrlo otra vez no hace nada. -->
+    <function model="dsi.cfdi.payment.line" name="_backfill_ligas_con_pagos"/>
+    <!-- Odoo 20: los «Pago recibido» fuera del menú Contabilidad › Auditoría ›
+         México › Documentos CFDI, cuyo dominio Odoo guarda al cargar
+         l10n_mx_edi. En 18 y 19 ese menú no existe y no hace nada. -->
+    <function model="l10n_mx_edi.document" name="_quitar_pagos_recibidos_del_menu_de_odoo"/>
+    <!-- 0.3.0: la primera revisión de discrepancias (con las compras PPD
+         pagadas sin REP de todo el histórico, o desde el corte opcional)
+         corre en cuanto Odoo se levanta, sin esperar al día siguiente. -->
+    <function model="dsi.cfdi.inconsistency" name="_programar_revision"/>
+</odoo>

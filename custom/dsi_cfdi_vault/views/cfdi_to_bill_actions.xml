@@ -1,0 +1,15 @@
+<odoo>
+
+    <!-- Conversión directa desde la lista: sin diálogo previo, igual que al
+         subir un XML en Odoo. Se crean los borradores con lo que dice el
+         comprobante y el usuario completa lo que falte sobre la factura. -->
+    <record id="action_cfdi_crear_factura" model="ir.actions.server">
+        <field name="name">Crear factura de proveedor</field>
+        <field name="model_id" ref="model_cfdi_document"/>
+        <field name="binding_model_id" ref="model_cfdi_document"/>
+        <field name="binding_view_types">list,form</field>
+        <field name="state">code</field>
+        <field name="code">action = records.action_crear_factura_proveedor()</field>
+    </record>
+
+</odoo>

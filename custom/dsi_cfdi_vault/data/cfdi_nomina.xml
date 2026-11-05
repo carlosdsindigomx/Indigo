@@ -1,0 +1,13 @@
+<odoo>
+    <!-- 0.3.0. La fecha de pago, el periodo y el tipo del complemento de
+         nómina de las N ya guardadas: con ellos el asistente «Relacionar con
+         póliza» encuentra la póliza. Solo las que aún no tienen fecha de pago,
+         y solo escribe lo que cambia: correrlo otra vez no hace nada. -->
+    <function model="cfdi.document" name="_backfill_datos_de_nomina"/>
+    <!-- Las N que la conciliación por RFC, total y fecha ligó a una factura
+         (ya no lo hace): se desligan con una nota. Las ligadas a mano se dejan. -->
+    <function model="cfdi.document" name="_desligar_nominas_de_facturas"/>
+    <!-- Las N que ya estaban ligadas a una póliza: su copia del XML en los
+         adjuntos de la póliza. Solo las que no la tienen. -->
+    <function model="cfdi.document" name="_copiar_nominas_a_sus_polizas"/>
+</odoo>

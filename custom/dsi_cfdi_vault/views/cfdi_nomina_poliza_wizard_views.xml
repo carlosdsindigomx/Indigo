@@ -1,0 +1,85 @@
+<odoo>
+
+    <!-- Lo abre cfdi.document.action_relacionar_con_poliza ya guardado y con
+         sus candidatas: no lleva acción propia. «Elegir» llena «Póliza» y
+         vuelve a abrirlo; liga «Relacionar». -->
+    <record id="view_dsi_cfdi_nomina_poliza_wizard_form" model="ir.ui.view">
+        <field name="name">dsi.cfdi.nomina.poliza.wizard.form</field>
+        <field name="model">dsi.cfdi.nomina.poliza.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Relacionar con póliza">
+                <field name="company_id" invisible="1"/>
+                <field name="currency_id" invisible="1"/>
+                <field name="payment_date_count" invisible="1"/>
+                <field name="other_move_count" invisible="1"/>
+                <div class="alert alert-warning" role="alert" invisible="not skipped_note">
+                    <field name="skipped_note" readonly="1"/>
+                </div>
+                <div class="alert alert-info" role="alert" invisible="payment_date_count &lt; 2">
+                    Los seleccionados tienen <field name="payment_date_count" readonly="1" class="oe_inline"/>
+                    fechas de pago distintas: revisa que todos vayan en la misma póliza.
+                </div>
+                <p class="text-muted">
+                    <field name="cfdi_count" readonly="1" class="oe_inline"/> CFDI de nómina con fecha de pago del
+                    <field name="payment_date_from" readonly="1" class="oe_inline"/> al
+                    <field name="payment_date_to" readonly="1" class="oe_inline"/>, neto
+                    <field name="net_total" readonly="1" class="oe_inline" widget="monetary"/>.
+                    Elige la póliza que los contabiliza: quedan ligados a ella y una copia de cada XML
+                    se guarda en sus adjuntos.
+                </p>
+                <group>
+                    <group string="Buscar pólizas">
+                        <field name="date_from"/>
+                        <field name="date_to"/>
+                        <field name="journal_id" options="{'no_create': True}"/>
+                        <field name="reference" placeholder="Número, referencia o etiqueta de una línea"/>
+                    </group>
+                    <group string="Importe">
+                        <field name="amount"/>
+                        <field name="only_matching_amount"/>
+                        <field name="include_draft"/>
+                    </group>
+                </group>
+                <button name="action_buscar" type="object" string="Buscar" icon="fa-search" class="btn-secondary"/>
+                <field name="line_ids" invisible="not line_ids">
+                    <list create="0" delete="0" edit="0" decoration-success="amount_matches">
+                        <field name="date" readonly="1"/>
+                        <field name="move_id" readonly="1"/>
+                        <field name="ref" readonly="1" optional="show"/>
+                        <field name="journal_id" readonly="1"/>
+                        <field name="state" readonly="1" widget="badge"
+                               decoration-info="state == 'draft'" decoration-success="state == 'posted'"/>
+                        <field name="currency_id" column_invisible="True"/>
+                        <field name="total_debit" readonly="1"/>
+                        <field name="closest_amount" readonly="1" optional="hide"/>
+                        <field name="difference" readonly="1"/>
+                        <field name="amount_matches" readonly="1"/>
+                        <field name="linked_cfdi_count" readonly="1"/>
+                        <button name="action_elegir" type="object" string="Elegir" class="btn-link"/>
+                    </list>
+                </field>
+                <p class="text-muted" invisible="line_ids">
+                    No hay pólizas que coincidan. Amplía las fechas, quita el diario o la referencia,
+                    o búscala por su número en «Póliza».
+                </p>
+                <group>
+                    <field name="move_id" options="{'no_create': True}"
+                           domain="[('company_id', '=', company_id), ('move_type', '=', 'entry'), ('state', '!=', 'cancel')]"
+                           context="{'list_view_ref': 'account.view_move_tree'}"/>
+                    <field name="replace_existing" invisible="not other_move_count"/>
+                </group>
+                <div class="text-muted" invisible="not other_move_count">
+                    <field name="other_move_count" readonly="1" class="oe_inline"/> de los seleccionados ya
+                    están relacionados con otra póliza. Sin «Reemplazar» se quedan donde están; con
+                    «Reemplazar» se mueven a esta, y la copia del XML se queda también en la anterior.
+                </div>
+                <footer>
+                    <button name="action_relacionar" type="object" string="Relacionar" class="btn-primary"
+                            invisible="not move_id"/>
+                    <button string="Cancelar" special="cancel" class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+</odoo>

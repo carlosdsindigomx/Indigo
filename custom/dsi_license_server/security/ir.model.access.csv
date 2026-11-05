@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_dsi_license_product,dsi.license.product,model_dsi_license_product,group_dsi_license_manager,1,1,1,1
+access_dsi_license,dsi.license,model_dsi_license,group_dsi_license_manager,1,1,1,1
+access_dsi_license_instance,dsi.license.instance,model_dsi_license_instance,group_dsi_license_manager,1,1,1,1
+access_dsi_license_log,dsi.license.log,model_dsi_license_log,group_dsi_license_manager,1,0,0,0

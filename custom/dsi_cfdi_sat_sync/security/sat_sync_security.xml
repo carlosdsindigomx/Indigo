@@ -1,0 +1,46 @@
+<odoo>
+
+    <record id="group_sat_credential_manager" model="res.groups">
+        <field name="name">Custodio de e.firma</field>
+        <field name="privilege_id" ref="dsi_cfdi_vault.res_groups_privilege_cfdi_vault"/>
+        <!-- Odoo pinta cada privilegio como UN solo desplegable: el usuario
+             queda con uno solo de sus grupos. Si el custodio no implicara al
+             usuario, elegirlo le quitaria "Usuario", y con el el menu raiz de
+             la Boveda del que cuelga la Descarga Masiva SAT. Al implicarlo
+             queda como el nivel de arriba: Usuario < Custodio de e.firma. -->
+        <field name="implied_ids" eval="[(4, ref('dsi_cfdi_vault.group_cfdi_vault_user'))]"/>
+        <field name="comment">Único grupo con permiso para cargar, ver o revocar la e.firma de la empresa. Incluye todo lo del Usuario de la Bóveda CFDI; el Usuario, en cambio, no puede tocar la e.firma.</field>
+        <!-- Sin esto el grupo nace VACÍO y sus menús quedan invisibles para
+             todos, incluido el administrador: en Odoo nadie pertenece a un
+             grupo custom por omisión. Se siembra al admin para que la
+             instalación quede usable; a partir de ahí se añaden a mano los
+             usuarios que deban custodiar la e.firma. -->
+        <field name="user_ids" eval="[(4, ref('base.user_admin'))]"/>
+    </record>
+
+    <!-- La e.firma, la descarga automática, las solicitudes y los metadatos
+         del SAT de una empresa solo los ve quien trabaja en ella, como los CFDI
+         y las discrepancias de la Bóveda. Los metadatos los escribe solo el
+         sistema: el Usuario de la Bóveda solo los lee. -->
+    <record id="rule_sat_credential_company" model="ir.rule">
+        <field name="name">e.firma: multiempresa</field>
+        <field name="model_id" ref="model_sat_credential"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_sat_sync_schedule_company" model="ir.rule">
+        <field name="name">Descarga automática del SAT: multiempresa</field>
+        <field name="model_id" ref="model_sat_sync_schedule"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_sat_download_request_company" model="ir.rule">
+        <field name="name">Solicitudes de descarga del SAT: multiempresa</field>
+        <field name="model_id" ref="model_sat_download_request"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_dsi_cfdi_sat_metadata_company" model="ir.rule">
+        <field name="name">Metadatos del SAT: multiempresa</field>
+        <field name="model_id" ref="model_dsi_cfdi_sat_metadata"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+
+</odoo>

@@ -1,0 +1,5 @@
+<odoo>
+    <menuitem id="menu_dsi_license_client_settings" name="Licenciamiento DS Indigo"
+              parent="base.menu_administration" action="action_dsi_license_client_state"
+              groups="base.group_system" sequence="60"/>
+</odoo>

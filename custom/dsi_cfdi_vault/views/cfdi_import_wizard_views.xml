@@ -1,0 +1,58 @@
+<odoo>
+
+    <record id="view_cfdi_import_wizard_form" model="ir.ui.view">
+        <field name="name">cfdi.import.wizard.form</field>
+        <field name="model">cfdi.import.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Importar CFDI">
+                <field name="state" invisible="1"/>
+                <group invisible="state == 'done'">
+                    <field name="company_id" groups="base.group_multi_company"/>
+                    <field name="attachment_ids" widget="many2many_binary" string="Archivos XML o ZIP"/>
+                </group>
+                <group invisible="state != 'done'">
+                    <div class="row text-center mb-3">
+                        <div class="col">
+                            <h2><field name="imported_count" readonly="1"/></h2>
+                            <span class="text-muted">Importados</span>
+                        </div>
+                        <div class="col">
+                            <h2><field name="duplicate_count" readonly="1"/></h2>
+                            <span class="text-muted">Duplicados</span>
+                        </div>
+                        <div class="col">
+                            <h2><field name="error_count" readonly="1"/></h2>
+                            <span class="text-muted">Con error</span>
+                        </div>
+                    </div>
+                    <field name="result_ids" readonly="1">
+                        <list>
+                            <field name="name"/>
+                            <field name="state" widget="badge"
+                                   decoration-success="state == 'imported'"
+                                   decoration-warning="state == 'duplicate'"
+                                   decoration-danger="state == 'error'"/>
+                            <field name="message"/>
+                            <field name="cfdi_document_id"/>
+                        </list>
+                    </field>
+                </group>
+                <footer>
+                    <button name="action_import" type="object" string="Importar" class="btn-primary"
+                            invisible="state == 'done'"/>
+                    <button name="action_view_imported" type="object" string="Ver CFDI importados" class="btn-primary"
+                            invisible="state != 'done'"/>
+                    <button string="Cerrar" special="cancel" class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_cfdi_import_wizard" model="ir.actions.act_window">
+        <field name="name">Importar CFDI</field>
+        <field name="res_model">cfdi.import.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+</odoo>
