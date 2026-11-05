@@ -11,7 +11,7 @@ env/
 .env
 odoo.conf
 
-.DS_Store
+
 # Secretos de desarrollo — NUNCA commitear.
 # Contienen la llave privada Ed25519 de firma de licencias y la llave maestra
 # Fernet que descifra la e.firma de los clientes. Ambas están en texto plano.
@@ -19,3 +19,4 @@ custom/_dev_scripts/*.conf
 custom/_dev_scripts/*.key
 custom/_dev_scripts/*.cer
 PRODUCTION_KEYS*
+.DS_Store
