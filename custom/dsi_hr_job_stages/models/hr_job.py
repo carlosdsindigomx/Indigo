@@ -5,7 +5,7 @@ class HrJob(models.Model):
 
     job_stage_id = fields.Many2one(
         'hr.job.stage', 
-        string='Etapa (Nuevo Estatus)',
+        string='Etapa',
         group_expand='_read_group_stage_ids',
         default=lambda self: self._default_job_stage_id(),
         tracking=True
