@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- Kanban: Diseño condicional (Dashboard por defecto, tarjetas compactas al agrupar) -->
+        <record id="hr_job_view_kanban_stages" model="ir.ui.view">
+            <field name="name">hr.job.view.kanban.stages</field>
+            <field name="model">hr.job</field>
+            <field name="inherit_id" ref="hr_recruitment.view_hr_job_kanban" />
+            <field name="arch" type="xml">
+                <!-- Se elimina default_group_by y se mantiene la estructura base del dashboard -->
+                <xpath expr="//kanban" position="attributes">
+                    <attribute name="class">o_kanban_dashboard o_hr_recruitment_kanban</attribute>
+                </xpath>
+                
+                <!-- Ocultar el diseño de pantallas grandes cuando se agrupa por etapa -->
+                <xpath expr="//div[hasclass('o_hr_recruitment_kanban_card_large_screen')]" position="attributes">
+                    <attribute name="invisible">context.get('group_by') == 'job_stage_id'</attribute>
+                </xpath>
+
+                <!-- Ocultar el diseño móvil cuando se agrupa por etapa -->
+                <xpath expr="//div[hasclass('o_hr_recruitment_kanban_card_mobile_screen')]" position="attributes">
+                    <attribute name="invisible">context.get('group_by') == 'job_stage_id'</attribute>
+                </xpath>
+
+                <!-- Mostrar el diseño de tarjeta compacta SOLO al agrupar por Etapa. 
+                     Lo insertamos justo antes de la tarjeta de pantalla grande -->
+                <xpath expr="//div[hasclass('o_hr_recruitment_kanban_card_large_screen')]" position="before">
+                    <div invisible="context.get('group_by') != 'job_stage_id'" class="oe_kanban_global_click w-100">
+                        <div class="oe_kanban_details">
+                            <strong class="o_kanban_record_title">
+                                <field name="name"/>
+                            </strong>
+                            <div class="mt4">
+                                <field name="company_id" groups="base.group_multi_company"/>
+                            </div>
+                            <div class="mt4">
+                                <field name="user_id" widget="many2one_avatar_user"/>
+                            </div>
+                        </div>
+                    </div>
+                </xpath>
+            </field>
+        </record>
+
+        <!-- Filtros: Agregar la opción de agrupar rápidamente en el panel de búsqueda -->
+        <record id="hr_job_view_search_stages" model="ir.ui.view">
+            <field name="name">hr.job.view.search.stages</field>
+            <field name="model">hr.job</field>
+            <field name="inherit_id" ref="hr_recruitment.view_job_filter_recruitment"/>
+            <field name="arch" type="xml">
+                <xpath expr="//group" position="inside">
+                    <filter string="Etapa (Nuevo Estatus)" name="group_by_stage" context="{'group_by':'job_stage_id'}"/>
+                </xpath>
+            </field>
+        </record>
+
+        <!-- Lista de etapas (Quitando readonly="1" para que funcione el drag & drop) -->
+        <record id="hr_job_stage_view_list" model="ir.ui.view">
+            <field name="name">hr.job.stage.list</field>
+            <field name="model">hr.job.stage</field>
+            <field name="arch" type="xml">
+                <list string="Etapas de Puesto">
+                    <field name="sequence" widget="handle"/>
+                    <field name="name" />
+                    <field name="fold"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- Formulario principal de Puestos de trabajo -->
+        <record id="hr_job_view_form_stages" model="ir.ui.view">
+            <field name="name">hr.job.view.form.stages</field>
+            <field name="model">hr.job</field>
+            <field name="inherit_id" ref="hr.view_hr_job_form" />
+            <field name="arch" type="xml">
+                <xpath expr="//header" position="inside">
+                    <field name="job_stage_id" widget="statusbar" options="{'clickable': '1'}" />
+                </xpath>
+            </field>
+        </record>
+
+        <!-- Acción y Menú -->
+        <record id="action_hr_job_stage" model="ir.actions.act_window">
+            <field name="name">Etapas de Puestos</field>
+            <field name="res_model">hr.job.stage</field>
+            <field name="view_mode">list,form</field>
+        </record>
+
+        <menuitem id="menu_hr_job_stage"
+            name="Etapas de Puestos"
+            parent="hr_recruitment.menu_hr_recruitment_config_jobs"
+            action="action_hr_job_stage"
+            sequence="15" />
+
+    </data>
+</odoo>
