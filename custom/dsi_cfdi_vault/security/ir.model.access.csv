@@ -18,3 +18,4 @@ access_dsi_cfdi_payment_line_user,dsi.cfdi.payment.line.user,model_dsi_cfdi_paym
 access_dsi_cfdi_payment_line_manager,dsi.cfdi.payment.line.manager,model_dsi_cfdi_payment_line,account.group_account_manager,1,1,1,1
 access_dsi_cfdi_rep_pago_wizard_user,dsi.cfdi.rep.pago.wizard.user,model_dsi_cfdi_rep_pago_wizard,group_cfdi_vault_user,1,1,1,1
 access_dsi_cfdi_rep_pago_wizard_line_user,dsi.cfdi.rep.pago.wizard.line.user,model_dsi_cfdi_rep_pago_wizard_line,group_cfdi_vault_user,1,1,1,1
+access_dsi_cfdi_vault_setup_wizard_admin,dsi.cfdi.vault.setup.wizard.admin,model_dsi_cfdi_vault_setup_wizard,base.group_system,1,1,1,1

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Abre la configuración inicial al terminar de instalar desde
+         Aplicaciones (ir.module.module.next()). noupdate: una actualización no
+         lo vuelve a poner pendiente. Abrir el asistente a mano lo da por
+         visto (ver default_get del asistente). -->
+    <data noupdate="1">
+        <record id="todo_cfdi_vault_setup" model="ir.actions.todo">
+            <field name="name">Configuración inicial de la Bóveda CFDI</field>
+            <field name="action_id" ref="action_cfdi_vault_setup_wizard"/>
+            <field name="sequence">50</field>
+        </record>
+    </data>
+
+</odoo>

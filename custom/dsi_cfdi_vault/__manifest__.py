@@ -8,8 +8,8 @@ Guarda todo CFDI recibido o emitido, esté o no contabilizado. Permite:
 
 - Importar XML/ZIP de CFDI manualmente, con deduplicación por UUID.
 - Conciliación automática contra facturas (account.move) por UUID.
-- Tableros de discrepancias: CFDI sin factura, facturas sin CFDI, CFDI cancelados que siguen contabilizados,
-  proveedores en la lista 69-B del SAT.
+- Tableros de discrepancias: CFDI sin factura (agrupados por clientes, proveedores y empleados), facturas
+  sin CFDI, CFDI cancelados que siguen contabilizados, proveedores en la lista 69-B del SAT.
 - Discrepancias guardadas con historial y marca de revisado (Discrepancias › Por revisar): emisores
   o receptores en la lista 69-B, avisos al convertir un CFDI en factura y estatus SAT distinto entre
   la Bóveda y Odoo. Las que dejan de aparecer se resuelven solas.
@@ -19,7 +19,8 @@ Guarda todo CFDI recibido o emitido, esté o no contabilizado. Permite:
 - Pagos (REP) recibidos ligados a su pago de Odoo, documento relacionado por documento relacionado:
   el pago (o el movimiento del banco conciliado directo) que aplicó el mismo importe a la factura,
   con copia del XML en el pago y su pestaña «Complementos de pago (REP)». Los casos ambiguos quedan
-  «Por elegir» para el contador, en su propia lista.
+  «Por elegir» para el contador, en su propia lista. El REP con todos sus documentos relacionados
+  ligados queda «Vinculado automáticamente» (con el asiento del pago si es uno solo).
 - Discrepancia «Compra PPD pagada sin REP»: una por cada pago aplicado a una compra PPD sin su REP
   ligado, desde el día 6 del mes siguiente al pago (o a su movimiento del banco, si se conoce y es
   posterior; hora de México). Fecha de corte opcional con el parámetro
@@ -30,11 +31,14 @@ Guarda todo CFDI recibido o emitido, esté o no contabilizado. Permite:
   «Discrepancia de estatus sin revisar» y «Cancelado en bóveda». Una compra cancelada en el SAT
   queda por revisar; el asiento no se toca.
 - Verificación de estatus (vigente/cancelado) bajo demanda y automática (cron) contra el servicio público del SAT.
-- Cruce contra la lista 69-B (EFOS): carga manual de CSV o refresco automático best-effort.
+- Cruce contra la lista 69-B (EFOS): botón «Actualizar listas del SAT» en la lista, carga manual de
+  CSV o refresco automático semanal.
+- Configuración inicial (Bóveda CFDI › Configuración inicial): empresa, RFC, licencia y lista 69-B
+  paso por paso, con el botón que resuelve cada uno. Se abre sola al instalar desde Aplicaciones.
 - Conciliación en cascada de 4 niveles: UUID exacto, RFC+total+fecha, sugerencias con score,
   y cola de asignación manual.
 """,
-    'version': '19.0.0.3.0',
+    'version': '19.0.0.4.1',
     'category': 'Accounting/Localizations',
     'author': "DS Indigo",
     'license': 'OPL-1',
@@ -59,6 +63,8 @@ Guarda todo CFDI recibido o emitido, esté o no contabilizado. Permite:
         'views/account_move_views.xml',
         'views/rep_pago_views.xml',
         'views/cfdi_to_bill_actions.xml',
+        'views/cfdi_vault_setup_wizard_views.xml',
+        'data/cfdi_vault_setup_todo.xml',
         'views/cfdi_vault_menus.xml',
     ],
     'installable': True,
