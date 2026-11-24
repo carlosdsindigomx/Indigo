@@ -29,6 +29,41 @@ class DsiSatCredentialKeyError(Exception):
     """La llave maestra de cifrado no está configurada en este servidor."""
 
 
+MASTER_KEY_PARAM = 'dsi_sat_credential_master_key'
+MASTER_KEY_ENV = 'DSI_SAT_CREDENTIAL_MASTER_KEY'
+
+
+def master_key_source(env=None):
+    """(origen, llave) de la llave maestra, en el orden en que se busca:
+    'conf' (odoo.conf), 'env' (variable de entorno) y, solo si se pasa `env`,
+    'param' (parámetro de sistema). (None, None) si no está en ninguno. Lo usa
+    también el asistente de configuración para decir dónde está."""
+    key = config.get(MASTER_KEY_PARAM)
+    if key:
+        return 'conf', key
+    key = os.environ.get(MASTER_KEY_ENV)
+    if key:
+        return 'env', key
+    if env is not None:
+        cp = env['ir.config_parameter'].sudo()
+        # Odoo 20 sustituyó get_param por accesores tipados.
+        key = (cp.get_str(MASTER_KEY_PARAM, '')
+               if hasattr(cp, 'get_str')
+               else cp.get_param(MASTER_KEY_PARAM))
+        if key:
+            return 'param', key
+    return None, None
+
+
+def is_valid_master_key(key):
+    """Si `key` sirve como llave de Fernet (32 bytes en base64 url-safe)."""
+    try:
+        Fernet(key.encode() if isinstance(key, str) else key)
+    except (ValueError, TypeError):
+        return False
+    return True
+
+
 def _get_master_key(env=None):
     """La llave maestra que cifra la e.firma.
 
@@ -45,13 +80,7 @@ def _get_master_key(env=None):
     prueba. Para custodiar la e.firma de un cliente real, el servidor debe
     permitir configurar la llave fuera de la base.
     """
-    key = config.get('dsi_sat_credential_master_key') or os.environ.get('DSI_SAT_CREDENTIAL_MASTER_KEY')
-    if not key and env is not None:
-        cp = env['ir.config_parameter'].sudo()
-        # Odoo 20 sustituyó get_param por accesores tipados.
-        key = (cp.get_str('dsi_sat_credential_master_key', '')
-               if hasattr(cp, 'get_str')
-               else cp.get_param('dsi_sat_credential_master_key'))
+    _origen, key = master_key_source(env)
     if not key:
         raise DsiSatCredentialKeyError(
             "Falta configurar 'dsi_sat_credential_master_key' en odoo.conf, en la variable "

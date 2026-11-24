@@ -15,6 +15,11 @@
          copia del XML en el pago, para TODOS los REP ya guardados. Solo las
          líneas sin evaluar (estado vacío): correrlo otra vez no hace nada. -->
     <function model="dsi.cfdi.payment.line" name="_backfill_ligas_con_pagos"/>
+    <!-- 0.4.1: los REP con todos sus renglones ligados a su pago quedan
+         «Vinculado automáticamente» (con el asiento si es uno solo) y salen
+         de «CFDI sin factura». Solo escribe los que cambian: correrlo otra
+         vez no hace nada. -->
+    <function model="cfdi.document" name="_sincronizar_vinculos_de_reps"/>
     <!-- Odoo 20: los «Pago recibido» fuera del menú Contabilidad › Auditoría ›
          México › Documentos CFDI, cuyo dominio Odoo guarda al cargar
          l10n_mx_edi. En 18 y 19 ese menú no existe y no hace nada. -->

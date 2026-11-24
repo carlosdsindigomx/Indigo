@@ -77,4 +77,10 @@
     <menuitem id="menu_cfdi_vault_license" name="Licencia" parent="menu_cfdi_vault_root"
               action="dsi_license_client.action_license_notice" sequence="90"/>
 
+    <!-- Para quien instala: revisa empresa, RFC, licencia y lista 69-B (y,
+         con la Descarga SAT, la e.firma). -->
+    <menuitem id="menu_cfdi_vault_setup" name="Configuración inicial" parent="menu_cfdi_vault_root"
+              action="action_cfdi_vault_setup_wizard" sequence="95"
+              groups="base.group_system"/>
+
 </odoo>

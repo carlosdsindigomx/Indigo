@@ -35,6 +35,10 @@ class SatCredentialImportWizard(models.TransientModel):
         else:
             credential = Credential.create(values)
 
+        if self.env.context.get('dsi_cfdi_vault_setup'):
+            # Desde la configuración inicial: cerrar y que se recargue con la
+            # e.firma ya en su paso.
+            return {'type': 'ir.actions.act_window_close'}
         return {
             'type': 'ir.actions.act_window',
             'name': _("e.firma"),

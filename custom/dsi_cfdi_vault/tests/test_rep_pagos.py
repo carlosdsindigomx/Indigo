@@ -32,7 +32,10 @@ Lo que más cuidan estas pruebas:
   * el contrato de account.move._dsi_pagos_aplicados, que también usa la
     discrepancia de compras PPD;
   * el asistente «Elegir pago», sus permisos y la licencia, y lo que ve quien
-    solo factura.
+    solo factura;
+  * el REP con todos sus renglones ligados queda «Vinculado automáticamente»
+    (con el asiento si es uno solo) y sale de «CFDI sin factura»; vuelve a
+    pendiente si uno deja de estarlo, y el asiento puesto a mano se respeta.
 
 Usa una empresa mexicana en pesos con el catálogo de México, como
 test_rep_facturas.py (tests/common_pagos.py).
@@ -314,6 +317,7 @@ class TestRepPagos(TransactionCase):
         (rep_a | rep_b)._ligar_reps()
         linea_a, linea_b = rep_a.dsi_payment_line_ids, rep_b.dsi_payment_line_ids
         self.assertEqual((linea_a | linea_b).mapped('payment_link_state'), ['to_choose', 'to_choose'])
+        self.assertEqual((rep_a | rep_b).mapped('match_state'), ['pending', 'pending'])
         self.assertIn("también lo pide", linea_b.payment_link_note)
         self.assertIn(pago1.display_name, linea_b.payment_link_note)
 
@@ -326,6 +330,9 @@ class TestRepPagos(TransactionCase):
 
         self.assertEqual((linea_b.payment_link_state, linea_b.account_payment_id), ('manual', pago2))
         self.assertEqual((linea_a.payment_link_state, linea_a.account_payment_id), ('linked', pago1))
+        self.assertEqual((rep_b.match_state, rep_b.match_method, rep_b.move_id),
+                         ('matched', 'rep_pagos', pago2.move_id), "la liga a mano también vincula")
+        self.assertEqual((rep_a.match_state, rep_a.move_id), ('matched', pago1.move_id))
         self.assertTrue(rep_b.message_ids.filtered(lambda m: "ligado a mano" in (m.body or '')))
         self.assertEqual(len(copias_en(self, pago2, rep_b)), 1)
         with self.assertRaises(AccessError):
@@ -376,8 +383,9 @@ class TestRepPagos(TransactionCase):
 
     def test_fecha_fuera_de_la_ventana_y_la_pista(self):
         """El pago cuadra pero es de 39 días antes: «Por elegir». Lo liga el
-        «Asiento del pago» puesto a mano en el REP (que no se escribe solo), o
-        una ventana más grande en el parámetro."""
+        «Asiento del pago» puesto a mano en el REP, o una ventana más grande en
+        el parámetro. El asiento que pone la Bóveda al quedar ligado no es
+        pista."""
         folio, factura = compra(self)
         pago = pagar(self, factura, fecha='2026-09-01')
         rep_doc = rep(self, (1000.0, 'MXN', '1', [docto(folio, 1000.0)], {'fecha': '2026-10-10'}))
@@ -397,7 +405,9 @@ class TestRepPagos(TransactionCase):
         self._poner_parametro(PARAMETRO_VENTANA, '60')
         rep_doc._ligar_reps()
         self.assertEqual((linea.payment_link_state, linea.account_payment_id), ('linked', pago))
-        self.assertFalse(rep_doc.move_id, "la Bóveda no pone el asiento del pago")
+        self.assertEqual((rep_doc.match_state, rep_doc.match_method, rep_doc.move_id),
+                         ('matched', 'rep_pagos', pago.move_id), "vinculado por su renglón")
+        self.assertFalse(rep_doc._pista_del_asiento(), "el asiento que puso la Bóveda no es pista")
 
     def test_factura_pagada_con_el_extracto(self):
         """Sin account.payment: la liga va al asiento del movimiento del banco,
@@ -1238,6 +1248,169 @@ class TestRepPagos(TransactionCase):
         lineas = self.Linea.with_user(self.usuario).search(
             safe_eval(accion.domain) + [('payment_doc_id', 'in', reps.ids)])
         self.assertEqual(lineas, por_elegir.dsi_payment_line_ids)
+
+    # -- El vínculo del REP por sus renglones ----------------------------
+
+    def _en_la_accion(self, xmlid, docs):
+        accion = self.env.ref(xmlid)
+        return self.Doc.with_user(self.usuario).search(safe_eval(accion.domain) + [('id', 'in', docs.ids)])
+
+    def _con_el_filtro(self, nombre, docs):
+        vista = self.env.ref('dsi_cfdi_vault.view_cfdi_document_search')
+        filtro = etree.fromstring(vista.arch).xpath("//filter[@name=$nombre]", nombre=nombre)[0]
+        return self.Doc.with_user(self.usuario).search(safe_eval(filtro.get('domain')) + [('id', 'in', docs.ids)])
+
+    def _vinculo(self, rep_doc):
+        return rep_doc.match_state, rep_doc.match_method, rep_doc.move_id
+
+    def test_rep_con_todos_sus_renglones_ligados_queda_vinculado(self):
+        """Un REP recibido con todos sus documentos relacionados ligados a su
+        pago queda «Vinculado automáticamente», con el asiento de ese pago, y
+        sale de «CFDI sin factura» y del filtro «Sin factura». Antes seguía
+        «Pendiente» aunque dijera «Ligado» en cada renglón. El REP sin pago
+        sigue ahí."""
+        folio1, compra1 = compra(self, 1000.0)
+        folio2, compra2 = compra(self, 500.0)
+        pago = pagar(self, compra1 | compra2, agrupado=True)
+        ligado = rep(self, (1500.0, 'MXN', '1', [docto(folio1, 1000.0), docto(folio2, 500.0)]))
+        self.assertEqual(set(ligado.dsi_payment_line_ids.mapped('payment_link_state')), {'linked'})
+        self.assertEqual(self._vinculo(ligado), ('matched', 'rep_pagos', pago.move_id))
+        self.assertFalse(ligado.is_discrepancy)
+
+        folio3, _compra3 = compra(self, 300.0)
+        pendiente = rep(self, (300.0, 'MXN', '1', [docto(folio3, 300.0)]))
+        self.assertEqual(pendiente.dsi_payment_line_ids.payment_link_state, 'no_payment')
+        self.assertEqual(self._vinculo(pendiente), ('pending', False, self.env['account.move']))
+
+        reps = ligado | pendiente
+        self.assertEqual(self._en_la_accion('dsi_cfdi_vault.action_cfdi_document_no_move', reps), pendiente)
+        self.assertEqual(self._con_el_filtro('filter_no_move', reps), pendiente)
+        self.assertEqual(self._con_el_filtro('filter_with_move', reps), ligado)
+
+    def test_rep_pagado_con_varios_pagos_queda_vinculado_sin_asiento(self):
+        """Dos facturas, cada una con su pago, y un REP que las paga: en
+        «Asiento del pago» cabe uno solo, así que queda vinculado sin asiento
+        (sus pagos están en sus renglones), y también sale de «CFDI sin
+        factura»."""
+        folio1, compra1 = compra(self, 1000.0)
+        folio2, compra2 = compra(self, 500.0)
+        pago1, pago2 = pagar(self, compra1), pagar(self, compra2)
+        rep_doc = rep(self, (1000.0, 'MXN', '1', [docto(folio1, 1000.0)]),
+                      (500.0, 'MXN', '1', [docto(folio2, 500.0)]))
+        lineas = rep_doc.dsi_payment_line_ids
+        self.assertEqual(lineas.mapped('payment_link_state'), ['linked', 'linked'])
+        self.assertEqual(lineas.account_payment_id, pago1 | pago2)
+        self.assertEqual(self._vinculo(rep_doc), ('matched', 'rep_pagos', self.env['account.move']))
+        self.assertFalse(self._en_la_accion('dsi_cfdi_vault.action_cfdi_document_no_move', rep_doc))
+        self.assertEqual(self._con_el_filtro('filter_with_move', rep_doc), rep_doc)
+
+    def test_un_renglon_sin_ligar_deja_el_rep_pendiente(self):
+        """Un renglón ligado y otro de una factura que no está en Odoo («No
+        aplica»): al REP todavía le falta algo y sigue pendiente."""
+        folio, factura = compra(self)
+        pagar(self, factura)
+        rep_doc = rep(self, (1300.0, 'MXN', '1', [docto(folio, 1000.0), docto(self._uuid(), 300.0)]))
+        self.assertEqual(sorted(rep_doc.dsi_payment_line_ids.mapped('payment_link_state')),
+                         ['linked', 'not_applicable'])
+        self.assertEqual(self._vinculo(rep_doc), ('pending', False, self.env['account.move']))
+        self.assertEqual(self._en_la_accion('dsi_cfdi_vault.action_cfdi_document_no_move', rep_doc), rep_doc)
+
+    def test_el_rep_vuelve_a_pendiente_si_un_renglon_pierde_su_pago(self):
+        """El pago regresa a borrador: el renglón queda «Sin pago en Odoo» y
+        el REP, pendiente y sin asiento. Al volver a publicarlo, vinculado
+        otra vez."""
+        folio, factura = compra(self)
+        pago = pagar(self, factura)
+        rep_doc = rep(self, (1000.0, 'MXN', '1', [docto(folio, 1000.0)]))
+        self.assertEqual(self._vinculo(rep_doc), ('matched', 'rep_pagos', pago.move_id))
+
+        pago.action_draft()
+        self.env.cr.flush()
+        self.assertEqual(rep_doc.dsi_payment_line_ids.payment_link_state, 'no_payment')
+        self.assertEqual(self._vinculo(rep_doc), ('pending', False, self.env['account.move']))
+
+        pago.action_post()
+        if factura.payment_state not in ('paid', 'in_payment'):
+            (pago.move_id.line_ids | factura.line_ids).filtered(
+                lambda l: l.account_type == 'liability_payable' and not l.reconciled).reconcile()
+        self.env.cr.flush()
+        self.assertEqual(self._vinculo(rep_doc), ('matched', 'rep_pagos', pago.move_id))
+
+    def test_rep_cancelado_deja_de_estar_vinculado_y_su_sustituto_se_vincula(self):
+        """El REP cancelado suelta su pago: deja de estar vinculado (no queda
+        como «cancelado que sigue contabilizado») y el sustituto, que toma el
+        pago, queda vinculado en el momento."""
+        folio, factura = compra(self)
+        pago = pagar(self, factura)
+        original = rep(self, (1000.0, 'MXN', '1', [docto(folio, 1000.0)]))
+        sustituto = rep(self, (1000.0, 'MXN', '1', [docto(folio, 1000.0)]))
+        self.assertEqual(self._vinculo(original), ('matched', 'rep_pagos', pago.move_id))
+        self.assertEqual(sustituto.match_state, 'pending')
+
+        sat_dice(self, original, 'cancelled')
+        self.assertEqual(self._vinculo(original), ('pending', False, self.env['account.move']))
+        self.assertFalse(original.is_discrepancy)
+        self.assertEqual(self._vinculo(sustituto), ('matched', 'rep_pagos', pago.move_id))
+
+    def test_el_asiento_puesto_a_mano_se_respeta(self):
+        """Si alguien escribe otro «Asiento del pago» en un REP vinculado por
+        sus renglones, pasa a «Vinculado manualmente» y la Bóveda ya no lo
+        cambia al volver a ligar. Lo mismo con el que ya tenía a mano."""
+        folio, factura = compra(self)
+        pago = pagar(self, factura)
+        rep_doc = rep(self, (1000.0, 'MXN', '1', [docto(folio, 1000.0)]))
+        self.assertEqual(rep_doc.match_method, 'rep_pagos')
+
+        otro = pagar(self, compra(self, 200.0)[1]).move_id
+        ficha = self.Doc.new({
+            'move_type': 'P', 'move_id': otro.id,
+            'match_state': rep_doc.match_state, 'match_method': rep_doc.match_method,
+        })
+        ficha._onchange_move_id()
+        self.assertEqual((ficha.match_state, ficha.match_method), ('manual', 'manual'))
+        rep_doc.write({'move_id': otro.id, 'match_state': ficha.match_state, 'match_method': ficha.match_method})
+        rep_doc._ligar_reps()
+        self.assertEqual(self._vinculo(rep_doc), ('manual', 'manual', otro))
+        self.assertEqual(rep_doc.dsi_payment_line_ids.account_payment_id, pago, "su renglón sigue con su pago")
+
+        pago.action_draft()
+        self.env.cr.flush()
+        self.assertEqual(self._vinculo(rep_doc), ('manual', 'manual', otro), "a mano no vuelve a pendiente")
+
+    def test_la_actualizacion_y_la_revision_diaria_dejan_el_vinculo_al_dia(self):
+        """Los REP que ya estaban ligados al actualizar (pendientes, como los
+        dejaba la 0.3.0) quedan vinculados, y uno vinculado así cuyo renglón ya
+        no está ligado vuelve a pendiente. Correrlo otra vez no hace nada. La
+        revisión diaria lo hace después de religar con los pagos."""
+        detectores = self.Inconsistencia._detectores()
+        self.assertEqual(detectores[detectores.index('_revisar_ligas_con_pagos') + 1], '_revisar_vinculo_de_reps')
+        folio, factura = compra(self)
+        pago = pagar(self, factura)
+        ligado = rep(self, (1000.0, 'MXN', '1', [docto(folio, 1000.0)]))
+        folio, _factura = compra(self, 700.0)
+        suelto = rep(self, (700.0, 'MXN', '1', [docto(folio, 700.0)]))
+        self.assertEqual(suelto.dsi_payment_line_ids.payment_link_state, 'no_payment')
+
+        def como_antes():
+            self.env.flush_all()
+            self.env.cr.execute(SQL(
+                "UPDATE cfdi_document SET move_id = NULL, match_state = 'pending', match_method = NULL "
+                "WHERE id = %s", ligado.id))
+            self.env.cr.execute(SQL(
+                "UPDATE cfdi_document SET match_state = 'matched', match_method = 'rep_pagos' WHERE id = %s",
+                suelto.id))
+            (ligado | suelto).invalidate_recordset()
+
+        como_antes()
+        self.Doc._sincronizar_vinculos_de_reps()
+        self.assertEqual(self._vinculo(ligado), ('matched', 'rep_pagos', pago.move_id))
+        self.assertEqual(self._vinculo(suelto), ('pending', False, self.env['account.move']))
+        self.assertEqual(self.Doc._sincronizar_vinculos_de_reps(), 0, "correrlo otra vez no hace nada")
+
+        como_antes()
+        self.Inconsistencia._cron_detectar_inconsistencias()
+        self.assertEqual(self._vinculo(ligado), ('matched', 'rep_pagos', pago.move_id))
+        self.assertEqual(self._vinculo(suelto), ('pending', False, self.env['account.move']))
 
     def test_rep_xml_acepta_fecha_y_forma_del_nodo(self):
         """La fábrica de REP de test_rep_facturas.py, con la FechaPago y la

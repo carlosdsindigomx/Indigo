@@ -17,6 +17,7 @@ from unittest.mock import MagicMock, patch
 import requests
 
 from odoo import Command
+from odoo.exceptions import UserError
 from odoo.tests.common import TransactionCase, new_test_user, tagged
 
 from odoo.addons.dsi_cfdi_vault.models.cfdi_efos_entry import DEFAULT_69B_URLS
@@ -151,3 +152,33 @@ class TestLista69B(TransactionCase):
 
         self.assertFalse(resultado['ok'])
         self.assertEqual([llamada.args[0] for llamada in descarga.call_args_list], [url])
+
+    # «Actualizar listas del SAT», en la lista 69-B ----------------------------
+
+    def test_el_boton_actualiza_la_lista_y_dice_la_fecha_del_sat(self):
+        presunto = self._cfdi_de('PRE010101AA1')
+        respuesta = MagicMock(content=csv_sat([('PRE010101AA1', 'Presunto'), ('DEF010101AA1', 'Definitivo')]))
+        with patch(DESCARGA, return_value=respuesta):
+            accion = self.efos.action_actualizar_del_sat()
+
+        self.assertEqual(self.efos.search_count([]), 2)
+        self.assertTrue(presunto.is_efos_risk, "los CFDI ya se recalcularon")
+        self.assertEqual(accion['params']['title'], "Lista 69-B actualizada")
+        self.assertIn("2 contribuyentes", accion['params']['message'])
+        self.assertIn("31 de diciembre de 2025", accion['params']['message'])
+        self.assertEqual(accion['params']['next'], {'type': 'ir.actions.client', 'tag': 'soft_reload'},
+                         "la lista se recarga con lo nuevo")
+
+    def test_si_el_sat_no_responde_el_boton_lo_dice_y_no_toca_la_lista(self):
+        self.efos._import_csv_bytes(csv_sat([('PRE010101AA1', 'Presunto')]))
+        with patch(DESCARGA, side_effect=requests.ConnectionError("sin red")), \
+                self.assertRaisesRegex(UserError, "Cargar lista 69-B"):
+            self.efos.action_actualizar_del_sat()
+        self.assertEqual(self.efos.search([]).mapped('rfc'), ['PRE010101AA1'])
+
+    def test_el_boton_esta_en_la_lista_para_quien_puede_cargarla(self):
+        vista = self.env.ref('dsi_cfdi_vault.view_cfdi_efos_entry_list')
+        gestor = new_test_user(self.env, login='gestor_69b', groups='account.group_account_manager')
+        arch = self.efos.with_user(gestor).get_view(vista.id, 'list')['arch']
+        self.assertIn('name="action_actualizar_del_sat"', arch)
+        self.assertIn('Actualizar listas del SAT', arch)

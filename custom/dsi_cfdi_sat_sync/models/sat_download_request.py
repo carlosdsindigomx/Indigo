@@ -33,6 +33,11 @@ MAX_ESPERA_HORAS = 24
 MIMETYPE_DEL_TXT = 'application/x-sat-metadata'
 
 
+class ErrorDeAutenticacion(UserError):
+    """El SAT no aceptó la e.firma o no dio token. Es de la e.firma y no de la
+    solicitud: quien recorre varias deja para después las demás de esa e.firma."""
+
+
 class SatDownloadRequest(models.Model):
     _name = 'sat.download.request'
     _description = "Solicitud de Descarga Masiva de CFDI ante el SAT"
@@ -129,7 +134,12 @@ class SatDownloadRequest(models.Model):
         """Empuja la solicitud al siguiente paso que le toque, tragándose los
         errores. Lo usan los crons: un fallo en una solicitud no debe frenar
         el resto ni tumbar la tarea programada. El detalle del problema queda
-        en 'Último error' del registro, como cuando se opera a mano."""
+        en 'Último error' del registro, como cuando se opera a mano.
+
+        Devuelve False si el SAT no contestó o no aceptó la e.firma: quien
+        recorre varias solicitudes deja para después las demás de esa e.firma.
+        True en cualquier otro caso, aunque no haya avanzado (el SAT la sigue
+        preparando, o la rechazó por algo de ella misma)."""
         self.ensure_one()
         try:
             if self.state == 'draft':
@@ -146,12 +156,17 @@ class SatDownloadRequest(models.Model):
                 self.action_descargar_y_procesar()
             elif self.state == 'processed' and self.metadata_pending:
                 self._procesar_metadatos()
+        except ErrorDeAutenticacion as e:
+            _logger.info("Solicitud %s: el SAT no aceptó la e.firma: %s", self.id, e)
+            return False
         except (UserError, RedirectWarning) as e:
             # Errores de negocio esperables (el SAT aún no la registra, rechazo
             # con motivo, etc.). Ya quedaron escritos en error_message.
             _logger.info("Solicitud %s no avanzó: %s", self.id, e)
         except Exception:  # pylint: disable=broad-except
             _logger.exception("Error inesperado avanzando la solicitud %s", self.id)
+            return False
+        return True
 
     def _ensure_token(self):
         """Devuelve un token vigente, re-autenticando si hace falta.
@@ -207,14 +222,14 @@ class SatDownloadRequest(models.Model):
         except etree.XMLSyntaxError as e:
             self.write({'state': 'rejected', 'error_message': f"Respuesta no es XML válido: {response.text[:500]}"})
             self.env.cr.commit()  # persistir el error ANTES del raise: si no, el rollback automático de la excepción se lo lleva
-            raise UserError(_("El SAT respondió algo inesperado al autenticar. Revisa el detalle del error en la solicitud.")) from e
+            raise ErrorDeAutenticacion(_("El SAT respondió algo inesperado al autenticar. Revisa el detalle del error en la solicitud.")) from e
 
         fault = root.find('.//{http://schemas.xmlsoap.org/soap/envelope/}Fault')
         if fault is not None:
             fault_text = etree.tostring(fault, pretty_print=True).decode()
             self.write({'state': 'rejected', 'error_message': fault_text})
             self.env.cr.commit()  # persistir el error ANTES del raise: si no, el rollback automático de la excepción se lo lleva
-            raise UserError(_(
+            raise ErrorDeAutenticacion(_(
                 "El SAT rechazó la autenticación (revisa que la e.firma sea vigente y real — "
                 "ver el mensaje completo en el campo 'Último error' de esta solicitud)."))
 
@@ -222,7 +237,7 @@ class SatDownloadRequest(models.Model):
         if token_el is None or not token_el.text:
             self.write({'state': 'rejected', 'error_message': response.text[:2000]})
             self.env.cr.commit()  # persistir el error ANTES del raise: si no, el rollback automático de la excepción se lo lleva
-            raise UserError(_("El SAT no devolvió un token de autenticación. Ver detalle del error."))
+            raise ErrorDeAutenticacion(_("El SAT no devolvió un token de autenticación. Ver detalle del error."))
 
         self.write({
             'auth_token': token_el.text,

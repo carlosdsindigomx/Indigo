@@ -5,6 +5,10 @@
         <field name="model">dsi.cfdi.efos.entry</field>
         <field name="arch" type="xml">
             <list string="Lista 69-B (EFOS)" create="0">
+                <header>
+                    <button name="action_actualizar_del_sat" type="object" string="Actualizar listas del SAT"
+                            class="btn-primary" display="always" groups="account.group_account_manager"/>
+                </header>
                 <field name="rfc"/>
                 <field name="name"/>
                 <field name="situation" widget="badge"
@@ -39,9 +43,9 @@
                 Todavía no se ha cargado la lista 69-B del SAT.
             </p>
             <p>
-                Usa el botón "Cargar lista 69-B" para subir el CSV publicado por el SAT
-                (Artículo 69-B del CFF), o configura la URL de descarga automática en
-                Ajustes técnicos.
+                Usa «Actualizar listas del SAT» para descargarla ahora, o el menú «Cargar
+                lista 69-B» para subir el CSV publicado por el SAT (Artículo 69-B del CFF).
+                Después se actualiza sola cada semana.
             </p>
         </field>
     </record>

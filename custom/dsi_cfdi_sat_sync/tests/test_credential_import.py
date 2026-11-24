@@ -84,6 +84,14 @@ class TestCredentialImport(TransactionCase):
             action = self._wizard().action_import()
             return self.env['sat.credential'].browse(action['res_id'])
 
+    def test_desde_la_configuracion_inicial_cierra_el_dialogo(self):
+        """Cargada desde la configuración inicial de la Bóveda, cierra el
+        diálogo para que el asistente se recargue, en vez de abrir la e.firma."""
+        with patch.dict('os.environ', {'DSI_SAT_CREDENTIAL_MASTER_KEY': Fernet.generate_key().decode()}):
+            wizard = self._wizard().with_context(dsi_cfdi_vault_setup=True)
+            self.assertEqual(wizard.action_import(), {'type': 'ir.actions.act_window_close'})
+        self.assertEqual(self.env['sat.credential'].search([('company_id', '=', self.company.id)]).rfc, RFC)
+
     def test_carga_y_lectura(self):
         with patch.dict('os.environ', {'DSI_SAT_CREDENTIAL_MASTER_KEY': Fernet.generate_key().decode()}):
             action = self._wizard().action_import()

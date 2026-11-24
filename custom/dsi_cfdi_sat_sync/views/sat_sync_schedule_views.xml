@@ -8,6 +8,7 @@
                 <field name="periodicity"/>
                 <field name="date_start"/>
                 <field name="date_covered_to"/>
+                <field name="date_next_visit" optional="show"/>
                 <field name="last_run"/>
                 <field name="request_count" string="Solicitudes"/>
                 <field name="last_error" optional="show"/>
@@ -23,7 +24,7 @@
             <form string="Descarga automática">
                 <header>
                     <button name="action_generar_ahora" type="object" class="btn-primary"
-                            string="Generar el siguiente periodo ahora"/>
+                            string="Ponerse al día ahora"/>
                     <button name="action_refrescar_metadatos" type="object"
                             string="Refrescar metadatos ahora"
                             invisible="not download_metadata or metadata_refresh_days &lt;= 0"/>
@@ -39,9 +40,10 @@
                     </div>
 
                     <div class="alert alert-info" role="alert">
-                        Configura esto una vez y el sistema se encarga: cada día genera las
-                        solicitudes del periodo que toque, y cada hora revisa cuáles ya están
-                        listas en el SAT para descargarlas. No hace falta volver a entrar aquí.
+                        Configura esto una vez y el sistema se encarga. Al guardar se pone al
+                        día: pide al SAT todo lo que falte desde «Traer desde» hasta hoy. Después
+                        vuelve al SAT según la periodicidad, y cada hora revisa cuáles solicitudes
+                        ya están listas para descargarlas. No hace falta volver a entrar aquí.
                     </div>
 
                     <group>
@@ -63,7 +65,9 @@
                     </group>
 
                     <group string="Avance">
+                        <field name="date_covered_from" invisible="not date_covered_from"/>
                         <field name="date_covered_to"/>
+                        <field name="date_next_visit"/>
                         <field name="last_run"/>
                         <field name="metadata_refreshed_on" invisible="not metadata_refreshed_on"/>
                         <field name="last_error"/>
