@@ -1,7 +1,7 @@
 ================================================================================
  ADDOBI - Boveda CFDI y Servidor de Licencias
  Guia de instalacion
- Version 0.3.0  -  Odoo 18, 19 y 20 (una rama del repositorio por version)
+ Version 0.4.1  -  Odoo 18, 19 y 20 (una rama del repositorio por version)
 ================================================================================
 
 QUE TRAE ESTE PAQUETE
@@ -154,6 +154,32 @@ SI ALGUN DIA HAY QUE GENERAR UN PAR NUEVO
  PASO 4 - INSTALAR EN EL ODOO DEL CLIENTE
 ================================================================================
 
+  LO NORMAL: ENTREGAR EL ZIP. Desde la rama de la version de Odoo del
+  cliente, con todo en commit:
+
+           ./empaquetar.sh
+
+  deja dist/addobi-<serie>-<version>.zip (y su .sha256) con los tres
+  modulos sin sus pruebas, instalar.py y LEEME.txt (la guia del cliente,
+  distribucion/LEEME.txt). Con el zip el cliente instala solo:
+
+    - Servidor propio: instalar.py copia los modulos, revisa o agrega la
+      ruta en el addons_path, genera la llave de la e.firma en su
+      odoo.conf (--generar-llave-sat) e instala o actualiza en la base.
+    - Odoo.sh: quien administra el repositorio del cliente copia las
+      carpetas de addons/ y las sube por staging. DS Indigo no entra a ese
+      repositorio.
+    - Odoo Online: no se puede (no admite modulos con codigo propio).
+
+  Al instalar desde Aplicaciones se abre la Configuracion inicial (Boveda
+  CFDI > Configuracion inicial, solo administradores): revisa empresa,
+  RFC, licencia y lista 69-B, y con la Descarga SAT la llave, la e.firma y
+  la descarga automatica, cada paso con su boton. Cubre los pasos 4.4, 5,
+  6 y 7 de abajo; en Odoo.sh tambien genera la llave del 4.2 como
+  parametro del sistema (con su aviso).
+
+  Lo que sigue es la instalacion a mano, paso por paso.
+
   4.1  Copia las carpetas de este repositorio, de la rama de la version
        de Odoo del cliente, al addons-path del cliente:
 
@@ -268,12 +294,35 @@ SI ALGUN DIA HAY QUE GENERAR UN PAR NUEVO
 
   Menu: Boveda CFDI > Descarga Masiva SAT > Descarga automatica > Nuevo
 
-    - Traer desde       desde que fecha se empieza a descargar
-    - Periodicidad      Diaria, Semanal o Quincenal
-                        (las quincenas son naturales: 1-15 y 16 a fin de mes)
-    - Dias de recuper.  vuelve a pedir los ultimos N dias de cada periodo ya
-                        cubierto, para atrapar lo que el proveedor timbro
-                        tarde. Los duplicados se descartan por folio fiscal.
+    - Traer desde       desde que fecha se descarga. Al guardar, la descarga
+                        se pone al dia: pide al SAT todo lo que falte desde
+                        esa fecha hasta hoy, en varias solicitudes, sea cual
+                        sea la periodicidad. Moverla a una fecha anterior pide
+                        lo que falta desde ahi; moverla despues no repite
+                        nada.
+    - Periodicidad      cada cuanto vuelve al SAT ya que esta al dia. Cada
+                        vez trae lo que falte hasta ese dia:
+                          Diaria     cada dia
+                          Semanal    a los 7 dias de la vez anterior
+                          Quincenal  el 1 y el 16: la quincena natural que
+                                     termino (1-15 o 16 a fin de mes) y lo
+                                     que va del dia
+                        Es tambien el tamano de cada solicitud: al ponerse al
+                        dia se pide un periodo tras otro.
+    - Dias de recuper.  al volver al SAT, la primera solicitud empieza N dias
+                        antes de lo ya cubierto, para atrapar lo que el
+                        proveedor timbro tarde. El ultimo dia ya pedido se
+                        repite siempre, aunque sea 0: se pidio antes de que
+                        terminara. Los duplicados se descartan por folio
+                        fiscal.
+
+    El dia de hoy se pide como vaya; lo que se timbre despues llega en la
+    siguiente ida al SAT. "Siguiente ida al SAT" dice cuando vuelve a pedir
+    por su cuenta. El boton "Ponerse al dia ahora" no espera: pide lo que
+    falte hasta hoy y la siguiente ida se cuenta desde ahi. Si ya estaba
+    pedido hasta hoy, vuelve a pedir los ultimos dias para traer lo que se
+    timbro despues; nunca repite las fechas de una solicitud anterior,
+    porque el SAT no lo deja.
 
     - Refrescar metadatos (dias)
                         90 por omision. Una vez por semana vuelve a pedir
@@ -286,10 +335,15 @@ SI ALGUN DIA HAY QUE GENERAR UN PAR NUEVO
                         "Descargar metadatos". Boton: "Refrescar metadatos
                         ahora".
 
-  A partir de ahi, tres tareas programadas hacen el resto: una diaria genera
-  el periodo que toca y lo manda al SAT, otra cada hora verifica y
-  descarga lo que ya este listo, y una semanal pide el refresco de
-  metadatos. Hay una cuarta, "Actualizar SAT", que se explica abajo.
+  A partir de ahi, tres tareas programadas hacen el resto. Una diaria crea
+  las solicitudes de lo que toque (tambien corre al guardar la
+  programacion). Otra, cada hora, las manda al SAT, verifica y descarga lo
+  que ya este listo; trabaja en tandas de menos de un minuto que se
+  encadenan cada 2 minutos mientras haya pendientes, porque al ponerse al
+  dia pueden ser cientos. Si el SAT no contesta o no acepta la e.firma,
+  las demas solicitudes de esa e.firma esperan a la siguiente corrida. La
+  tercera, semanal, pide el refresco de metadatos. Hay una cuarta,
+  "Actualizar SAT", que se explica abajo.
 
   El SAT tarda de minutos a varias horas en preparar un paquete. Es normal
   que una solicitud pase un rato en "Verificando".
@@ -521,6 +575,21 @@ SI ALGUN DIA HAY QUE GENERAR UN PAR NUEVO
   falla, el pago se registra igual y queda en el log. La revision diaria
   repara la que haya quedado vieja.
 
+  EL REP VINCULADO POR SUS RENGLONES (desde 0.4.1)
+  Un REP recibido con todos sus documentos relacionados en "Ligado" o
+  "Ligado a mano" queda "Vinculado automaticamente", con el metodo
+  "Renglones ligados a su pago": sale de Discrepancias > CFDI sin factura
+  y del filtro "Sin factura". Si todos son del mismo asiento de pago, ese
+  asiento queda en "Asiento del pago"; si el REP paga con varios pagos (o
+  con un pago sin asiento), queda vinculado sin asiento y sus pagos se
+  ven en "Documentos relacionados". Basta un renglon sin ligar (por
+  elegir, sin pago o con su factura fuera de Odoo) para que siga
+  "Pendiente", y vuelve a pendiente si un renglon pierde su pago o el REP
+  se cancela. En estos REP no sale "Desvincular": el vinculo se cambia
+  con "Elegir pago" o escribiendo otro "Asiento del pago", que pasa a
+  "Vinculado manualmente" y la boveda ya no lo toca. Antes de 0.4.1 un
+  REP asi seguia "Pendiente" aunque cada renglon dijera "Ligado".
+
   En Odoo 18, regresar a borrador una factura la desconcilia de sus pagos
   (lo hace Odoo; en 19 y 20 los conserva): sus REP quedan "No aplica" en
   ese momento. Al volver a publicarla hay que conciliarla otra vez con sus
@@ -620,6 +689,25 @@ SI ALGUN DIA HAY QUE GENERAR UN PAR NUEVO
   boveda", "Discrepancia de estatus sin revisar" y "Cancelado en
   boveda". Una compra que el SAT cancelo y Odoo no queda con la marca
   "Por revisar" de Odoo; el asiento no se toca.
+
+  CFDI SIN FACTURA
+  Discrepancias > CFDI sin factura sale agrupado: Clientes (los emitidos,
+  por su receptor), Proveedores (los recibidos, por su emisor) y Empleados
+  (la nomina emitida), y dentro de cada grupo por nombre y RFC. El
+  agrupado se quita o se cambia en la barra de busqueda; "Cliente o
+  proveedor" y "Cliente / proveedor" tambien estan en Agrupar por de
+  cualquier lista de CFDI.
+
+  LISTA 69-B
+  Boveda CFDI > Lista 69-B (EFOS), boton "Actualizar listas del SAT": en
+  ese momento descarga del SAT el listado completo (presuntos,
+  desvirtuados, definitivos y sentencias favorables), reemplaza la lista y
+  recalcula el riesgo 69-B de todos los CFDI. Dice cuantos contribuyentes
+  trajo y a que fecha publico el SAT la informacion. La tarea semanal
+  hace lo mismo sola. Si el servidor no alcanza al SAT, lo dice y la lista
+  cargada no cambia: baja el CSV del "Listado completo" en la pagina del
+  SAT y usa "Cargar lista 69-B". Solo para administradores de
+  contabilidad.
 
   VARIAS EMPRESAS
   Desde la 0.2.0 cada usuario ve solo los CFDI, la e.firma, la descarga
@@ -754,6 +842,26 @@ SI ALGUN DIA HAY QUE GENERAR UN PAR NUEVO
 
   Correrlo otra vez no repite nada. Las nominas del paso 3 salen en
   Discrepancias > CFDI de nomina sin poliza (antes "sin factura").
+
+  DE 0.4.0 A 0.4.1
+  Se actualizan dsi_cfdi_vault y dsi_cfdi_sat_sync, a 18.0.0.4.1,
+  19.0.0.4.1 o 20.0.0.4.1: dsi_license_client no cambia. El comando de
+  arriba sirve igual, y desde 0.3.0 tambien (un solo -u hace lo de las
+  dos versiones). El -u deja "Vinculado automaticamente" los REP recibidos
+  que ya tenian todos sus renglones ligados a su pago (ver EL REP
+  VINCULADO POR SUS RENGLONES en USO DIARIO). En el log: "Pagos (REP): N
+  CFDI de pago cambiaron su vinculo por sus renglones". Los que tenian un
+  "Asiento del pago" puesto a mano no cambian. El -u tambien llena
+  "Cliente o proveedor" y "Cliente / proveedor" en todos los CFDI ya
+  guardados (ver CFDI SIN FACTURA en USO DIARIO); en una base grande tarda
+  unos minutos mas. Correrlo otra vez no repite nada.
+
+  La descarga automatica cambia de forma de trabajar (ver PASO 7): antes
+  cada corrida diaria pedia un solo periodo, y con "Diaria" y "Traer
+  desde" en el pasado nunca se ponia al dia. La actualizacion no la
+  mueve: en su siguiente corrida diaria pide de una vez todo lo que le
+  falte hasta hoy. Para no esperar, abre la programacion y aprieta
+  "Ponerse al dia ahora". Las solicitudes ya hechas no cambian.
 
 
 ================================================================================

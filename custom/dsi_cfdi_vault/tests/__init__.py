@@ -14,3 +14,5 @@ from . import test_rep_pagos
 from . import test_ppd_sin_rep
 from . import test_nomina_poliza
 from . import test_iconos
+from . import test_asistente_configuracion
+from . import test_cfdi_sin_factura

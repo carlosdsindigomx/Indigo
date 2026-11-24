@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Cada paso: su estado en una etiqueta, qué falta y el botón que lo
+         resuelve. Sin iconos a propósito: Odoo 20 quitó Font Awesome y así la
+         vista es la misma en las tres ramas. dsi_cfdi_sat_sync agrega sus
+         pasos después de name="paso_69b". -->
+    <record id="view_cfdi_vault_setup_wizard_form" model="ir.ui.view">
+        <field name="name">dsi.cfdi.vault.setup.wizard.form</field>
+        <field name="model">dsi.cfdi.vault.setup.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Configuración inicial de la Bóveda CFDI" create="0">
+                <header>
+                    <button name="action_ir_a_la_boveda" type="object" string="Ir a la Bóveda"
+                            class="btn-primary" invisible="not listo"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>Configuración inicial de la Bóveda CFDI</h1>
+                    </div>
+                    <p class="text-muted">
+                        Lo que hace falta para trabajar con la Bóveda en esta empresa. Cada paso
+                        dice si ya está listo y, si no, qué falta y cómo resolverlo. Puedes volver
+                        cuando quieras desde Bóveda CFDI › Configuración inicial: siempre revisa
+                        cómo está todo en ese momento.
+                    </p>
+                    <div class="alert alert-success" role="status" invisible="not listo">
+                        Todo listo: ya puedes importar CFDI a la Bóveda.
+                    </div>
+                    <group>
+                        <field name="company_id" options="{'no_create': True, 'no_open': True}"
+                               groups="base.group_multi_company"/>
+                    </group>
+
+                    <div name="paso_empresa" class="mt-4">
+                        <h4>
+                            1. Empresa
+                            <span class="badge rounded-pill text-bg-success ms-2" invisible="not empresa_ok">Listo</span>
+                            <span class="badge rounded-pill text-bg-warning ms-2" invisible="empresa_ok">Falta</span>
+                        </h4>
+                        <div><field name="empresa_texto"/></div>
+                        <button name="action_abrir_empresa" type="object" string="Abrir la empresa"
+                                class="btn btn-link px-0" invisible="empresa_ok"/>
+                    </div>
+
+                    <div name="paso_rfc" class="mt-4">
+                        <h4>
+                            2. RFC de la empresa
+                            <span class="badge rounded-pill text-bg-success ms-2" invisible="not rfc_ok or rfc_cambiado">Listo</span>
+                            <span class="badge rounded-pill text-bg-warning ms-2" invisible="rfc_ok and not rfc_cambiado">Falta</span>
+                        </h4>
+                        <div><field name="rfc_texto"/></div>
+                        <div class="d-flex align-items-center gap-2 mt-1">
+                            <field name="rfc" placeholder="p. ej. EKU9003173C9" class="w-auto"/>
+                            <button name="action_guardar_rfc" type="object" string="Guardar RFC"
+                                    class="btn-secondary" invisible="not rfc_cambiado"/>
+                        </div>
+                    </div>
+
+                    <div name="paso_licencia" class="mt-4">
+                        <h4>
+                            3. Licencia
+                            <span class="badge rounded-pill text-bg-success ms-2" invisible="not licencia_ok">Listo</span>
+                            <span class="badge rounded-pill text-bg-warning ms-2" invisible="licencia_ok">Falta</span>
+                        </h4>
+                        <div><field name="licencia_texto"/></div>
+                        <button name="action_licencia" type="object" string="Activar la licencia o pedir la prueba"
+                                class="btn btn-link px-0" invisible="licencia_ok"/>
+                        <button name="action_licencia" type="object" string="Ver la licencia"
+                                class="btn btn-link px-0" invisible="not licencia_ok"/>
+                    </div>
+
+                    <div name="paso_69b" class="mt-4">
+                        <h4>
+                            4. Lista 69-B del SAT
+                            <span class="badge rounded-pill text-bg-success ms-2" invisible="not efos_ok">Listo</span>
+                            <span class="badge rounded-pill text-bg-secondary ms-2" invisible="efos_ok">Recomendado</span>
+                        </h4>
+                        <div><field name="efos_texto"/></div>
+                        <div groups="account.group_account_manager">
+                            <button name="action_descargar_69b" type="object" string="Descargar del SAT"
+                                    class="btn btn-link px-0 me-3"/>
+                            <button name="action_cargar_69b" type="object" string="Cargar CSV"
+                                    class="btn btn-link px-0"/>
+                        </div>
+                    </div>
+
+                    <field name="empresa_ok" invisible="1"/>
+                    <field name="rfc_ok" invisible="1"/>
+                    <field name="rfc_cambiado" invisible="1"/>
+                    <field name="licencia_ok" invisible="1"/>
+                    <field name="efos_ok" invisible="1"/>
+                    <field name="listo" invisible="1"/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_cfdi_vault_setup_wizard" model="ir.actions.act_window">
+        <field name="name">Configuración inicial</field>
+        <field name="res_model">dsi.cfdi.vault.setup.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">current</field>
+    </record>
+
+</odoo>

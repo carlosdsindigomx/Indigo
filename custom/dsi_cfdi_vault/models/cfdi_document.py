@@ -275,6 +275,20 @@ class CfdiDocument(models.Model):
     partner_name_issuer = fields.Char(string="Nombre emisor")
     partner_rfc_receiver = fields.Char(string="RFC receptor")
     partner_name_receiver = fields.Char(string="Nombre receptor")
+    # La otra parte del CFDI, para agrupar: en los emitidos el receptor (un
+    # cliente, o un empleado en la nómina) y en los recibidos el emisor (un
+    # proveedor). Guardados: Odoo solo agrupa por campos guardados.
+    counterpart_kind = fields.Selection([
+        ('customer', "Clientes"),
+        ('supplier', "Proveedores"),
+        ('employee', "Empleados"),
+    ], string="Cliente o proveedor", compute='_compute_counterpart', store=True,
+        help="Quién es la otra parte del CFDI: en los emitidos, el receptor (un cliente, o un "
+             "empleado en la nómina); en los recibidos, el emisor (un proveedor).")
+    counterpart_name = fields.Char(
+        string="Cliente / proveedor", compute='_compute_counterpart', store=True,
+        help="Nombre y RFC de la otra parte del CFDI: el receptor en los emitidos y el emisor en los "
+             "recibidos.")
     invoice_date = fields.Date(string="Fecha del comprobante")
     amount_total = fields.Monetary(string="Total")
     currency_id = fields.Many2one(
@@ -298,9 +312,13 @@ class CfdiDocument(models.Model):
         ('uuid_exact', "UUID exacto"),
         ('rfc_amount_date', "RFC + total + fecha"),
         ('manual', "Manual"),
+        ('rep_pagos', "Renglones ligados a su pago"),
     ], string="Método de vinculación", tracking=True,
         help="Cómo se vinculó este CFDI a su factura: UUID exacto (nivel 1, alta confianza), "
-             "RFC + total + fecha con tolerancia (nivel 2), o asignación manual del usuario.")
+             "RFC + total + fecha con tolerancia (nivel 2), o asignación manual del usuario. "
+             "En un REP recibido, «Renglones ligados a su pago»: todos sus documentos relacionados "
+             "están ligados a su pago de Odoo; el «Asiento del pago» se llena si todos son del mismo "
+             "asiento.")
     source = fields.Selection([
         ('manual_upload', "Carga manual"),
     ], string="Origen", default='manual_upload', required=True)
@@ -409,6 +427,22 @@ class CfdiDocument(models.Model):
         for doc in self:
             doc.is_discrepancy = doc.sat_status == 'canceled' and bool(doc.move_id)
 
+    @api.depends('direction', 'move_type', 'partner_rfc_issuer', 'partner_name_issuer',
+                 'partner_rfc_receiver', 'partner_name_receiver')
+    def _compute_counterpart(self):
+        for doc in self:
+            if doc.direction == 'issued':
+                rfc, nombre = doc.partner_rfc_receiver, doc.partner_name_receiver
+                doc.counterpart_kind = 'employee' if doc.move_type == 'N' else 'customer'
+            elif doc.direction == 'received':
+                rfc, nombre = doc.partner_rfc_issuer, doc.partner_name_issuer
+                doc.counterpart_kind = 'supplier'
+            else:
+                rfc = nombre = False
+                doc.counterpart_kind = False
+            nombre = (nombre or '').strip()
+            doc.counterpart_name = f"{nombre} ({rfc})" if nombre and rfc else (nombre or rfc or False)
+
     @api.depends('partner_rfc_issuer', 'partner_rfc_receiver')
     def _compute_efos_risk(self):
         rfcs = {rfc for rfc in self.mapped('partner_rfc_issuer') + self.mapped('partner_rfc_receiver') if rfc}
@@ -467,8 +501,11 @@ class CfdiDocument(models.Model):
 
     @api.onchange('move_id')
     def _onchange_move_id(self):
+        # Un REP vinculado por sus renglones (rep_pagos) al que alguien le
+        # pone otro «Asiento del pago» pasa a manual: si no, la Bóveda se lo
+        # regresaría al volver a ligar sus renglones.
         for doc in self:
-            if doc.move_id and doc.match_state == 'pending':
+            if doc.move_id and (doc.match_state == 'pending' or doc.match_method == 'rep_pagos'):
                 doc.match_state = 'manual'
                 doc.match_method = 'manual'
             elif not doc.move_id:

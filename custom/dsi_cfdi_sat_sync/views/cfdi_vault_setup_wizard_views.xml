@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Los pasos de la Descarga SAT en la configuración inicial de la Bóveda. -->
+    <record id="view_cfdi_vault_setup_wizard_form_sat" model="ir.ui.view">
+        <field name="name">dsi.cfdi.vault.setup.wizard.form.sat</field>
+        <field name="model">dsi.cfdi.vault.setup.wizard</field>
+        <field name="inherit_id" ref="dsi_cfdi_vault.view_cfdi_vault_setup_wizard_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@name='paso_69b']" position="after">
+                <div name="paso_llave" class="mt-4">
+                    <h4>
+                        5. Llave que cifra la e.firma
+                        <span class="badge rounded-pill text-bg-success ms-2" invisible="not llave_ok">Listo</span>
+                        <span class="badge rounded-pill text-bg-warning ms-2" invisible="llave_ok">Falta</span>
+                    </h4>
+                    <div><field name="llave_texto"/></div>
+                    <button name="action_generar_llave" type="object"
+                            string="Generarla y guardarla en la base (Odoo.sh)"
+                            class="btn btn-link px-0" invisible="llave_origen"
+                            groups="base.group_system"
+                            confirm="La llave quedará en la base de datos, junto con la e.firma cifrada: quien tenga un respaldo de la base tendrá las dos. Úsalo solo si el servidor no deja ponerla fuera de la base, como en Odoo.sh. En un servidor propio, ponla en el odoo.conf. ¿Generarla y guardarla?"/>
+                </div>
+
+                <div name="paso_efirma" class="mt-4">
+                    <h4>
+                        6. e.firma de la empresa
+                        <span class="badge rounded-pill text-bg-success ms-2" invisible="not efirma_ok">Listo</span>
+                        <span class="badge rounded-pill text-bg-warning ms-2" invisible="efirma_ok">Falta</span>
+                    </h4>
+                    <div><field name="efirma_texto"/></div>
+                    <div groups="dsi_cfdi_sat_sync.group_sat_credential_manager">
+                        <button name="action_cargar_efirma" type="object" string="Cargar la e.firma"
+                                class="btn btn-link px-0" invisible="efirma_ok or not llave_ok"/>
+                        <button name="action_cargar_efirma" type="object" string="Reemplazar la e.firma"
+                                class="btn btn-link px-0" invisible="not efirma_ok or not llave_ok"/>
+                    </div>
+                    <div class="text-muted" invisible="llave_ok">Primero la llave del paso 5.</div>
+                </div>
+
+                <div name="paso_descarga" class="mt-4">
+                    <h4>
+                        7. Descarga automática del SAT
+                        <span class="badge rounded-pill text-bg-success ms-2" invisible="not descarga_ok">Listo</span>
+                        <span class="badge rounded-pill text-bg-secondary ms-2" invisible="descarga_ok">Opcional</span>
+                    </h4>
+                    <div><field name="descarga_texto"/></div>
+                    <button name="action_programar_descarga" type="object" string="Programar la descarga"
+                            class="btn btn-link px-0" invisible="descarga_ok or not efirma_ok"
+                            groups="dsi_cfdi_sat_sync.group_sat_credential_manager"/>
+                </div>
+            </xpath>
+            <xpath expr="//field[@name='listo']" position="before">
+                <field name="llave_origen" invisible="1"/>
+                <field name="llave_ok" invisible="1"/>
+                <field name="efirma_ok" invisible="1"/>
+                <field name="descarga_ok" invisible="1"/>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

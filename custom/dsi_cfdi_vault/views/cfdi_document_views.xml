@@ -13,6 +13,7 @@
                 <field name="partner_name_issuer" string="Emisor"/>
                 <field name="partner_rfc_receiver" optional="hide"/>
                 <field name="partner_name_receiver" string="Receptor" optional="hide"/>
+                <field name="counterpart_name" optional="hide"/>
                 <field name="amount_total" sum="Total"/>
                 <field name="currency_id" invisible="1"/>
                 <field name="sat_status" widget="badge"
@@ -75,8 +76,10 @@
             <form string="CFDI">
                 <header>
                     <button name="action_verify_sat_status" type="object" string="Verificar estatus SAT" class="btn-primary"/>
+                    <!-- Un REP vinculado por sus renglones (rep_pagos) puede no tener
+                         asiento: ya está vinculado. -->
                     <button name="action_match_automatically" type="object" string="Conciliar automáticamente"
-                            invisible="move_id"/>
+                            invisible="move_id or match_method == 'rep_pagos'"/>
                     <!-- Propone facturas: en un CFDI de Pago el vínculo es el asiento
                          del pago, y las facturas que paga se ligan solas; en uno de
                          Nómina, la póliza. -->
@@ -89,8 +92,12 @@
                     <button name="action_crear_factura_proveedor" type="object" class="btn-primary"
                             string="Crear factura de proveedor"
                             invisible="move_id or direction != 'received' or move_type not in ['I', 'E']"/>
+                    <!-- El vínculo de un REP por sus renglones lo decide la liga con
+                         sus pagos: se cambia con «Elegir pago» o escribiendo otro
+                         «Asiento del pago», no desvinculando. -->
                     <button name="action_unlink_move" type="object" string="Desvincular"
-                            invisible="not move_id or move_type == 'N'" confirm="¿Desvincular este CFDI de su factura?"/>
+                            invisible="not move_id or move_type == 'N' or match_method == 'rep_pagos'"
+                            confirm="¿Desvincular este CFDI de su factura?"/>
                     <button name="action_unlink_move" type="object" string="Desvincular"
                             invisible="not move_id or move_type != 'N'"
                             confirm="¿Desvincular este CFDI de su póliza? La copia del XML se queda en los adjuntos de la póliza."/>
@@ -156,7 +163,7 @@
                                  _check_poliza_no_cancelada lo revisan en el servidor). -->
                             <field name="move_id" string="Póliza" invisible="move_type != 'N'" options="{'no_create': True}"
                                    domain="[('move_type', '=', 'entry'), ('company_id', '=', company_id), ('state', '!=', 'cancel')]"/>
-                            <field name="match_method" invisible="not move_id"/>
+                            <field name="match_method" invisible="not move_id and match_method != 'rep_pagos'"/>
                         </group>
                         <group string="Estatus SAT">
                             <field name="sat_status" widget="badge"
@@ -247,12 +254,17 @@
                 <field name="partner_rfc_receiver"/>
                 <field name="partner_name_issuer"/>
                 <field name="partner_name_receiver"/>
+                <field name="counterpart_name"/>
                 <field name="move_id"/>
                 <filter string="Emitidos" name="filter_issued" domain="[('direction', '=', 'issued')]"/>
                 <filter string="Recibidos" name="filter_received" domain="[('direction', '=', 'received')]"/>
                 <separator/>
-                <filter string="Sin factura" name="filter_no_move" domain="[('move_id', '=', False)]"/>
-                <filter string="Con factura" name="filter_with_move" domain="[('move_id', '!=', False)]"/>
+                <!-- Un REP vinculado por sus renglones (rep_pagos) cuenta como
+                     vinculado aunque no tenga un solo asiento de pago. -->
+                <filter string="Sin factura" name="filter_no_move"
+                        domain="[('move_id', '=', False), ('match_method', '!=', 'rep_pagos')]"/>
+                <filter string="Con factura" name="filter_with_move"
+                        domain="['|', ('move_id', '!=', False), ('match_method', '=', 'rep_pagos')]"/>
                 <filter string="Discrepancias críticas" name="filter_discrepancy" domain="[('is_discrepancy', '=', True)]"/>
                 <filter string="Riesgo 69-B" name="filter_efos_risk" domain="[('is_efos_risk', '=', True)]"/>
                 <separator/>
@@ -263,6 +275,10 @@
                         domain="[('move_type', '=', 'P'), ('dsi_payment_line_ids.invoice_id', '!=', False)]"/>
                 <group>
                     <filter string="Dirección" name="group_direction" context="{'group_by': 'direction'}"/>
+                    <filter string="Cliente o proveedor" name="group_counterpart_kind"
+                            context="{'group_by': 'counterpart_kind'}"/>
+                    <filter string="Cliente / proveedor" name="group_counterpart"
+                            context="{'group_by': 'counterpart_name'}"/>
                     <filter string="Tipo de comprobante" name="group_move_type" context="{'group_by': 'move_type'}"/>
                     <filter string="Conciliación" name="group_match_state" context="{'group_by': 'match_state'}"/>
                     <filter string="Estatus SAT" name="group_sat_status" context="{'group_by': 'sat_status'}"/>
@@ -348,7 +364,10 @@
         <field name="name">CFDI sin factura</field>
         <field name="res_model">cfdi.document</field>
         <field name="view_mode">list,form</field>
-        <field name="domain">[('move_id', '=', False)]</field>
+        <field name="domain">[('move_id', '=', False), ('match_method', '!=', 'rep_pagos')]</field>
+        <!-- Agrupados por clientes, proveedores y empleados, y dentro por la otra
+             parte: se quita o se cambia en la barra de búsqueda. -->
+        <field name="context">{'search_default_group_counterpart_kind': 1, 'search_default_group_counterpart': 1}</field>
         <field name="search_view_id" ref="view_cfdi_document_search"/>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">

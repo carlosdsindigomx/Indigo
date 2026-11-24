@@ -5,3 +5,4 @@ from . import test_bloqueo_licencia
 from . import test_credential_import
 from . import test_metadatos
 from . import test_cancelacion_emitidas
+from . import test_asistente_sat

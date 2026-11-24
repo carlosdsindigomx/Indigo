@@ -90,6 +90,12 @@ CAMPOS_DEL_PAGO = {'state', 'invoice_ids', 'amount', 'currency_id', 'date', 'mov
 # no reciben nada de él (_facturas_del_pago).
 REEMBOLSOS = ('in_refund', 'out_refund')
 
+# El método de vinculación de un REP recibido que la Bóveda da por vinculado
+# porque todos sus documentos relacionados están ligados a su pago
+# (_sincronizar_vinculo_con_sus_pagos). Sale de la liga y no es pista para
+# ella: el «Asiento del pago» que sí lo es lo pone alguien a mano.
+METODO_POR_SUS_PAGOS = 'rep_pagos'
+
 
 def _estados_de_pago_aplicado(env):
     """Los estados de account.payment de un pago que ya aplicó a la factura,
@@ -402,8 +408,7 @@ class CfdiPaymentLine(models.Model):
         """Si el pago aplicado `e` está a `ventana` días o menos de la
         FechaPago, o es el «Asiento del pago» que alguien puso a mano en el REP."""
         self.ensure_one()
-        rep = self.payment_doc_id
-        pista = rep.move_id if rep.move_id.move_type == 'entry' else self.env['account.move']
+        pista = self.payment_doc_id._pista_del_asiento()
         return self._dias_a(e) <= ventana or bool(pista and (e['asiento'] == pista or e['pago'].move_id == pista))
 
     def _dias_a(self, e):
@@ -546,6 +551,10 @@ class CfdiPaymentLine(models.Model):
         sin_copia = elegibles.filtered(
             lambda linea: linea.payment_link_state in ESTADOS_LIGADOS and not linea._copia_al_dia())
         (cambiadas | sin_copia).payment_doc_id._copiar_rep_a_sus_pagos()
+        # Y el vínculo de sus REP: vinculado si todos sus renglones quedaron
+        # ligados. De todos los REP evaluados, no solo de los que cambiaron:
+        # «Elegir pago» escribe la línea antes de llamar aquí.
+        todas.payment_doc_id._sincronizar_vinculo_con_sus_pagos()
         return afectadas
 
     def _motivo_no_aplica(self, linea):
@@ -656,8 +665,7 @@ class CfdiPaymentLine(models.Model):
         def evaluar(linea):
             """(los que cuadran y están libres, los que además están en la
             ventana, los que quedan después de desempatar)."""
-            rep = linea.payment_doc_id
-            pista = rep.move_id if rep.move_id.move_type == 'entry' else Asiento
+            pista = linea.payment_doc_id._pista_del_asiento()
             respaldo = linea in con_respaldo
             cuadran = [
                 e for e in unidades
@@ -999,6 +1007,107 @@ class CfdiDocument(models.Model):
                     })
                 grupo.filtered(lambda linea, c=copia: linea.payment_attachment_id != c).write(
                     {'payment_attachment_id': copia.id})
+
+    # -------------------------------------------------------------------
+    # El vínculo del REP por sus renglones
+    # -------------------------------------------------------------------
+
+    def _pista_del_asiento(self):
+        """El «Asiento del pago» de este REP que sirve de pista para ligar sus
+        renglones (_en_su_ventana, _desempatar): el que alguien puso a mano o
+        el que lleva el folio del REP. El que pone la Bóveda porque sus
+        renglones ya están ligados (METODO_POR_SUS_PAGOS) no lo es: sale de
+        la liga misma y no debe sostenerla."""
+        self.ensure_one()
+        if self.move_id.move_type == 'entry' and self.match_method != METODO_POR_SUS_PAGOS:
+            return self.move_id
+        return self.env['account.move']
+
+    def _vinculo_por_sus_pagos(self):
+        """(vinculado, asiento) de este REP según sus renglones: vinculado si
+        está activo, no cancelado y todos sus documentos relacionados están
+        ligados a su pago («Ligado» o «Ligado a mano»); el asiento, si todos
+        son del mismo asiento de pago. Un REP que paga con varios pagos, o con
+        un pago sin asiento, queda vinculado sin asiento: en «Asiento del
+        pago» cabe uno solo, y sus pagos están en «Documentos relacionados».
+
+        Basta un renglón sin ligar (por elegir, sin pago, o «No aplica»
+        porque su factura no está en Odoo o está en otra empresa) para que
+        el REP siga pendiente: todavía le falta algo."""
+        self.ensure_one()
+        Asiento = self.env['account.move']
+        lineas = self.dsi_payment_line_ids
+        if not (self.active and self.sat_status != 'canceled' and lineas
+                and all(linea.payment_link_state in ESTADOS_LIGADOS for linea in lineas)):
+            return False, Asiento
+        asientos = lineas.payment_move_id
+        if len(asientos) == 1 and all(lineas.mapped('payment_move_id')):
+            return True, asientos
+        return True, Asiento
+
+    def _sincronizar_vinculo_con_sus_pagos(self):
+        """Deja el vínculo de estos CFDI de Pago como dicen sus renglones
+        (_vinculo_por_sus_pagos): «Vinculado automáticamente», con el método
+        «Renglones ligados a su pago» y el asiento si es uno solo; y, si ya
+        no lo están, de vuelta a «Pendiente». Antes un REP con todos sus
+        renglones ligados seguía «Pendiente» y en «CFDI sin factura», porque
+        su vínculo era solo el «Asiento del pago» puesto a mano.
+
+        Solo toca los REP pendientes sin asiento y los que vinculó así: el
+        asiento que alguien puso a mano o que trae el folio del REP se
+        respeta. Escribe solo lo que cambia, con `dsi_sin_sync`: el asiento de
+        un pago no tiene Estado bóveda, y volver a ligar sus renglones no
+        cambia nada (ya los ligó quien llama). Lo escribe la Bóveda, con sudo."""
+        cambios = defaultdict(lambda: self.env['cfdi.document'].sudo())
+        for rep in self.sudo().with_context(active_test=False).filtered(lambda d: d.move_type == 'P'):
+            propio = rep.match_method == METODO_POR_SUS_PAGOS
+            if not propio and (rep.move_id or rep.match_state != 'pending'):
+                continue
+            vinculado, asiento = rep._vinculo_por_sus_pagos()
+            if vinculado:
+                valores = (asiento.id or False, 'matched', METODO_POR_SUS_PAGOS)
+            elif propio:
+                valores = (False, 'pending', False)
+            else:
+                continue
+            if (rep.move_id.id or False, rep.match_state, rep.match_method or False) != valores:
+                cambios[valores] |= rep
+        for (move_id, estado, metodo), reps in cambios.items():
+            reps.with_context(dsi_sin_sync=True).write(
+                {'move_id': move_id, 'match_state': estado, 'match_method': metodo})
+        return self.browse([rep.id for reps in cambios.values() for rep in reps])
+
+    @api.model
+    def _sincronizar_vinculos_de_reps(self):
+        """El vínculo por sus renglones de los REP que no lo tienen al día:
+        los pendientes sin asiento con todos sus renglones ligados y los
+        vinculados así que ya no lo están. Corre al actualizar el módulo
+        (data/cfdi_payment_lines.xml), para los REP que ya estaban ligados,
+        y en la revisión diaria, para lo que ningún gancho vio. En tandas con
+        flush y la caché vacía, como _backfill_ligas_con_pagos. Un asiento
+        que cambió sin que cambiara ningún renglón lo corrige el siguiente
+        religado de esos renglones."""
+        Doc = self.sudo().with_context(active_test=False)
+        sin_ligar = [('payment_link_state', 'not in', list(ESTADOS_LIGADOS))]
+        por_vincular = Doc.search([
+            ('move_type', '=', 'P'), ('match_state', '=', 'pending'), ('move_id', '=', False),
+            ('active', '=', True), ('sat_status', '!=', 'canceled'),
+            ('dsi_payment_line_ids', '!=', False), ('dsi_payment_line_ids', 'not any', sin_ligar),
+        ])
+        por_desvincular = Doc.search([
+            ('move_type', '=', 'P'), ('match_method', '=', METODO_POR_SUS_PAGOS),
+            '|', '|', '|', ('active', '=', False), ('sat_status', '=', 'canceled'),
+            ('dsi_payment_line_ids', '=', False), ('dsi_payment_line_ids', 'any', sin_ligar),
+        ])
+        ids = (por_vincular | por_desvincular).ids
+        cambiados = 0
+        for tanda in split_every(LOTE_DE_REPS, ids):
+            cambiados += len(Doc.browse(tanda)._sincronizar_vinculo_con_sus_pagos())
+            self.env.flush_all()
+            self.env.invalidate_all()
+        if cambiados:
+            _logger.info("Pagos (REP): %s CFDI de pago cambiaron su vínculo por sus renglones.", cambiados)
+        return cambiados
 
 
 class AccountMove(models.Model):
@@ -1356,12 +1465,20 @@ class CfdiInconsistency(models.Model):
             self.env.invalidate_all()
 
     @api.model
+    def _revisar_vinculo_de_reps(self):
+        """El detector de la revisión diaria: el vínculo de los REP por sus
+        renglones que ningún gancho dejó al día (un cambio por SQL, un REP
+        archivado sin volver a ligar)."""
+        self.env['cfdi.document']._sincronizar_vinculos_de_reps()
+
+    @api.model
     def _detectores(self):
         """La liga con los pagos va justo después de la liga con las facturas
         (_detectar_reps_sin_factura), que puede cambiar la factura de una
-        línea."""
+        línea, y el vínculo de los REP justo después de la liga con los
+        pagos, que lo decide."""
         detectores = list(super()._detectores())
         posicion = (detectores.index('_detectar_reps_sin_factura') + 1
                     if '_detectar_reps_sin_factura' in detectores else len(detectores))
-        detectores.insert(posicion, '_revisar_ligas_con_pagos')
+        detectores[posicion:posicion] = ['_revisar_ligas_con_pagos', '_revisar_vinculo_de_reps']
         return detectores

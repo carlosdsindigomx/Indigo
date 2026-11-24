@@ -1,6 +1,7 @@
 import csv
 import io
 import logging
+import re
 import unicodedata
 
 import requests
@@ -45,6 +46,26 @@ def _normalize(text):
     text = (text or '').strip().lower()
     text = unicodedata.normalize('NFKD', text).encode('ascii', 'ignore').decode('ascii')
     return text
+
+
+def _fecha_del_sat(csv_bytes):
+    """La fecha con que el SAT publica la lista, de su primer renglón
+    («Información actualizada al 31 de diciembre de 2025; …»). Vacía si no
+    viene: el archivo sirve igual."""
+    inicio = csv_bytes[:2000]
+    for encoding in CSV_ENCODINGS:
+        try:
+            texto = inicio.decode(encoding)
+            break
+        except UnicodeDecodeError:
+            continue
+    else:
+        return ''
+    for renglon in texto.splitlines()[:5]:
+        encontrada = re.search(r'actualizada al ([^;"]+)', renglon, re.IGNORECASE)
+        if encontrada:
+            return encontrada.group(1).strip()
+    return ''
 
 
 class CfdiEfosEntry(models.Model):
@@ -100,8 +121,41 @@ class CfdiEfosEntry(models.Model):
                 # cargada, así que se puede probar la siguiente dirección.
                 errors.append(f"{candidate}: {e}")
                 continue
-            return {'ok': True, 'count': count, 'url': candidate}
+            return {'ok': True, 'count': count, 'url': candidate,
+                    'fecha_sat': _fecha_del_sat(response.content)}
         return {'ok': False, 'error': "; ".join(errors)}
+
+    @api.model
+    def action_actualizar_del_sat(self, como_cargar=None):
+        """«Actualizar listas del SAT»: descarga ahora el listado completo de la
+        lista 69-B (presuntos, desvirtuados, definitivos y sentencias
+        favorables), lo carga en lugar del anterior y recalcula el riesgo 69-B
+        de los CFDI. Es lo que hace la tarea semanal, pero diciendo cómo le fue.
+        Si no se puede descargar, la lista cargada no cambia y el mensaje dice
+        cómo cargar el CSV a mano (`como_cargar`: el botón que lo hace)."""
+        resultado = self._refresh_from_url()
+        if not resultado.get('ok'):
+            raise UserError(_(
+                "No se pudo descargar la lista 69-B del SAT desde este servidor.\n\n%(error)s\n\n"
+                "Descarga el CSV del «Listado completo» en la página del SAT y cárgalo con "
+                "«%(boton)s».",
+                error=resultado.get('error'), boton=como_cargar or _("Cargar lista 69-B")))
+        if resultado.get('fecha_sat'):
+            mensaje = _("%(total)s contribuyentes, con la información del SAT al %(fecha)s. Los CFDI "
+                        "ya se recalcularon.", total=resultado['count'], fecha=resultado['fecha_sat'])
+        else:
+            mensaje = _("%s contribuyentes. Los CFDI ya se recalcularon.", resultado['count'])
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _("Lista 69-B actualizada"),
+                'message': mensaje,
+                'type': 'success',
+                'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'soft_reload'},
+            },
+        }
 
     @api.model
     def _import_csv_bytes(self, csv_bytes):
