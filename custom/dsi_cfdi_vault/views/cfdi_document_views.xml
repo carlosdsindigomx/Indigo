@@ -4,7 +4,11 @@
         <field name="name">cfdi.document.list</field>
         <field name="model">cfdi.document</field>
         <field name="arch" type="xml">
-            <list string="CFDI" decoration-danger="is_discrepancy or is_efos_risk" decoration-muted="match_state == 'pending'">
+            <!-- default_order además del _order del modelo: los grupos por fecha
+                 (p. ej. por mes) solo salen del más reciente al más antiguo si
+                 la lista lo pide. -->
+            <list string="CFDI" default_order="invoice_date desc, id desc"
+                  decoration-danger="is_discrepancy or is_efos_risk" decoration-muted="match_state == 'pending'">
                 <field name="invoice_date"/>
                 <field name="uuid"/>
                 <field name="direction" widget="badge" decoration-info="direction == 'issued'" decoration-success="direction == 'received'"/>
@@ -35,7 +39,8 @@
         <field name="name">cfdi.document.kanban</field>
         <field name="model">cfdi.document</field>
         <field name="arch" type="xml">
-            <kanban default_group_by="match_state">
+            <!-- Como la lista: agrupado por mes, el más reciente primero. -->
+            <kanban default_group_by="match_state" default_order="invoice_date desc, id desc">
                 <field name="uuid"/>
                 <field name="sat_status"/>
                 <field name="match_state"/>
@@ -259,6 +264,18 @@
                 <filter string="Emitidos" name="filter_issued" domain="[('direction', '=', 'issued')]"/>
                 <filter string="Recibidos" name="filter_received" domain="[('direction', '=', 'received')]"/>
                 <separator/>
+                <!-- Conciliación: los tres estados de la columna «Conciliación». -->
+                <filter string="Pendientes" name="filter_pending" domain="[('match_state', '=', 'pending')]"/>
+                <filter string="Vinculados manualmente" name="filter_manual" domain="[('match_state', '=', 'manual')]"/>
+                <filter string="Vinculados automáticamente" name="filter_matched" domain="[('match_state', '=', 'matched')]"/>
+                <separator/>
+                <!-- Tipo de comprobante, en el orden del menú «Por tipo». -->
+                <filter string="Ingresos" name="filter_type_ingreso" domain="[('move_type', '=', 'I')]"/>
+                <filter string="Egresos" name="filter_type_egreso" domain="[('move_type', '=', 'E')]"/>
+                <filter string="Pagos (REP)" name="filter_type_pago" domain="[('move_type', '=', 'P')]"/>
+                <filter string="Nómina" name="filter_type_nomina" domain="[('move_type', '=', 'N')]"/>
+                <filter string="Traslados" name="filter_type_traslado" domain="[('move_type', '=', 'T')]"/>
+                <separator/>
                 <!-- Un REP vinculado por sus renglones (rep_pagos) cuenta como
                      vinculado aunque no tenga un solo asiento de pago. -->
                 <filter string="Sin factura" name="filter_no_move"
@@ -274,6 +291,8 @@
                 <filter string="Pagos (REP) con facturas en Odoo" name="filter_rep_with_invoices"
                         domain="[('move_type', '=', 'P'), ('dsi_payment_line_ids.invoice_id', '!=', False)]"/>
                 <group>
+                    <filter string="Fecha del comprobante" name="group_invoice_month"
+                            context="{'group_by': 'invoice_date:month'}"/>
                     <filter string="Dirección" name="group_direction" context="{'group_by': 'direction'}"/>
                     <filter string="Cliente o proveedor" name="group_counterpart_kind"
                             context="{'group_by': 'counterpart_kind'}"/>
@@ -349,7 +368,10 @@
         <field name="res_model">cfdi.document</field>
         <field name="view_mode">list,kanban,form</field>
         <field name="search_view_id" ref="view_cfdi_document_search"/>
-        <field name="context">{'search_default_group_match_state': 1}</field>
+        <!-- Abre en lo que falta conciliar, agrupado por mes del comprobante (el
+             más reciente arriba, por el default_order de la lista). Los dos se
+             quitan en la barra de búsqueda. -->
+        <field name="context">{'search_default_filter_pending': 1, 'search_default_group_invoice_month': 1}</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
                 Todavía no hay CFDI en la bóveda.

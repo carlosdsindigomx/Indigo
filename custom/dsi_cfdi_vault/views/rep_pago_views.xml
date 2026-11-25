@@ -40,12 +40,18 @@
         </field>
     </record>
 
-    <!-- En el REP, a qué pago de Odoo quedó ligado cada documento relacionado. -->
+    <!-- En el REP, a qué pago de Odoo quedó ligado cada documento relacionado.
+         La fila de uno ligado abre directo ese pago, y la de uno sin pago en
+         Odoo, la ventana para crearlo (widget dsi_renglones_de_pago,
+         static/src/renglones_de_pago_field.js, que le pregunta al servidor). -->
     <record id="view_cfdi_document_form_dsi_rep_pago" model="ir.ui.view">
         <field name="name">cfdi.document.form.dsi.rep.pago</field>
         <field name="model">cfdi.document</field>
         <field name="inherit_id" ref="view_cfdi_document_form"/>
         <field name="arch" type="xml">
+            <xpath expr="//field[@name='dsi_payment_line_ids']" position="attributes">
+                <attribute name="widget">dsi_renglones_de_pago</attribute>
+            </xpath>
             <xpath expr="//field[@name='dsi_payment_line_ids']/list/field[@name='invoice_id']" position="after">
                 <field name="account_payment_id" optional="show"/>
                 <field name="payment_move_id" optional="hide"/>
@@ -54,6 +60,31 @@
                        decoration-warning="payment_link_state in ('to_choose', 'amount_mismatch')"
                        decoration-danger="payment_link_state == 'no_payment'"/>
             </xpath>
+        </field>
+    </record>
+
+    <!-- «Pago sin registrar en Odoo»: lo que abre la fila de un documento
+         relacionado cuya factura está en Odoo sin pago
+         (action_abrir_desde_la_fila). Solo la factura, el monto, la forma de
+         pago y «Crear pago». Prioridad baja: la ficha completa del renglón
+         sigue siendo la de siempre. -->
+    <record id="view_dsi_cfdi_payment_line_form_sin_pago" model="ir.ui.view">
+        <field name="name">dsi.cfdi.payment.line.form.sin.pago</field>
+        <field name="model">dsi.cfdi.payment.line</field>
+        <field name="priority">90</field>
+        <field name="arch" type="xml">
+            <form string="Pago sin registrar en Odoo" create="false" delete="false">
+                <group>
+                    <field name="invoice_id" string="Factura" readonly="1"/>
+                    <field name="currency_id" invisible="1"/>
+                    <field name="imp_pagado" string="Monto del pago" readonly="1"/>
+                    <field name="forma_pago_nombre" string="Forma de pago" readonly="1"/>
+                </group>
+                <footer>
+                    <button name="action_crear_pago" type="object" string="Crear pago" class="btn-primary"/>
+                    <button string="Cerrar" special="cancel" class="btn-secondary"/>
+                </footer>
+            </form>
         </field>
     </record>
 
