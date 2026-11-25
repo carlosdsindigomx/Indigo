@@ -1,7 +1,7 @@
 ================================================================================
  ADDOBI - Boveda CFDI y Servidor de Licencias
  Guia de instalacion
- Version 0.4.1  -  Odoo 18, 19 y 20 (una rama del repositorio por version)
+ Version 0.4.2  -  Odoo 18, 19 y 20 (una rama del repositorio por version)
 ================================================================================
 
 QUE TRAE ESTE PAQUETE
@@ -465,6 +465,18 @@ SI ALGUN DIA HAY QUE GENERAR UN PAR NUEVO
                                        botones "Marcar como revisado" y
                                        "Reabrir".
 
+  LA LISTA DE CFDI
+  Boveda CFDI > CFDI abre en los comprobantes "Pendiente" de conciliar,
+  agrupados por mes del comprobante, del mas reciente al mas antiguo
+  (igual en la vista kanban). Los dos se quitan en la barra de busqueda.
+  En Filtros estan Emitidos y Recibidos, los tres estados de conciliacion
+  (Pendientes, Vinculados manualmente y Vinculados automaticamente) y los
+  tipos de comprobante (Ingresos, Egresos, Pagos (REP), Nomina y
+  Traslados), tambien en las demas listas de CFDI (las de Por tipo y las
+  de Discrepancias que son de CFDI). En Agrupar por, "Fecha del
+  comprobante" agrupa por mes, y ahi mismo se cambia a ano, trimestre,
+  semana o dia.
+
   CREAR LA FACTURA DE PROVEEDOR
   Abre un comprobante de Ingreso o Egreso que no este vinculado y pulsa
   "Crear factura de proveedor". Tambien funciona seleccionando varios desde
@@ -574,6 +586,21 @@ SI ALGUN DIA HAY QUE GENERAR UN PAR NUEVO
   desconciliar un pago revisa la liga en ese momento; si esa revision
   falla, el pago se registra igual y queda en el log. La revision diaria
   repara la que haya quedado vieja.
+
+  LAS FILAS DE DOCUMENTOS RELACIONADOS (desde 0.4.2)
+  En el REP, pestana "Documentos relacionados":
+    - la fila de un renglon "Ligado" o "Ligado a mano" abre directo su
+      pago de Odoo (o el asiento del banco, si se concilio con la factura
+      sin pago);
+    - la de un renglon "Sin pago en Odoo" abre la ventana "Pago sin
+      registrar en Odoo": la factura (con su liga), el monto y la forma de
+      pago del REP, y el boton "Crear pago". Ese boton abre el asistente
+      de pago de Odoo con el importe, la fecha y la forma de pago del REP
+      (la forma de pago sale si la empresa es de Mexico). Al crear el pago
+      la boveda lo liga en ese momento y lo avisa: "Pago creado y ligado",
+      o "Pago creado" con el motivo si no le cuadro (por ejemplo, si se
+      cambio el importe). El REP se recarga con la liga nueva;
+    - las demas abren el renglon, donde esta "Elegir pago".
 
   EL REP VINCULADO POR SUS RENGLONES (desde 0.4.1)
   Un REP recibido con todos sus documentos relacionados en "Ligado" o
@@ -862,6 +889,16 @@ SI ALGUN DIA HAY QUE GENERAR UN PAR NUEVO
   mueve: en su siguiente corrida diaria pide de una vez todo lo que le
   falte hasta hoy. Para no esperar, abre la programacion y aprieta
   "Ponerse al dia ahora". Las solicitudes ya hechas no cambian.
+
+  DE 0.4.1 A 0.4.2
+  Se actualiza solo dsi_cfdi_vault, a 18.0.0.4.2, 19.0.0.4.2 o
+  20.0.0.4.2: dsi_cfdi_sat_sync y dsi_license_client no cambian. El
+  comando de arriba sirve igual, y desde 0.3.0 o 0.4.0 tambien (un solo -u
+  hace lo de todas). No toca datos: cambia la lista de CFDI (ver LA LISTA
+  DE CFDI en USO DIARIO) y las filas de "Documentos relacionados" en el
+  REP (ver LAS FILAS DE DOCUMENTOS RELACIONADOS), que traen codigo nuevo
+  para el navegador: quien tenga Odoo abierto al actualizar, recarga la
+  pagina para que la fila abra el pago.
 
 
 ================================================================================

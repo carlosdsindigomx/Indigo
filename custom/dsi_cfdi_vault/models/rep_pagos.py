@@ -59,6 +59,9 @@ PARAMETRO_VENTANA = 'dsi_cfdi_vault.rep_pago_ventana_dias'
 # Los estados con pago. «A mano» lo eligió el contador y la Bóveda no lo
 # cambia mientras ese pago siga aplicado a la factura.
 ESTADOS_LIGADOS = ('linked', 'manual')
+# En el contexto del asistente de pago de Odoo: el documento relacionado de un
+# REP desde cuyo «Crear pago» se abrió, para ligarlo al crear el pago.
+CONTEXTO_CREAR_PAGO = 'dsi_rep_linea_sin_pago'
 # Los que esperan algo (un pago, o que el contador elija): la revisión diaria
 # los vuelve a ver cuando la factura ya tiene algo pagado.
 ESTADOS_PENDIENTES = ('to_choose', 'amount_mismatch', 'no_payment')
@@ -228,6 +231,9 @@ class CfdiPaymentLine(models.Model):
              "No aplica: REP emitido, cancelado o archivado, sin factura publicada en Odoo, o una forma de "
              "pago sin movimiento del banco (compensación, condonación…).")
     payment_link_note = fields.Char(string="Motivo", readonly=True, copy=False)
+    forma_pago_nombre = fields.Char(
+        string="Forma de pago con su nombre", compute='_compute_forma_pago_nombre',
+        help="La forma de pago del REP con su nombre en el catálogo del SAT.")
     invoice_currency_id = fields.Many2one(
         related='invoice_id.currency_id', string="Moneda de la factura en Odoo")
     payment_amount_applied = fields.Monetary(
@@ -964,6 +970,91 @@ class CfdiPaymentLine(models.Model):
             folio=self.display_name, estado=estados.get(self.payment_link_state, self.payment_link_state)))
         return False
 
+    def action_abrir_desde_la_fila(self):
+        """Lo que abre la fila en «Documentos relacionados» del REP (widget
+        dsi_renglones_de_pago): ligada a su pago, ese pago; con la factura en
+        Odoo y sin pago, la ventana para crearlo. Lo demás, False: la fila abre
+        el renglón completo, donde está «Elegir pago»."""
+        self.ensure_one()
+        if self.payment_link_state in ESTADOS_LIGADOS:
+            return self.action_abrir_pago()
+        if self.payment_link_state == 'no_payment' and self.invoice_id:
+            return {
+                'type': 'ir.actions.act_window',
+                'name': self.env._("Pago sin registrar en Odoo"),
+                'res_model': self._name,
+                'res_id': self.id,
+                'views': [(self.env.ref('dsi_cfdi_vault.view_dsi_cfdi_payment_line_form_sin_pago').id, 'form')],
+                'target': 'new',
+            }
+        return False
+
+    def action_crear_pago(self):
+        """«Crear pago», en la ventana de un documento relacionado cuya factura
+        está en Odoo sin pago: el asistente de Odoo para registrar el pago de la
+        factura, con el importe, la fecha y la forma de pago del REP. Al crearlo,
+        la Bóveda lo liga con el REP en ese momento (account.payment.register)."""
+        self.ensure_one()
+        self.check_access('read')
+        if self.payment_link_state != 'no_payment' or not self.invoice_id:
+            raise UserError(self.env._(
+                "Este documento relacionado ya no está «Sin pago en Odoo»: vuelve a abrir el REP."))
+        contexto = {
+            'active_model': 'account.move',
+            'active_ids': self.invoice_id.ids,
+            'default_amount': self.imp_pagado,
+            'default_currency_id': self.invoice_id.currency_id.id,
+            'default_payment_date': self.fecha_pago or fields.Date.context_today(self),
+            CONTEXTO_CREAR_PAGO: self.id,
+        }
+        forma = self._forma_de_pago_sat()
+        if forma:
+            contexto['default_l10n_mx_edi_payment_method_id'] = forma.id
+        return {
+            'type': 'ir.actions.act_window',
+            'name': self.env._("Crear pago"),
+            'res_model': 'account.payment.register',
+            'views': [(False, 'form')],
+            'target': 'new',
+            'context': contexto,
+        }
+
+    def _forma_de_pago_sat(self):
+        """La forma de pago del REP (FormaDePagoP) en el catálogo del SAT de Odoo."""
+        self.ensure_one()
+        codigo = (self.forma_pago or '').strip()
+        if not codigo:
+            return self.env['l10n_mx_edi.payment.method']
+        return self.env['l10n_mx_edi.payment.method'].search([('code', '=', codigo)], limit=1)
+
+    @api.depends('forma_pago')
+    def _compute_forma_pago_nombre(self):
+        codigos = list({(linea.forma_pago or '').strip() for linea in self} - {''})
+        nombres = {forma.code: forma.name for forma in self.env['l10n_mx_edi.payment.method'].search(
+            [('code', 'in', codigos)])} if codigos else {}
+        for linea in self:
+            codigo = (linea.forma_pago or '').strip()
+            linea.forma_pago_nombre = f"{codigo} · {nombres[codigo]}" if codigo in nombres else (codigo or False)
+
+    def action_abrir_pago(self):
+        """El pago de Odoo al que quedó ligado este documento relacionado: el
+        pago (account.payment), o el asiento del movimiento del banco si se
+        concilió directo con la factura, sin pago. Lo abre la fila en
+        «Documentos relacionados» del REP (widget dsi_renglones_de_pago), sin
+        pasar por el renglón. False si no está ligado: entonces la fila abre el
+        renglón, donde está «Elegir pago»."""
+        self.ensure_one()
+        destino = self.account_payment_id or self.payment_move_id
+        if self.payment_link_state not in ESTADOS_LIGADOS or not destino:
+            return False
+        return {
+            'type': 'ir.actions.act_window',
+            'res_model': destino._name,
+            'res_id': destino.id,
+            'views': [(False, 'form')],
+            'target': 'current',
+        }
+
 
 class CfdiDocument(models.Model):
     _inherit = 'cfdi.document'
@@ -1482,3 +1573,42 @@ class CfdiInconsistency(models.Model):
                     if '_detectar_reps_sin_factura' in detectores else len(detectores))
         detectores[posicion:posicion] = ['_revisar_ligas_con_pagos', '_revisar_vinculo_de_reps']
         return detectores
+
+
+class AccountPaymentRegister(models.TransientModel):
+    _inherit = 'account.payment.register'
+
+    def action_create_payments(self):
+        """Desde «Crear pago» de un documento relacionado de un REP (contexto
+        CONTEXTO_CREAR_PAGO): crea el pago como siempre, lo liga con el REP en
+        ese momento y avisa cómo quedó. Al cerrar, la pantalla de atrás (el REP)
+        se vuelve a cargar con la liga nueva."""
+        linea_id = self.env.context.get(CONTEXTO_CREAR_PAGO)
+        if not linea_id:
+            return super().action_create_payments()
+        super(AccountPaymentRegister, self.with_context(dont_redirect_to_payments=True)).action_create_payments()
+        linea = self.env['dsi.cfdi.payment.line'].sudo().browse(linea_id).exists()
+        if linea:
+            self.env['dsi.cfdi.inconsistency'].sudo()._ligar_reps_con_pagos(linea, 'rep')
+        if linea.payment_link_state in ESTADOS_LIGADOS:
+            titulo, tipo = self.env._("Pago creado y ligado"), 'success'
+            mensaje = self.env._("Quedó ligado con el REP %s.", linea.payment_doc_id.display_name)
+        else:
+            estados = dict(self.env['dsi.cfdi.payment.line']._fields['payment_link_state']
+                           ._description_selection(self.env))
+            titulo, tipo = self.env._("Pago creado"), 'warning'
+            mensaje = self.env._(
+                "La Bóveda no lo ligó con el REP: %(estado)s. %(motivo)s",
+                estado=estados.get(linea.payment_link_state, linea.payment_link_state or ''),
+                motivo=linea.payment_link_note or '')
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': titulo,
+                'message': mensaje,
+                'type': tipo,
+                'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'soft_reload'},
+            },
+        }

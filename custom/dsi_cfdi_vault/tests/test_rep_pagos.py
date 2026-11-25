@@ -285,10 +285,16 @@ class TestRepPagos(TransactionCase):
         números, también en «Elegir pago». Como texto, 'pago:1000' iba antes
         que 'pago:999' y la prueba de arriba dependía de los ids."""
         # Los dos pagos quedan con ids de distinto número de dígitos (99 y
-        # 100, 999 y 1000…).
-        self.env.cr.execute("SELECT nextval('account_payment_id_seq')")
-        siguiente = self.env.cr.fetchone()[0] + 1
-        self.env.cr.execute("SELECT setval('account_payment_id_seq', %s)", [10 ** len(str(siguiente)) - 2])
+        # 100, 999 y 1000…), justo arriba del id más alto de la tabla. No
+        # arriba de la secuencia: la secuencia no se deshace al terminar la
+        # prueba, así que crecía un dígito en cada corrida sobre la misma base
+        # hasta pasarse del entero de Postgres.
+        self.env.cr.execute("SELECT COALESCE(MAX(id), 0) FROM account_payment")
+        mas_alto = self.env.cr.fetchone()[0]
+        frontera = 10
+        while frontera - 2 <= mas_alto:
+            frontera *= 10
+        self.env.cr.execute("SELECT setval('account_payment_id_seq', %s)", [frontera - 2])
         folio, factura = compra(self)
         primero = pagar(self, factura, importe=500.0)
         segundo = pagar(self, factura, importe=500.0)
@@ -1286,6 +1292,80 @@ class TestRepPagos(TransactionCase):
         self.assertEqual(self._en_la_accion('dsi_cfdi_vault.action_cfdi_document_no_move', reps), pendiente)
         self.assertEqual(self._con_el_filtro('filter_no_move', reps), pendiente)
         self.assertEqual(self._con_el_filtro('filter_with_move', reps), ligado)
+
+    def test_la_fila_ligada_abre_el_pago(self):
+        """En «Documentos relacionados» del REP, la fila de un renglón ligado
+        abre directo el pago de Odoo con el que se ligó (widget
+        dsi_renglones_de_pago, que llama a action_abrir_pago). Si se ligó a un
+        movimiento del banco sin pago, abre el asiento de ese movimiento. La de
+        uno sin pago no tiene qué abrir y sigue abriendo el renglón."""
+        folio1, compra1 = compra(self, 1000.0)
+        pago = pagar(self, compra1)
+        folio2, _compra2 = compra(self, 300.0)
+        rep_doc = rep(self, (1000.0, 'MXN', '1', [docto(folio1, 1000.0)]),
+                      (300.0, 'MXN', '1', [docto(folio2, 300.0)]))
+        ligada = rep_doc.dsi_payment_line_ids.filtered(lambda linea: linea.payment_link_state == 'linked')
+        sin_pago = rep_doc.dsi_payment_line_ids - ligada
+        self.assertEqual(sin_pago.payment_link_state, 'no_payment')
+
+        accion = ligada.action_abrir_desde_la_fila()
+        self.assertEqual((accion['res_model'], accion['res_id'], accion['views']),
+                         ('account.payment', pago.id, [(False, 'form')]))
+        self.assertFalse(sin_pago.action_abrir_pago())
+
+        ligada.sudo().account_payment_id = False
+        accion = ligada.action_abrir_desde_la_fila()
+        self.assertEqual((accion['res_model'], accion['res_id']), ('account.move', pago.move_id.id),
+                         "ligada a un movimiento del banco sin pago: su asiento")
+
+        sin_pago.sudo().payment_link_state = 'to_choose'
+        self.assertFalse(sin_pago.action_abrir_desde_la_fila(), "por elegir: el renglón completo")
+
+        vista = self.env.ref('dsi_cfdi_vault.view_cfdi_document_form')
+        arch = etree.fromstring(self.env['cfdi.document'].get_view(vista.id, 'form')['arch'])
+        campo, = arch.xpath("//field[@name='dsi_payment_line_ids']")
+        self.assertEqual(campo.get('widget'), 'dsi_renglones_de_pago')
+
+    def test_sin_pago_en_odoo_la_fila_abre_la_ventana_para_crearlo(self):
+        """La fila de un documento relacionado cuya factura está en Odoo sin
+        pago abre una ventana corta: la factura, el monto, la forma de pago y
+        «Crear pago». «Crear pago» abre el asistente de Odoo con el importe, la
+        fecha y la forma de pago del REP, y al crear el pago la Bóveda lo liga
+        con el REP en ese momento."""
+        folio, factura = compra(self, 300.0)
+        rep_doc = rep(self, (300.0, 'MXN', '1', [docto(folio, 300.0)]))
+        linea = rep_doc.dsi_payment_line_ids
+        self.assertEqual(linea.payment_link_state, 'no_payment')
+
+        ventana = linea.action_abrir_desde_la_fila()
+        self.assertEqual((ventana['res_model'], ventana['res_id'], ventana['target']),
+                         ('dsi.cfdi.payment.line', linea.id, 'new'))
+        arch = etree.fromstring(self.env['dsi.cfdi.payment.line'].get_view(ventana['views'][0][0], 'form')['arch'])
+        self.assertEqual([campo.get('name') for campo in arch.xpath("//field[not(@invisible)]")],
+                         ['invoice_id', 'imp_pagado', 'forma_pago_nombre'])
+        self.assertEqual(arch.xpath("//footer/button[@type='object']/@name"), ['action_crear_pago'])
+        if linea.forma_pago:
+            self.assertTrue(linea.forma_pago_nombre.startswith(linea.forma_pago))
+
+        accion = linea.action_crear_pago()
+        contexto = accion['context']
+        self.assertEqual((accion['res_model'], contexto['active_ids'], contexto['default_amount'],
+                          contexto['default_payment_date']),
+                         ('account.payment.register', factura.ids, 300.0, linea.fecha_pago))
+        asistente = self.env['account.payment.register'].with_context(contexto).create({})
+        self.assertEqual(asistente.amount, 300.0)
+        if linea._forma_de_pago_sat():
+            self.assertEqual(asistente.l10n_mx_edi_payment_method_id, linea._forma_de_pago_sat())
+        resultado = asistente.action_create_payments()
+
+        self.assertEqual(linea.payment_link_state, 'linked', "ligada al crear el pago")
+        self.assertTrue(linea.account_payment_id)
+        self.assertEqual(resultado['params']['type'], 'success')
+        self.assertEqual(resultado['params']['next'], {'type': 'ir.actions.client', 'tag': 'soft_reload'},
+                         "el REP de atrás se vuelve a cargar con la liga")
+        self.assertEqual(linea.action_abrir_desde_la_fila()['res_model'], 'account.payment')
+        with self.assertRaises(UserError):
+            linea.action_crear_pago()
 
     def test_rep_pagado_con_varios_pagos_queda_vinculado_sin_asiento(self):
         """Dos facturas, cada una con su pago, y un REP que las paga: en

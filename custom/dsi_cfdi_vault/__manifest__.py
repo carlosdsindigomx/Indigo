@@ -8,6 +8,9 @@ Guarda todo CFDI recibido o emitido, esté o no contabilizado. Permite:
 
 - Importar XML/ZIP de CFDI manualmente, con deduplicación por UUID.
 - Conciliación automática contra facturas (account.move) por UUID.
+- Pantalla de CFDI que abre en los pendientes de conciliar, agrupados por mes del comprobante (el
+  más reciente arriba), con filtros por estado de conciliación, tipo de comprobante y Emitidos /
+  Recibidos.
 - Tableros de discrepancias: CFDI sin factura (agrupados por clientes, proveedores y empleados), facturas
   sin CFDI, CFDI cancelados que siguen contabilizados, proveedores en la lista 69-B del SAT.
 - Discrepancias guardadas con historial y marca de revisado (Discrepancias › Por revisar): emisores
@@ -20,7 +23,10 @@ Guarda todo CFDI recibido o emitido, esté o no contabilizado. Permite:
   el pago (o el movimiento del banco conciliado directo) que aplicó el mismo importe a la factura,
   con copia del XML en el pago y su pestaña «Complementos de pago (REP)». Los casos ambiguos quedan
   «Por elegir» para el contador, en su propia lista. El REP con todos sus documentos relacionados
-  ligados queda «Vinculado automáticamente» (con el asiento del pago si es uno solo).
+  ligados queda «Vinculado automáticamente» (con el asiento del pago si es uno solo). En el REP, la
+  fila de un documento relacionado ligado abre su pago, y la de uno cuya factura está en Odoo sin
+  pago, una ventana con «Crear pago»: el pago sale con el importe, la fecha y la forma de pago del
+  REP y queda ligado al crearlo.
 - Discrepancia «Compra PPD pagada sin REP»: una por cada pago aplicado a una compra PPD sin su REP
   ligado, desde el día 6 del mes siguiente al pago (o a su movimiento del banco, si se conoce y es
   posterior; hora de México). Fecha de corte opcional con el parámetro
@@ -38,7 +44,7 @@ Guarda todo CFDI recibido o emitido, esté o no contabilizado. Permite:
 - Conciliación en cascada de 4 niveles: UUID exacto, RFC+total+fecha, sugerencias con score,
   y cola de asignación manual.
 """,
-    'version': '19.0.0.4.1',
+    'version': '19.0.0.4.2',
     'category': 'Accounting/Localizations',
     'author': "DS Indigo",
     'license': 'OPL-1',
@@ -67,6 +73,11 @@ Guarda todo CFDI recibido o emitido, esté o no contabilizado. Permite:
         'data/cfdi_vault_setup_todo.xml',
         'views/cfdi_vault_menus.xml',
     ],
+    'assets': {
+        'web.assets_backend': [
+            'dsi_cfdi_vault/static/src/**/*',
+        ],
+    },
     'installable': True,
     'application': True,
 }
