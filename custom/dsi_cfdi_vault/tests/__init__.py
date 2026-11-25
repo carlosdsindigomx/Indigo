@@ -16,3 +16,4 @@ from . import test_nomina_poliza
 from . import test_iconos
 from . import test_asistente_configuracion
 from . import test_cfdi_sin_factura
+from . import test_pantalla_cfdi
