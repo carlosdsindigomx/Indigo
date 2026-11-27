@@ -1,7 +1,7 @@
 import json
 import logging
 from datetime import timedelta
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 
 from markupsafe import Markup
 
@@ -10,7 +10,7 @@ from odoo.exceptions import UserError
 from odoo.http import request
 
 from ..crypto import sign_token, DsiLicenseKeyError
-from ..models.dsi_license_product import CFDI_VAULT_CODE
+from ..models.dsi_license_product import CFDI_VAULT_CODE, CORREO_CONTRATACION
 
 _logger = logging.getLogger(__name__)
 
@@ -258,12 +258,18 @@ class DsiLicenseController(http.Controller):
             if license:
                 destino += ('&' if '?' in destino else '?') + urlencode({'clave': license.key})
             return request.redirect(destino, local=False)
-        return request.make_response(Markup(
-            '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">'
-            '<meta name="viewport" content="width=device-width, initial-scale=1">'
-            '<title>Comprar licencia</title></head>'
-            '<body style="font-family: sans-serif; max-width: 32rem; margin: 4rem auto; padding: 0 1rem;">'
-            '<h1>La compra en línea todavía no está disponible</h1>'
-            '<p>Escríbenos y te ayudamos a contratar tu licencia de %s.</p>'
-            '</body></html>') % (product.name or "DS Indigo"),
-            headers=[('Content-Type', 'text/html; charset=utf-8')])
+        # Sin tienda: a quién escribir, en una página con forma de ventana de
+        # Odoo. El correo se abre con el asunto, y con la clave si el cliente
+        # ya tiene una (su prueba), para saber cuál convertir en suscripción.
+        nombre = product.name or "DS Indigo"
+        datos = {'subject': f"Licencia de {nombre}"}
+        if license:
+            datos['body'] = f"Mi clave de licencia: {license.key}"
+        html = env['ir.qweb']._render('dsi_license_server.pagina_comprar_sin_tienda', {
+            'nombre': nombre,
+            'correo': CORREO_CONTRATACION,
+            'correo_href': f"mailto:{CORREO_CONTRATACION}?{urlencode(datos, quote_via=quote)}",
+            'clave': license.key if license else False,
+        })
+        return request.make_response(Markup('<!DOCTYPE html>\n') + html,
+                                     headers=[('Content-Type', 'text/html; charset=utf-8')])

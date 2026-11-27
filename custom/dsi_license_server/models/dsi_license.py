@@ -8,7 +8,7 @@ from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
 
 from .. import trial
-from .dsi_license_product import CFDI_VAULT_CODE, client_code, normalize_version, split_csv
+from .dsi_license_product import CFDI_VAULT_CODE, CORREO_CONTRATACION, client_code, normalize_version, split_csv
 
 _logger = logging.getLogger(__name__)
 
@@ -299,8 +299,8 @@ class DsiLicense(models.Model):
 
         if self.search_count([('product_id', '=', product.id), ('rfc_authorized', '=ilike', rfc)]):
             raise UserError(_(
-                "El RFC %s ya usó su prueba o ya tiene una licencia de este producto. "
-                "Escríbenos para contratarla.", rfc))
+                "El RFC %(rfc)s ya usó su prueba o ya tiene una licencia de este producto. "
+                "Escríbenos a %(correo)s para contratarla.", rfc=rfc, correo=CORREO_CONTRATACION))
         if self.env['dsi.license.instance'].search_count([
                 ('license_id.product_id', '=', product.id), ('database_uuid', '=', db_uuid)]):
             raise UserError(_("Esta base de datos ya usó su prueba o ya tiene una licencia."))
