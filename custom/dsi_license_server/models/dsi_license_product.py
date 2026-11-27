@@ -12,6 +12,10 @@ CFDI_VAULT_CODE = 'cfdi_vault'
 # producto importara. Los clientes la piden y la reciben siempre como
 # 'cfdi_vault' (ver client_code): es el único código que conocen.
 CFDI_VAULT_CODES = (CFDI_VAULT_CODE, 'I-BCDFI')
+# A dónde escribe quien quiere contratar una licencia. Lo dicen la página de
+# «Comprar licencia» cuando el producto no tiene URL de compra y el rechazo de
+# una segunda prueba.
+CORREO_CONTRATACION = 'administracion@dsindigo.com'
 # Funciones de la Bóveda, fijas en código. Los clientes ya instalados solo
 # conocen estas y abren la Bóveda con 'vault': si cambian, se rompe el
 # contrato con ellos (lo vigila la prueba del payload exacto).
@@ -105,7 +109,7 @@ class DsiLicenseProduct(models.Model):
         help="A dónde lleva el botón «Comprar licencia» de los clientes. Pasa por "
              "/dsi/license/v1/comprar, así que se puede definir o cambiar aquí sin actualizar "
              "el módulo en cada cliente. Se le agrega ?clave=<clave de la licencia>. Vacía, "
-             "el cliente ve una página que dice que la compra en línea aún no está disponible.")
+             "el cliente ve una ventana con el correo al que debe escribir para contratarla.")
 
     _code_uniq = models.Constraint('unique(code)', "Ya existe un producto con este código.")
 

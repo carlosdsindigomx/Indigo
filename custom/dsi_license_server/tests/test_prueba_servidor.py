@@ -97,8 +97,10 @@ class TestPruebaServidor(TransactionCase):
         self.assertEqual(payload['db_uuid'], DATOS['db_uuid'])
 
     def test_una_prueba_por_rfc(self):
+        """La segunda prueba del mismo RFC se rechaza y el mensaje dice a dónde
+        escribir para contratar."""
         self._pedir()
-        with self.assertRaises(UserError):
+        with self.assertRaisesRegex(UserError, r"Escríbenos a administracion@dsindigo\.com para contratarla"):
             self._pedir(db_uuid='otra-base', base_url='https://otro.example.com')
 
     def test_una_prueba_por_base(self):
@@ -239,10 +241,32 @@ class TestEndpointPrueba(HttpCase):
         self.assertEqual(clic.license_id, licencia)
 
     def test_comprar_sin_tienda_definida(self):
-        _producto(self.env).purchase_url = False
+        """Sin URL de compra, una ventana dice a qué correo escribir, con ligas
+        que abren el correo con el asunto puesto."""
+        producto = _producto(self.env)
+        producto.purchase_url = False
         respuesta = self.url_open('/dsi/license/v1/comprar?producto=cfdi_vault')
         self.assertEqual(respuesta.status_code, 200)
-        self.assertIn("todavía no está disponible", respuesta.text)
+        self.assertTrue(respuesta.text.startswith('<!DOCTYPE html>'))
+        self.assertIn("Escríbenos y te ayudamos a contratar tu licencia de", respuesta.text)
+        self.assertIn('<span>administracion@dsindigo.com</span>', respuesta.text)
+        self.assertEqual(respuesta.text.count('href="mailto:administracion@dsindigo.com?subject=Licencia%20de%20'), 2,
+                         "la tarjeta del correo y el botón «Escribir correo»")
+        self.assertIn('>Escribir correo</a>', respuesta.text)
+        self.assertIn('data-correo="administracion@dsindigo.com"', respuesta.text,
+                      "«Copiar», para quien escribe desde otro correo")
+        self.assertNotIn('body=', respuesta.text, "sin clave, el correo no lleva cuerpo")
+        self.assertNotIn('Tu clave de licencia', respuesta.text)
+
+    def test_comprar_sin_tienda_con_la_clave_de_la_prueba(self):
+        """Desde una base con prueba, el correo lleva su clave y la ventana la
+        muestra: así se sabe qué licencia convertir en suscripción."""
+        licencia, _instancia = self._crear_prueba()
+        licencia.product_id.purchase_url = False
+        respuesta = self.url_open(f'/dsi/license/v1/comprar?producto=cfdi_vault&clave={licencia.key}')
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn(f'&amp;body=Mi%20clave%20de%20licencia%3A%20{licencia.key}"', respuesta.text)
+        self.assertIn(f'<code>{licencia.key}</code>', respuesta.text)
 
     def test_limite_de_solicitudes_por_ip(self):
         self.env['dsi.license.log'].create([
