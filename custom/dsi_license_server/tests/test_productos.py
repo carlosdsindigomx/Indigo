@@ -752,7 +752,7 @@ class TestEndpointsPorProducto(HttpCase):
         self.boveda.write({'name': "Bóveda CFDI", 'purchase_url': 'https://tienda.example.com/boveda'})
         respuesta = self._comprar(f'producto=inexistente&clave={self.lic_boveda.key}')
         self.assertEqual(respuesta.status_code, 200)
-        self.assertIn("todavía no está disponible", respuesta.text)
+        self.assertIn("Escríbenos y te ayudamos a contratar tu licencia de", respuesta.text)
         self.assertIn("DS Indigo", respuesta.text)
         self.assertNotIn("Bóveda", respuesta.text)
         self.assertFalse(self._ultimo_log('purchase').license_id)

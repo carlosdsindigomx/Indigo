@@ -1,0 +1,283 @@
+<odoo>
+
+    <!-- «Comprar licencia» cuando el producto no tiene URL de compra (ver
+         /dsi/license/v1/comprar): una página suelta con la forma de una
+         ventana de Odoo. Lleva su estilo dentro y no usa los archivos de Odoo,
+         porque la abren los clientes sin sesión en este servidor. Los colores
+         son los de Odoo 17-19: morado en el botón principal y verde azulado en
+         las ligas. -->
+    <template id="pagina_comprar_sin_tienda" name="Comprar licencia: sin tienda">
+        <html lang="es">
+            <head>
+                <meta charset="utf-8"/>
+                <meta name="viewport" content="width=device-width, initial-scale=1"/>
+                <meta name="robots" content="noindex"/>
+                <title>Comprar licencia</title>
+                <style>
+                    :root { color-scheme: light dark; }
+                    * { box-sizing: border-box; }
+                    html, body { margin: 0; height: 100%; }
+                    body {
+                        font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Ubuntu,
+                                     Helvetica Neue, Arial, Noto Sans, sans-serif;
+                        font-size: 14px;
+                        line-height: 1.5;
+                        color: #374151;
+                        background: #f3f4f6;
+                    }
+                    .fondo {
+                        min-height: 100%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        padding: 16px;
+                        background: rgba(0, 0, 0, 0.5);
+                    }
+                    .ventana {
+                        width: 100%;
+                        max-width: 520px;
+                        background: #ffffff;
+                        border-radius: 8px;
+                        box-shadow: 0 16px 48px rgba(0, 0, 0, 0.3);
+                        overflow: hidden;
+                    }
+                    .ventana header {
+                        display: flex;
+                        align-items: center;
+                        justify-content: space-between;
+                        gap: 12px;
+                        padding: 16px 20px;
+                        border-bottom: 1px solid #d8dadd;
+                    }
+                    .ventana h1 {
+                        margin: 0;
+                        font-size: 18px;
+                        font-weight: 500;
+                        color: #111827;
+                    }
+                    .cerrar {
+                        border: 0;
+                        background: none;
+                        font: inherit;
+                        font-size: 22px;
+                        line-height: 1;
+                        color: #6b7280;
+                        cursor: pointer;
+                        padding: 4px 8px;
+                        border-radius: 4px;
+                    }
+                    .cerrar:hover { color: #111827; background: #f3f4f6; }
+                    .cuerpo { padding: 20px; }
+                    .cuerpo p { margin: 0 0 8px; }
+                    .contacto {
+                        display: flex;
+                        align-items: center;
+                        gap: 12px;
+                        margin-top: 16px;
+                        padding: 10px 10px 10px 14px;
+                        border: 1px solid #d8dadd;
+                        border-radius: 6px;
+                    }
+                    .contacto .correo {
+                        display: flex;
+                        align-items: center;
+                        gap: 12px;
+                        flex: 1;
+                        min-width: 0;
+                        color: #017e84;
+                        font-size: 15px;
+                        font-weight: 500;
+                        text-decoration: none;
+                        overflow-wrap: anywhere;
+                    }
+                    .contacto .correo:hover { text-decoration: underline; }
+                    .contacto svg { flex: none; }
+                    .copiar {
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 6px;
+                        flex: none;
+                        padding: 5px 10px;
+                        font: inherit;
+                        font-size: 13px;
+                        font-weight: 500;
+                        color: #1f2937;
+                        background: #e7e9ed;
+                        border: 1px solid transparent;
+                        border-radius: 4px;
+                        cursor: pointer;
+                    }
+                    .copiar:hover { background: #d8dadd; }
+                    .copiar .icono-listo, .copiar .texto-listo { display: none; }
+                    .copiar.copiado { color: #0f5132; background: #d1e7dd; }
+                    .copiar.copiado .icono-copiar, .copiar.copiado .texto-copiar { display: none; }
+                    .copiar.copiado .icono-listo, .copiar.copiado .texto-listo { display: inline; }
+                    /* En celular el correo cabe en un renglón: «Copiar» queda
+                       solo con su ícono y se aprietan los márgenes. */
+                    @media (max-width: 420px) {
+                        .cuerpo { padding: 16px; }
+                        .contacto { gap: 8px; padding: 8px 8px 8px 12px; }
+                        .contacto .correo { gap: 8px; font-size: 14px; }
+                        .copiar { padding: 6px 8px; }
+                        .copiar .texto-copiar, .copiar.copiado .texto-listo { display: none; }
+                    }
+                    @media (max-width: 360px) {
+                        .contacto .correo { font-size: 13px; }
+                        .contacto .correo svg { display: none; }
+                    }
+                    .clave { margin-top: 12px; font-size: 13px; color: #6b7280; }
+                    .clave code {
+                        font-family: SFMono-Regular, Menlo, Consolas, monospace;
+                        color: #374151;
+                        background: #f3f4f6;
+                        padding: 1px 6px;
+                        border-radius: 4px;
+                    }
+                    .ventana footer {
+                        display: flex;
+                        flex-wrap: wrap;
+                        gap: 8px;
+                        padding: 12px 20px;
+                        border-top: 1px solid #d8dadd;
+                    }
+                    .boton {
+                        display: inline-block;
+                        padding: 6px 14px;
+                        font: inherit;
+                        font-weight: 500;
+                        border: 1px solid transparent;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        text-decoration: none;
+                    }
+                    .boton.principal { background: #714b67; color: #ffffff; }
+                    .boton.principal:hover { background: #624159; }
+                    .boton.secundario { background: #e7e9ed; color: #1f2937; }
+                    .boton.secundario:hover { background: #d8dadd; }
+                    .boton:focus-visible,
+                    .cerrar:focus-visible,
+                    .copiar:focus-visible,
+                    .contacto .correo:focus-visible {
+                        outline: 2px solid #017e84;
+                        outline-offset: 2px;
+                    }
+                    @media (prefers-color-scheme: dark) {
+                        body { background: #1b1d26; color: #c9ccd2; }
+                        .fondo { background: rgba(0, 0, 0, 0.6); }
+                        .ventana { background: #262a36; }
+                        .ventana header, .ventana footer, .contacto { border-color: #3c3e4b; }
+                        .ventana h1 { color: #e4e4e4; }
+                        .cerrar { color: #9aa0ab; }
+                        .cerrar:hover { color: #ffffff; background: #3c3e4b; }
+                        .contacto .correo { color: #00a09d; }
+                        .copiar { color: #e4e4e4; background: #3c3e4b; }
+                        .copiar:hover { background: #4a4d5c; }
+                        .copiar.copiado { color: #8fd19e; background: #1e3a2b; }
+                        .clave { color: #9aa0ab; }
+                        .clave code { color: #c9ccd2; background: #1b1d26; }
+                        .boton.secundario { background: #3c3e4b; color: #e4e4e4; }
+                        .boton.secundario:hover { background: #4a4d5c; }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="fondo">
+                    <section class="ventana" role="dialog" aria-modal="true" aria-labelledby="titulo">
+                        <header>
+                            <h1 id="titulo">Comprar licencia</h1>
+                            <button type="button" class="cerrar" aria-label="Cerrar" onclick="cerrar()">×</button>
+                        </header>
+                        <div class="cuerpo">
+                            <p>Escríbenos y te ayudamos a contratar tu licencia de <strong t-out="nombre"/>.</p>
+                            <div class="contacto">
+                                <a class="correo" t-att-href="correo_href">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                        <rect x="3" y="5" width="18" height="14" rx="2"/>
+                                        <path d="m3 7 9 6 9-6"/>
+                                    </svg>
+                                    <span t-out="correo"/>
+                                </a>
+                                <!-- Para quien escribe desde otro correo (Gmail en el
+                                     navegador, por ejemplo): copia la dirección. -->
+                                <button type="button" class="copiar" title="Copiar el correo"
+                                        t-att-data-correo="correo" onclick="copiarCorreo(this)">
+                                    <svg class="icono-copiar" width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                         stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                         stroke-linejoin="round" aria-hidden="true">
+                                        <rect x="9" y="9" width="13" height="13" rx="2"/>
+                                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                                    </svg>
+                                    <svg class="icono-listo" width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                         stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                                         stroke-linejoin="round" aria-hidden="true">
+                                        <path d="M20 6 9 17l-5-5"/>
+                                    </svg>
+                                    <span class="texto-copiar">Copiar</span>
+                                    <span class="texto-listo">Copiado</span>
+                                </button>
+                            </div>
+                            <p t-if="clave" class="clave">Tu clave de licencia: <code t-out="clave"/></p>
+                        </div>
+                        <footer>
+                            <a class="boton principal" t-att-href="correo_href">Escribir correo</a>
+                            <button type="button" class="boton secundario" onclick="cerrar()">Cerrar</button>
+                        </footer>
+                    </section>
+                </div>
+                <script>
+                    // Abierta por «Comprar licencia», es una pestaña nueva y se
+                    // cierra; si se llegó desde otra página, regresa a ella.
+                    function cerrar() {
+                        if (window.history.length === 1) {
+                            window.close();
+                        } else {
+                            window.history.back();
+                        }
+                    }
+
+                    // «Copiar»: deja el correo en el portapapeles y el botón
+                    // dice «Copiado» un par de segundos. Sin la API del
+                    // portapapeles (o si la niega el navegador), lo copia
+                    // seleccionando un campo oculto.
+                    function copiarCorreo(boton) {
+                        var correo = boton.dataset.correo;
+                        var listo = function () {
+                            boton.classList.add('copiado');
+                            window.setTimeout(function () { boton.classList.remove('copiado'); }, 2000);
+                        };
+                        var aMano = function () {
+                            if (copiarSeleccionando(correo)) {
+                                listo();
+                            }
+                        };
+                        if (navigator.clipboard) {
+                            navigator.clipboard.writeText(correo).then(listo, aMano);
+                        } else {
+                            aMano();
+                        }
+                    }
+
+                    function copiarSeleccionando(texto) {
+                        var campo = document.createElement('textarea');
+                        campo.value = texto;
+                        campo.setAttribute('readonly', '');
+                        campo.style.position = 'fixed';
+                        campo.style.opacity = '0';
+                        document.body.appendChild(campo);
+                        campo.select();
+                        var copiado = false;
+                        try {
+                            copiado = document.execCommand('copy');
+                        } catch (error) {
+                            copiado = false;
+                        }
+                        document.body.removeChild(campo);
+                        return copiado;
+                    }
+                </script>
+            </body>
+        </html>
+    </template>
+
+</odoo>
